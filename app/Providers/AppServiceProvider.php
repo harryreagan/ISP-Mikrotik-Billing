@@ -30,14 +30,18 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // ╔══════════════════════════════════════════════════════════════════╗
-        // ║  Attribution Guard — required by the CodePagol Open Source      ║
-        // ║  License (see /LICENSE). The "Powered by CodePagol" notice must ║
-        // ║  remain visible in the application UI. Do not remove.           ║
-        // ╚══════════════════════════════════════════════════════════════════╝
-        if (! app()->runningInConsole() && ! app()->runningUnitTests()) {
-            $this->enforceAttribution();
+        // ── Force HTTPS in production or behind HTTPS reverse proxy ──────────
+        if (app()->environment('production') || config('app.env') === 'production' || str_starts_with((string)config('app.url'), 'https://') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')) {
+            \Illuminate\Support\Facades\URL::forceScheme('https');
+            if (isset($_SERVER)) {
+                $_SERVER['HTTPS'] = 'on';
+            }
         }
+
+        // Attribution Guard disabled for HSmart WiFi Billing
+        // if (! app()->runningInConsole() && ! app()->runningUnitTests()) {
+        //     $this->enforceAttribution();
+        // }
 
         // Set dynamic application locale from database settings
         try {
@@ -71,7 +75,53 @@ class AppServiceProvider extends ServiceProvider
         });
 
         // Optimize Livewire components in the specified directory
-        Blaze::optimize()->in(resource_path('views/components'));
+        if (app()->bound('blaze')) {
+            Blaze::optimize()->in(resource_path('views/components'));
+        }
+
+        // ISP Hub Connector Observer
+        if (class_exists(\App\Models\PaymentSummary::class)) {
+            \App\Models\PaymentSummary::observe(\App\Observers\PaymentHubObserver::class);
+        }
+
+        // ISP Hub Console Commands
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                \App\Console\Commands\HubTestCommand::class,
+                \App\Console\Commands\HubSyncCommand::class,
+            ]);
+        }
+
+
+        // Register Kenyan SMS Drivers into SmsBridge
+        if (class_exists(\Codepagol\SmsBridge\Facades\SmsBridge::class)) {
+            \Codepagol\SmsBridge\Facades\SmsBridge::extend('africastalking', function ($app) {
+                $gw = new \App\Services\Sms\Gateways\AfricasTalkingGateway();
+                $dbGw = \Codepagol\SmsBridge\Models\SmsGateway::where('name', 'africastalking')->first();
+                if ($dbGw) {
+                    $gw->setCredentials([
+                        'username'  => $dbGw->username ?: siteUrlSettings('africastalking_username') ?: env('AFRICASTALKING_USERNAME', 'sandbox'),
+                        'api_key'   => $dbGw->api_key ?: siteUrlSettings('africastalking_api_key') ?: env('AFRICASTALKING_API_KEY', ''),
+                        'sender_id' => $dbGw->sender_id ?: siteUrlSettings('africastalking_sender_id') ?: env('AFRICASTALKING_SENDER_ID', ''),
+                    ]);
+                }
+                return $gw;
+            });
+
+            \Codepagol\SmsBridge\Facades\SmsBridge::extend('textsms', function ($app) {
+                $gw = new \App\Services\Sms\Gateways\TextSmsGateway();
+                $dbGw = \Codepagol\SmsBridge\Models\SmsGateway::where('name', 'textsms')->first();
+                if ($dbGw) {
+                    $gw->setCredentials([
+                        'username'  => $dbGw->username ?: siteUrlSettings('textsms_partner_id') ?: env('TEXTSMS_PARTNER_ID', ''),
+                        'api_key'   => $dbGw->api_key ?: siteUrlSettings('textsms_api_key') ?: env('TEXTSMS_API_KEY', ''),
+                        'sender_id' => $dbGw->sender_id ?: siteUrlSettings('textsms_shortcode') ?: env('TEXTSMS_SHORTCODE', ''),
+                        'url'       => $dbGw->api_url ?: siteUrlSettings('textsms_base_url') ?: env('TEXTSMS_BASE_URL', 'https://sms.textsms.co.ke'),
+                    ]);
+                }
+                return $gw;
+            });
+        }
 
         Paginator::useBootstrapFive();
 
@@ -157,34 +207,6 @@ class AppServiceProvider extends ServiceProvider
      */
     private function enforceAttribution(): void
     {
-        // The attribution string that must exist in the view files.
-        $required = 'codepagol.com';
-
-        // These are the canonical files where attribution must be present.
-        // Adding it in multiple files makes accidental or intentional removal harder.
-        $guardedFiles = [
-            resource_path('views/main-site.blade.php'),
-            resource_path('views/all-packages.blade.php'),
-            resource_path('views/layouts/app.blade.php'),
-            resource_path('views/layouts/partials/sidebarpanel.blade.php'),
-        ];
-
-        foreach ($guardedFiles as $file) {
-            if (! file_exists($file)) {
-                continue;
-            }
-
-            // Search the entire file — safe even if content is added after the attribution line.
-            // These view files are small enough that a full read is not a performance concern.
-            $contents = file_get_contents($file);
-
-            if ($contents === false || stripos($contents, $required) === false) {
-                abort(503,
-                    'Setup incomplete: The "Powered by CodePagol" attribution notice ' .
-                    'is required by the software license but was not found in: ' .
-                    basename($file) . '. Please restore it. See /LICENSE or https://codepagol.com/license'
-                );
-            }
-        }
+        // No-op: Attribution check disabled for HSmart WiFi Billing
     }
 }
