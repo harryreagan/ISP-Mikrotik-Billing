@@ -43,4 +43,10 @@ return [
         'app_secret' => env('BKASH_APP_SECRET'),
         'ipn_secret' => env('BKASH_IPN_SECRET'), // shared secret for HMAC-SHA256 webhook signature
     ],
+
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI', env('APP_URL', 'http://localhost:8095') . '/auth/google/callback'),
+    ],
 ];

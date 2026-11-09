@@ -57,79 +57,84 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
-// Extract domain host from APP_URL for consistent subdomain routing
+// Supported primary and alias hosts
 $baseDomain = parse_url(config('app.url'), PHP_URL_HOST) ?: config('app.url');
+
+$isLocal = in_array($baseDomain, ['localhost', '127.0.0.1']) || app()->environment('local');
+$validHosts = [
+    $baseDomain,
+    'isp.hsmart.co.ke',
+    'billing.hsmart.co.ke',
+    'localhost',
+    '127.0.0.1',
+];
 
 // Catch-all redirect for external domains or direct IP requests (NAT Redirection for Expired Users)
 $currentHost = request()->getHost();
-if ($currentHost && !in_array($currentHost, [$baseDomain, 'portal.'.$baseDomain, 'billing.'.$baseDomain])) {
+if ($currentHost && !in_array($currentHost, $validHosts)) {
     Route::any('{any}', function () {
         return redirect()->away(config('app.url') . '/warning');
     })->where('any', '.*');
 }
 
-// Main domain
-Route::domain($baseDomain)->group(function () {
-    Route::get('/', [MainSiteController::class, 'index'])->name('welcome');
-    Route::get('/all-packages', [MainSiteController::class, 'allPackages'])->name('all-packages');
-    Route::get('/lang/{locale}', function ($locale) {
-        if (in_array($locale, ['en', 'bn'])) {
-            session()->put('main_site_locale', $locale);
-        }
-        return redirect()->back();
-    })->name('welcome.lang');
+// Public & Landing Routes
+Route::get('/', function () {
+    if (request()->getHost() === 'billing.hsmart.co.ke') {
+        return auth()->check() ? redirect()->route('dashboard') : redirect()->route('login');
+    }
+    return view('landing');
+})->name('welcome');
 
-    // Warning / Recharge page for expired users
-    Route::get('/warning', function () {
-        return view('warning');
-    })->name('warning');
+Route::get('/all-packages', [MainSiteController::class, 'allPackages'])->name('all-packages');
+Route::get('/lang/{locale}', function ($locale) {
+    if (in_array($locale, ['en', 'bn'])) {
+        session()->put('main_site_locale', $locale);
+    }
+    return redirect()->back();
+})->name('welcome.lang');
 
-    // Public voucher redemption route on main domain
-    Route::get('/recharge/voucher', [PortalVoucherController::class, 'showRechargeForm'])->name('welcome.voucher.recharge');
-    Route::post('/recharge/voucher', [PortalVoucherController::class, 'redeem'])->name('welcome.voucher.redeem');
+// Warning / Recharge page for expired users
+Route::get('/warning', function () {
+    return view('warning');
+})->name('warning');
 
-    Route::get('/portal', function () {
-        $host = request()->getHost();
-        if (Str::startsWith($host, 'portal.')) {
-            return redirect('/');
-        }
+// Public voucher redemption route on main domain
+Route::get('/recharge/voucher', [PortalVoucherController::class, 'showRechargeForm'])->name('welcome.voucher.recharge');
+Route::post('/recharge/voucher', [PortalVoucherController::class, 'redeem'])->name('welcome.voucher.redeem');
 
-        return redirect()->away('https://portal.'.$host);
-    });
-
-    Route::get('/billing', function () {
-        $host = request()->getHost();
-        if (Str::startsWith($host, 'billing.')) {
-            return redirect('/');
-        }
-
-        return redirect()->away('https://billing.'.$host);
-    });
+Route::get('/portal', function () {
+    return redirect('/portal/login');
 });
+
+Route::get('/billing', function () {
+    return auth()->check() ? redirect()->route('dashboard') : redirect()->route('login');
+});
+
+// Authentication & Verification Extensions (Email 6-digit Code & Google OAuth)
+Route::post('/auth/register-step1', [\App\Http\Controllers\Auth\CustomAuthController::class, 'registerStep1'])->name('auth.register.step1');
+Route::post('/auth/verify-code', [\App\Http\Controllers\Auth\CustomAuthController::class, 'verifyCode'])->name('auth.verify.code');
+Route::post('/auth/resend-code', [\App\Http\Controllers\Auth\CustomAuthController::class, 'resendCode'])->name('auth.verify.resend');
+Route::get('/auth/google/redirect', [\App\Http\Controllers\Auth\CustomAuthController::class, 'redirectToGoogle'])->name('auth.google');
+Route::get('/auth/google/callback', [\App\Http\Controllers\Auth\CustomAuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
 
 Route::middleware([
     'auth:sanctum',
     config('jetstream.auth_session'),
     'verified',
     'restrict.profile',
-])->group(function () use ($baseDomain) {
+])->group(function () {
+    Route::get('/system/db-backup/download/{filename}', function ($filename) {
+        if (str_contains($filename, '/') || str_contains($filename, '\\')) {
+            abort(403, 'Invalid filename.');
+        }
+        $path = base_path('backups/'.$filename);
+        if (file_exists($path)) {
+            return response()->download($path);
+        }
+        abort(404, 'Backup file not found.');
+    })->name('system.db-backup.download');
 
-    // billing domain
-    Route::domain('billing.'.$baseDomain)->group(function () {
-        Route::get('/system/db-backup/download/{filename}', function ($filename) {
-            if (str_contains($filename, '/') || str_contains($filename, '\\')) {
-                abort(403, 'Invalid filename.');
-            }
-            $path = base_path('backups/'.$filename);
-            if (file_exists($path)) {
-                return response()->download($path);
-            }
-            abort(404, 'Backup file not found.');
-        })->name('system.db-backup.download');
-
-        Route::redirect('/', '/dashboard');
-
-        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::resources([
             'collection-report' => CollectionReportController::class,
         ]);
@@ -231,6 +236,10 @@ Route::middleware([
             // Reseller Vouchers Audit
             Route::get('vouchers', AdminVoucherList::class)->name('vouchers');
 
+            // Kenyan Payment Gateways & Unmatched Payments
+            Route::get('payment-gateways', \App\Livewire\Admin\PaymentGatewaysSetup::class)->name('payment-gateways');
+            Route::get('unmatched-payments', \App\Livewire\Admin\UnmatchedPayments::class)->name('unmatched-payments');
+
             // Package purchase requests
             Route::get('purchase-requests', ManagePurchaseRequests::class)->name('purchase-requests');
         });
@@ -250,41 +259,16 @@ Route::middleware([
             Route::get('wallet', ResellerWalletManagement::class)->name('wallet.index');
         });
     });
-});
 
+// Universal PayBridge endpoints & Public voucher redemption
+Route::any('/payment/{gateway}/callback', [PayBridgePaymentController::class, 'callback'])->name('payment.paybridge.callback');
+Route::any('/payment/{gateway}/success', [PayBridgePaymentController::class, 'success'])->name('payment.success');
+Route::any('/payment/{gateway}/fail', [PayBridgePaymentController::class, 'fail'])->name('payment.fail');
+Route::any('/payment/{gateway}/cancel', [PayBridgePaymentController::class, 'cancel'])->name('payment.cancel');
+Route::any('/payment/{gateway}/webhook', [PayBridgePaymentController::class, 'webhook'])->name('payment.webhook');
+Route::post('/payment/mock/submit', [BkashPaymentController::class, 'mockSubmit'])->name('payment.mock.submit');
 
-// portal domain routes
-Route::domain('portal.'.$baseDomain)->group(function () {
-    // Authenticated portal payment initiation routes
-    Route::middleware(['auth:ppp'])->group(function () {
-        Route::get('/payment/bkash/initiate', [BkashPaymentController::class, 'initiate'])->name('payment.bkash.initiate');
-        Route::get('/payment/nagad/initiate', [NagadPaymentController::class, 'initiate'])->name('payment.nagad.initiate');
-        Route::get('/payment/sslcommerz/initiate', [SslCommerzPaymentController::class, 'initiate'])->name('payment.sslcommerz.initiate');
-    });
-
-    // Public payment callback routes (Gateways redirect here, CSRF is disabled for POSTs)
-    Route::any('/payment/bkash/callback', [BkashPaymentController::class, 'callback'])->name('payment.bkash.callback');
-    Route::any('/payment/nagad/callback', [NagadPaymentController::class, 'callback'])->name('payment.nagad.callback');
-    Route::any('/payment/sslcommerz/callback', [SslCommerzPaymentController::class, 'callback'])->name('payment.sslcommerz.callback');
-    
-    // PayBridge standard callback endpoints
-    Route::any('/payment/{gateway}/callback', [PayBridgePaymentController::class, 'callback'])->name('payment.paybridge.callback');
-    Route::any('/payment/{gateway}/success', [PayBridgePaymentController::class, 'success'])->name('payment.success');
-    Route::any('/payment/{gateway}/fail', [PayBridgePaymentController::class, 'fail'])->name('payment.fail');
-    Route::any('/payment/{gateway}/cancel', [PayBridgePaymentController::class, 'cancel'])->name('payment.cancel');
-    Route::any('/payment/{gateway}/webhook', [PayBridgePaymentController::class, 'webhook'])->name('payment.webhook');
-    Route::post('/payment/mock/submit', [BkashPaymentController::class, 'mockSubmit'])->name('payment.mock.submit');
-
-    // Public voucher redemption route
-    Route::get('/recharge/voucher', [PortalVoucherController::class, 'showRechargeForm'])->name('portal.voucher.recharge');
-    Route::post('/recharge/voucher', [PortalVoucherController::class, 'redeem'])->name('portal.voucher.redeem');
-});
-
-// Fallback universal PayBridge routes (for root host or IP redirects)
-Route::any('/payment/{gateway}/callback', [PayBridgePaymentController::class, 'callback'])->name('payment.paybridge.callback.fallback');
-Route::any('/payment/{gateway}/success', [PayBridgePaymentController::class, 'success'])->name('payment.success.fallback');
-Route::any('/payment/{gateway}/fail', [PayBridgePaymentController::class, 'fail'])->name('payment.fail.fallback');
-Route::any('/payment/{gateway}/cancel', [PayBridgePaymentController::class, 'cancel'])->name('payment.cancel.fallback');
-Route::any('/payment/{gateway}/webhook', [PayBridgePaymentController::class, 'webhook'])->name('payment.webhook.fallback');
+Route::get('/portal/recharge/voucher', [PortalVoucherController::class, 'showRechargeForm'])->name('portal.voucher.recharge');
+Route::post('/portal/recharge/voucher', [PortalVoucherController::class, 'redeem'])->name('portal.voucher.redeem');
 
 

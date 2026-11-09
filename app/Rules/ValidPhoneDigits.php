@@ -36,7 +36,7 @@ class ValidPhoneDigits implements ValidationRule
     protected function resolveCountryIso(): string
     {
         try {
-            $tz = config('app.timezone', 'Asia/Dhaka');
+            $tz = config('app.timezone', 'Africa/Nairobi');
             if (class_exists('IntlTimeZone')) {
                 $region = \IntlTimeZone::getRegion($tz);
                 if ($region && strlen($region) === 2) {
@@ -47,7 +47,7 @@ class ValidPhoneDigits implements ValidationRule
             // fall through
         }
 
-        return 'BD'; // fallback
+        return 'KE'; // fallback
     }
 
     /**

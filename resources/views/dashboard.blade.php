@@ -1,13 +1,33 @@
 <x-app-layout>
-    <x-slot name="header">
-        {{ __('Dashboard') }}
-    </x-slot>
+    @php
+        $hour = (int) now()->timezone('Africa/Nairobi')->format('H');
+        $greeting = $hour < 12 ? 'Good morning' : ($hour < 17 ? 'Good afternoon' : 'Good evening');
+        $userName = Auth::user()->name ?? 'Administrator';
+        $userFirstName = explode(' ', trim($userName))[0];
+    @endphp
+
+    {{-- Personalized Greeting Header --}}
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h1 class="mb-1" style="font-size: clamp(28px, 3vw, 36px); font-weight: 800; font-family: var(--font-sans); color: #111;">
+                {{ $greeting }}, <span style="color: #6D3FE0;">{{ $userFirstName }}</span>! 👋
+            </h1>
+            <p class="text-muted mb-0" style="font-size: 0.92rem;">
+                {{ __('Here is what is happening across your WiFi network and M-Pesa collections today.') }}
+            </p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge" style="background:#ECFDF5; color:#059669; border:1px solid #A7F3D0; padding:8px 16px; border-radius:999px; font-weight:700; font-size:0.8rem;">
+                <i class="bi bi-circle-fill me-1" style="font-size:7px;"></i> {{ __('System Operational') }}
+            </span>
+        </div>
+    </div>
 
     {{-- Modern Stat Cards Row --}}
     <div class="row g-3 mb-4">
         <!-- Card 1: Active Users -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; border-radius: 12px; transition: transform 0.3s ease;">
+            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #7C3AED, #5B34E6); color: #fff; border-radius: 16px; transition: transform 0.3s ease;">
                 <div class="card-body position-relative z-1">
                     <div class="d-flex justify-content-between align-items-sm-center">
                         <div>
@@ -31,19 +51,19 @@
 
         <!-- Card 2: Today PPPoE Collection -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff; border-radius: 12px; transition: transform 0.3s ease;">
+            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #0EA5E9, #1E88E5); color: #fff; border-radius: 16px; transition: transform 0.3s ease;">
                 <div class="card-body position-relative z-1">
                     <div class="d-flex justify-content-between align-items-sm-center">
                         <div>
                             <h6 class="text-uppercase fw-bold mb-1" style="font-size: 0.72rem; letter-spacing: 1px; opacity: 0.85;">{{ __("Today's PPPoE Sales") }}</h6>
-                            <h3 class="fw-bold mb-0">৳{{ number_format($billInformationData['today_paid_amount'] ?? 0, 0) }}</h3>
+                            <h3 class="fw-bold mb-0">KES {{ number_format($billInformationData['today_paid_amount'] ?? 0, 0) }}</h3>
                         </div>
                         <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background: rgba(255,255,255,0.2);">
                             <i class="bi bi-wallet2 fs-4"></i>
                         </div>
                     </div>
                     <div class="mt-3 pt-2 border-top border-white border-opacity-25">
-                        <span class="small fw-medium" style="opacity: 0.9;"><i class="bi bi-calendar3 me-1"></i>{{ __('Total Mo:') }} ৳{{ number_format($billInformationData['paid_amount'] ?? 0, 0) }}</span>
+                        <span class="small fw-medium" style="opacity: 0.9;"><i class="bi bi-calendar3 me-1"></i>{{ __('Total Mo:') }} KES {{ number_format($billInformationData['paid_amount'] ?? 0, 0) }}</span>
                         <span class="small float-end" style="opacity: 0.9;"><i class="bi bi-arrow-up-right me-1"></i>{{ __('PPPoE Only') }}</span>
                     </div>
                 </div>
@@ -55,19 +75,19 @@
 
         <!-- Card 3: Today Hotspot Sales -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; border-radius: 12px; transition: transform 0.3s ease;">
+            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #F59E0B, #E8790B); color: #fff; border-radius: 16px; transition: transform 0.3s ease;">
                 <div class="card-body position-relative z-1">
                     <div class="d-flex justify-content-between align-items-sm-center">
                         <div>
                             <h6 class="text-uppercase fw-bold mb-1" style="font-size: 0.72rem; letter-spacing: 1px; opacity: 0.85;">{{ __("Today's Hotspot Sales") }}</h6>
-                            <h3 class="fw-bold mb-0">৳{{ number_format($billInformationData['hotspot_today'] ?? 0, 0) }}</h3>
+                            <h3 class="fw-bold mb-0">KES {{ number_format($billInformationData['hotspot_today'] ?? 0, 0) }}</h3>
                         </div>
                         <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background: rgba(255,255,255,0.2);">
                             <i class="bi bi-wifi fs-4"></i>
                         </div>
                     </div>
                     <div class="mt-3 pt-2 border-top border-white border-opacity-25">
-                        <span class="small fw-medium" style="opacity: 0.9;"><i class="bi bi-calendar3 me-1"></i>{{ __('Total Mo:') }} ৳{{ number_format($billInformationData['hotspot_total'] ?? 0, 0) }}</span>
+                        <span class="small fw-medium" style="opacity: 0.9;"><i class="bi bi-calendar3 me-1"></i>{{ __('Total Mo:') }} KES {{ number_format($billInformationData['hotspot_total'] ?? 0, 0) }}</span>
                         <span class="small float-end" style="opacity: 0.9;"><i class="bi bi-arrow-up-right me-1"></i>{{ __('Hotspot Only') }}</span>
                     </div>
                 </div>
@@ -79,19 +99,19 @@
 
         <!-- Card 4: Total Revenue YTD -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #10b981, #059669); color: #fff; border-radius: 12px; transition: transform 0.3s ease;">
+            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #10B981, #059669); color: #fff; border-radius: 16px; transition: transform 0.3s ease;">
                 <div class="card-body position-relative z-1">
                     <div class="d-flex justify-content-between align-items-sm-center">
                         <div>
                             <h6 class="text-uppercase fw-bold mb-1" style="font-size: 0.72rem; letter-spacing: 1px; opacity: 0.85;">{{ __('Total Global Revenue') }}</h6>
-                            <h3 class="fw-bold mb-0">৳{{ number_format(($billInformationData['paid_amount'] ?? 0) + ($billInformationData['hotspot_total'] ?? 0), 0) }}</h3>
+                            <h3 class="fw-bold mb-0">KES {{ number_format(($billInformationData['paid_amount'] ?? 0) + ($billInformationData['hotspot_total'] ?? 0), 0) }}</h3>
                         </div>
                         <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background: rgba(255,255,255,0.2);">
                             <i class="bi bi-graph-up-arrow fs-4"></i>
                         </div>
                     </div>
                     <div class="mt-3 pt-2 border-top border-white border-opacity-25">
-                        <span class="small fw-semibold text-warning" style="opacity: 1;"><i class="bi bi-exclamation-triangle-fill me-1"></i>{{ __('Pending Due:') }} ৳{{ number_format($billInformationData['due_amount'] ?? 0, 0) }}</span>
+                        <span class="small fw-semibold text-warning" style="opacity: 1;"><i class="bi bi-exclamation-triangle-fill me-1"></i>{{ __('Pending Due:') }} KES {{ number_format($billInformationData['due_amount'] ?? 0, 0) }}</span>
                         <span class="small float-end" style="opacity: 0.9;">{{ __('Total Arrears') }}</span>
                     </div>
                 </div>
@@ -106,7 +126,7 @@
     <div class="row g-3 mb-4">
         <!-- Card 1: Total Resellers -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #1e293b, #334155); color: #fff; border-radius: 12px;">
+            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: #1B2238; color: #fff; border-radius: 16px;">
                 <div class="card-body position-relative z-1">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
@@ -127,7 +147,7 @@
 
         <!-- Card 2: Reseller Customers -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #4f46e5, #6366f1); color: #fff; border-radius: 12px;">
+            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #7C3AED, #5B34E6); color: #fff; border-radius: 16px;">
                 <div class="card-body position-relative z-1">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
@@ -148,12 +168,12 @@
 
         <!-- Card 3: Total Reseller Balance -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #0d9488, #14b8a6); color: #fff; border-radius: 12px;">
+            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #0EA5E9, #1E88E5); color: #fff; border-radius: 16px;">
                 <div class="card-body position-relative z-1">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h6 class="text-uppercase fw-bold mb-1 text-white-50" style="font-size: 0.72rem; letter-spacing: 1px;">{{ __('Wallet Balances') }}</h6>
-                            <h3 class="fw-bold mb-0">৳{{ number_format($resellerData['total_balance'] ?? 0, 2) }}</h3>
+                            <h3 class="fw-bold mb-0">KES {{ number_format($resellerData['total_balance'] ?? 0, 2) }}</h3>
                         </div>
                         <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background: rgba(255,255,255,0.15);">
                             <i class="bi bi-cash-stack fs-4 text-success"></i>
@@ -168,12 +188,12 @@
 
         <!-- Card 4: Total Reseller Commission -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #db2777, #ec4899); color: #fff; border-radius: 12px;">
+            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #EC4899, #DB2777); color: #fff; border-radius: 16px;">
                 <div class="card-body position-relative z-1">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h6 class="text-uppercase fw-bold mb-1 text-white-50" style="font-size: 0.72rem; letter-spacing: 1px;">{{ __('Total Commissions') }}</h6>
-                            <h3 class="fw-bold mb-0">৳{{ number_format($resellerData['total_commission'] ?? 0, 2) }}</h3>
+                            <h3 class="fw-bold mb-0">KES {{ number_format($resellerData['total_commission'] ?? 0, 2) }}</h3>
                         </div>
                         <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background: rgba(255,255,255,0.15);">
                             <i class="bi bi-percent fs-4 text-light"></i>
@@ -188,6 +208,36 @@
     </div>
 
     <div class="row g-4 mb-4">
+        {{-- Clean Empty State when no active routers are syncing --}}
+        @php
+            $hasActiveRouters = false;
+            foreach ($systemOverview as $rData) {
+                if ($rData['status'] ?? false) {
+                    $hasActiveRouters = true;
+                    break;
+                }
+            }
+        @endphp
+
+        @if (!$hasActiveRouters)
+            <div class="col-12 mb-2">
+                <div class="card p-4 text-center bg-white shadow-sm" style="border: 1px dashed var(--card-border); border-radius: 18px;">
+                    <div class="rounded-circle bg-light d-inline-flex align-items-center justify-content-center mx-auto mb-2" style="width: 54px; height: 54px;">
+                        <i class="bi bi-router text-muted fs-3"></i>
+                    </div>
+                    <h5 class="fw-bold mb-1" style="color: #111;">{{ __('No Active MikroTik Routers Connected') }}</h5>
+                    <p class="text-muted mb-3" style="font-size: 0.88rem; max-width: 480px; margin: 0 auto;">
+                        {{ __('Connect your MikroTik Core router via API (Port 8728) or WireGuard to monitor real-time CPU, RAM, and live PPPoE interfaces.') }}
+                    </p>
+                    <div>
+                        <a href="{{ route('mikrotik-sync') }}" class="btn btn-primary btn-sm px-3 py-2" style="font-weight: 700;">
+                            <i class="bi bi-plus-circle me-1"></i> {{ __('Sync MikroTik Router') }}
+                        </a>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         {{-- Unified Row for Routers and Graphs to allow dynamic "weight" adjustment --}}
         @foreach ($systemOverview as $routerName => $routerData)
             @php
@@ -565,7 +615,7 @@
                             },
                             grid: { borderColor: 'rgba(128,128,128,0.15)', strokeDashArray: 4 },
                             tooltip: {
-                                y: { formatter: val => '৳ ' + Math.abs(val).toLocaleString(undefined, {minimumFractionDigits:2}) },
+                                y: { formatter: val => 'KES ' + Math.abs(val).toLocaleString(undefined, {minimumFractionDigits:2}) },
                             },
                         };
                         window.chart2 = new ApexCharts(billEl, billInformation);
@@ -643,7 +693,7 @@
                             tooltip: {
                                 shared: true,
                                 intersect: false,
-                                y: { formatter: val => '৳ ' + val.toLocaleString(undefined,{minimumFractionDigits:2}) },
+                                y: { formatter: val => 'KES ' + val.toLocaleString(undefined,{minimumFractionDigits:2}) },
                             },
                         };
                         window.chart2b = new ApexCharts(billStatusEl, billByStatus);

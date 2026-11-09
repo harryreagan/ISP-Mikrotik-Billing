@@ -22,7 +22,7 @@
                             @forelse($assignedPackages as $pkg)
                                 <tr>
                                     <td class="fw-bold text-dark ps-3">{{ $pkg->package }}</td>
-                                    <td class="fw-semibold text-success">৳{{ number_format($pkg->price, 2) }}</td>
+                                    <td class="fw-semibold text-success">KES {{ number_format($pkg->price, 2) }}</td>
                                     <td>{{ $pkg->speed ?? 'N/A' }}</td>
                                     <td><span class="badge bg-secondary-subtle text-secondary">{{ $pkg->router_name ?? __('Global') }}</span></td>
                                     <td class="text-muted small">{{ $pkg->description ?? 'N/A' }}</td>
@@ -60,7 +60,7 @@
                             @forelse($customPackages as $pkg)
                                 <tr>
                                     <td class="fw-bold text-dark ps-3">{{ $pkg->package }}</td>
-                                    <td class="fw-semibold text-success">৳{{ number_format($pkg->price, 2) }}</td>
+                                    <td class="fw-semibold text-success">KES {{ number_format($pkg->price, 2) }}</td>
                                     <td>{{ $pkg->speed ?? 'N/A' }}</td>
                                     <td>{{ $pkg->plan_label ?? 'N/A' }}</td>
                                     <td>

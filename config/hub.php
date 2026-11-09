@@ -22,3 +22,4 @@ return [
 
     'max_retries' => (int) env('HUB_MAX_RETRIES', 3),
 ];
+

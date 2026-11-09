@@ -396,12 +396,12 @@
 								<li>{{ __('Fiber Optics') }}</li>
 								<li>{{ __('Talk Time - N/A') }}</li>
 								<li>{{ __('Free SMS - N/A') }}</li>
-								<li>{{ __('OTC Fee - :fee Taka', ['fee' => 3000]) }}</li>
+								<li>{{ __('OTC Fee - KES :fee', ['fee' => 3000]) }}</li>
 								<li>{{ __('24/7 Customer Care') }}</li>
 								</ul>
 							</div>
 							<div class="price mb-20">
-								<h2>500৳ <span>/{{ __('MONTH') }}</span>
+								<h2>KES 500 <span>/{{ __('MONTH') }}</span>
 								</h2>
 							</div>
 							<div class="pricing-btn">
@@ -426,12 +426,12 @@
 								<li>{{ __('Fiber Optics') }}</li>
 								<li>{{ __('Talk Time - N/A') }}</li>
 								<li>{{ __('Free SMS - N/A') }}</li>
-								<li>{{ __('OTC Fee - :fee Taka', ['fee' => 2000]) }}</li>
+								<li>{{ __('OTC Fee - KES :fee', ['fee' => 2000]) }}</li>
 								<li>{{ __('24/7 Customer Care') }}</li>
 							</ul>
 							</div>
 							<div class="price mb-20">
-							<h2>650৳ <span>/{{ __('MONTH') }}</span>
+							<h2>KES 650 <span>/{{ __('MONTH') }}</span>
 							</h2>
 							</div>
 							<div class="pricing-btn">
@@ -456,12 +456,12 @@
 								<li>{{ __('Fiber Optics') }}</li>
 								<li>{{ __('Talk Time - N/A') }}</li>
 								<li>{{ __('Free SMS - N/A') }}</li>
-								<li>{{ __('OTC Fee - :fee Taka', ['fee' => 1000]) }}</li>
+								<li>{{ __('OTC Fee - KES :fee', ['fee' => 1000]) }}</li>
 								<li>{{ __('24/7 Customer Care') }}</li>
 							</ul>
 							</div>
 							<div class="price mb-20">
-							<h2>800৳ <span>/{{ __('MONTH') }}</span>
+							<h2>KES 800 <span>/{{ __('MONTH') }}</span>
 							</h2>
 							</div>
 							<div class="pricing-btn">
@@ -486,12 +486,12 @@
 								<li>{{ __('Fiber Optics') }}</li>
 								<li>{{ __('Free :min Min Talk Time /month', ['min' => 200]) }}</li>
 								<li>{{ __('Free :sms SMS /month', ['sms' => 200]) }}</li>
-								<li>{{ __('OTC Fee - :fee Taka', ['fee' => 500]) }}</li>
+								<li>{{ __('OTC Fee - KES :fee', ['fee' => 500]) }}</li>
 								<li>{{ __('24/7 Customer Care') }}</li>
 							</ul>
 							</div>
 							<div class="price mb-20">
-							<h2>1000৳ <span>/{{ __('MONTH') }}</span>
+							<h2>KES 1,000 <span>/{{ __('MONTH') }}</span>
 							</h2>
 							</div>
 							<div class="pricing-btn">

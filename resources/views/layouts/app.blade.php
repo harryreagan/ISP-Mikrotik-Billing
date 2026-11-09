@@ -24,19 +24,188 @@
     <link rel="shortcut icon" type="image/x-icon" href="{{asset('/images/favicons/favicon.ico')}}">
     <meta name="msapplication-TileImage" content="{{asset('/images/favicons/mstile-150x150.png')}}"> --}}
 
+    <!-- Jost Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
     @vite(['resources/sass/app.scss', 'resources/css/app.css', 'resources/js/app.js'])
     @stack('styles')
     @filamentStyles
     <link rel="stylesheet" href="{{ asset('css/filament/filament/app.css') }}">
     @livewireStyles
     {!! \App\Support\Hooks::applyFilters('layout.head', '') !!}
+
+    <style>
+        :root {
+            --font-sans: 'Jost', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --primary: #F47B06;
+            --primary-hover: #E86F00;
+            --accent-purple: #6D3FE0;
+            --card-border: #E6E3F5;
+            --bg-page: #FAFAF8;
+            --dark-navy: #161B2E;
+        }
+
+        body, .font-sans, .fi-body, table, input, button, select, textarea, .nav-link, .dropdown-item {
+            font-family: var(--font-sans) !important;
+        }
+
+        /* Sidebar as White Rounded Card */
+        .navbar-vertical {
+            background: #ffffff !important;
+            border: 1px solid var(--card-border) !important;
+            border-radius: 20px !important;
+            margin: 14px 0 14px 14px !important;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04) !important;
+        }
+
+        .navbar-vertical .navbar-brand {
+            padding: 18px 20px !important;
+            border-bottom: 1px solid #f0edf8 !important;
+        }
+
+        .navbar-vertical-label {
+            font-size: 0.68rem !important;
+            font-weight: 800 !important;
+            letter-spacing: 0.08em !important;
+            text-transform: uppercase !important;
+            color: #8882a5 !important;
+        }
+
+        .navbar-vertical .nav-link {
+            border-radius: 10px !important;
+            margin: 2px 10px !important;
+            font-weight: 600 !important;
+            color: #333333 !important;
+            transition: all 0.2s ease !important;
+        }
+
+        .navbar-vertical .nav-link:hover {
+            background: #fff4eb !important;
+            color: #F47B06 !important;
+        }
+
+        .navbar-vertical .nav-link.active {
+            background: #F47B06 !important;
+            color: #111111 !important;
+            font-weight: 700 !important;
+        }
+
+        /* Top Bar Styling */
+        .navbar-top {
+            background: #ffffff !important;
+            border: 1px solid var(--card-border) !important;
+            border-radius: 16px !important;
+            margin: 14px 14px 14px 0 !important;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.03) !important;
+            padding: 10px 20px !important;
+        }
+
+        /* Cards Design System */
+        .card {
+            border: 1px solid var(--card-border) !important;
+            border-radius: 18px !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02) !important;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        /* Status Badges */
+        .badge.bg-success, .badge-subtle-success, .status-active, .status-paid {
+            background-color: #ECFDF5 !important;
+            color: #059669 !important;
+            border: 1px solid #A7F3D0 !important;
+            border-radius: 999px !important;
+            font-weight: 600 !important;
+        }
+
+        .badge.bg-warning, .badge-subtle-warning, .status-pending {
+            background-color: #F3F4F6 !important;
+            color: #4B5563 !important;
+            border: 1px solid #E5E7EB !important;
+            border-radius: 999px !important;
+            font-weight: 600 !important;
+        }
+
+        .badge.bg-danger, .badge-subtle-danger, .status-expired, .status-overdue {
+            background-color: #FEF2F2 !important;
+            color: #DC2626 !important;
+            border: 1px solid #FECACA !important;
+            border-radius: 999px !important;
+            font-weight: 600 !important;
+        }
+
+        /* Active Tab: Black pill with white text */
+        .nav-tabs .nav-link.active, .nav-pills .nav-link.active, [role="tab"].active, [role="tab"][aria-selected="true"] {
+            background-color: #111111 !important;
+            color: #ffffff !important;
+            border-radius: 999px !important;
+            border: none !important;
+            font-weight: 700 !important;
+        }
+
+        /* Tables */
+        .table {
+            border-collapse: separate !important;
+            border-spacing: 0 !important;
+        }
+
+        .table thead th {
+            font-size: 0.75rem !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.05em !important;
+            color: #666666 !important;
+            background-color: #FAFAF8 !important;
+            border-bottom: 1px solid var(--card-border) !important;
+        }
+
+        .table th.text-end, .table td.text-end, .table td:has(.currency-amount) {
+            text-align: right !important;
+        }
+
+        /* Small pill row actions */
+        .btn-action-pill, .table .btn-sm {
+            border-radius: 999px !important;
+            padding: 4px 12px !important;
+            font-size: 0.75rem !important;
+            font-weight: 600 !important;
+        }
+
+        /* Primary Button */
+        .btn-primary, .btn-primary:focus {
+            background-color: #F47B06 !important;
+            border-color: #F47B06 !important;
+            color: #111111 !important;
+            font-weight: 700 !important;
+            border-radius: 12px !important;
+        }
+
+        .btn-primary:hover {
+            background-color: #E86F00 !important;
+            border-color: #E86F00 !important;
+            color: #111111 !important;
+        }
+
+        /* Skeleton loading animation */
+        @keyframes skeleton-loading {
+            0% { background-color: #f0edf8; }
+            50% { background-color: #f9f8fc; }
+            100% { background-color: #f0edf8; }
+        }
+        .skeleton {
+            animation: skeleton-loading 1.4s ease-in-out infinite;
+            border-radius: 8px;
+        }
+    </style>
+
     <!-- ===============================================-->
     <!--    Stylesheets-->
     <!-- ===============================================-->
     <script>
         @php
-            $tz = config('app.timezone', 'Asia/Dhaka');
-            $phoneCountry = 'bd';
+            $tz = config('app.timezone', 'Africa/Nairobi');
+            $phoneCountry = 'ke';
             if (class_exists('IntlTimeZone')) {
                 $region = \IntlTimeZone::getRegion($tz);
                 if ($region && strlen($region) === 2) {
@@ -98,20 +267,7 @@
 
 
                 @include('layouts.partials.topnav')
-                @if (isset($header))
-                    <div class="card mb-3">
-                        <div class="bg-holder d-none d-lg-block bg-card"
-                            style="background-image:url({{ asset('images/corner-4.png') }});">
-                        </div><!--/.bg-holder-->
-                        <div class="card-body position-relative">
-                            <div class="row">
-                                <div class="col-md-12">
-                                    <h3 class="text-center">{{ $header }}</h3>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                @endif
+
                 <script>
                     var storedNavbarPosition = localStorage.getItem('navbarPosition');
                     var navVerticalEl = document.querySelector('.navbar-vertical');
@@ -154,12 +310,10 @@
                 <footer class="footer">
                     <div class="row g-0 justify-content-between fs-10 mt-4 mb-3 px-3">
                         <div class="col-12 col-sm-auto text-center">
-                            <p class="mb-0 text-600">{{ __('Thank you for stay with us') }} <span class="d-none d-sm-inline-block">|
-                                </span><br class="d-sm-none" /> 2024 &copy; <a
-                                    href="https://github.com/rohan9222">{{ __('Rohan') }}</a></p>
+                            <p class="mb-0 text-600">&copy; {{ date('Y') }} <strong>HSmart WiFi Billing</strong>. All rights reserved.</p>
                         </div>
                         <div class="col-12 col-sm-auto text-center">
-                            <p class="mb-0 text-600">v1.0.0</p>
+                            <p class="mb-0 text-600">v2.0 (Kenyan Localization)</p>
                         </div>
                     </div>
                 </footer>

@@ -25,3 +25,4 @@ class HubOutbox extends Model
         'attempts' => 'integer',
     ];
 }
+

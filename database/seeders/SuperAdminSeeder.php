@@ -13,12 +13,18 @@ class SuperAdminSeeder extends Seeder
      */
     public function run(): void
     {
-        // Creating Super Admin User
-        $superAdmin = User::create([
-            'name' => 'Rohan9222',
-            'email' => 'rohan9222@gmail.com',
-            'password' => Hash::make('rohan9222@gmail.com'),
-        ]);
+        // Creating Super Admin User with secure default HSmart credentials
+        $name = env('SEED_ADMIN_NAME', 'HSmart Super Admin');
+        $email = env('SEED_ADMIN_EMAIL', 'admin@hsmart.co.ke');
+        $password = env('SEED_ADMIN_PASSWORD', 'HSmart@Admin2026!');
+
+        $superAdmin = User::firstOrCreate(
+            ['email' => $email],
+            [
+                'name' => $name,
+                'password' => Hash::make($password),
+            ]
+        );
         $superAdmin->assignRole('Super Admin');
     }
 }

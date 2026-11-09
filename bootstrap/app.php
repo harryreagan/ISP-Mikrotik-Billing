@@ -24,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission'         => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role'               => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+            'webhook.log'        => \App\Http\Middleware\LogSafeWebhookPayload::class,
         ]);
         $middleware->validateCsrfTokens(except: [
             '/payment/bkash/callback',
@@ -32,6 +33,8 @@ return Application::configure(basePath: dirname(__DIR__))
             '/payment/mock/submit',
             '/payment/*/callback',
             '/payment/paybridge/*',
+            '/api/payment/*',
+            '/api/*',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

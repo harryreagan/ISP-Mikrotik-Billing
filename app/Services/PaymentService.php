@@ -12,17 +12,40 @@ use App\Models\CustomersInfo;
 use App\Models\PaymentSummary;
 use App\Models\PPPSecrets;
 use Carbon\Carbon;
+use App\Jobs\ProvisionMikrotikUserJob;
+use App\Models\UnmatchedPayment;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class PaymentService
 {
     /**
-     * Process a successful online payment, update billing records,
-     * record collection summary, and activate the user on MikroTik.
+     * Backward-compatible wrapper for fulfill().
      */
-    public function processSuccessPayment(CustomersInfo $customer, float $amount, string $gateway, string $trxId): bool
+    public function processSuccessPayment(CustomersInfo $customer, float $amount, string $gateway, string $trxId, array $metadata = []): bool
     {
+        return $this->fulfill($customer, $amount, $gateway, $trxId, $metadata);
+    }
+
+    /**
+     * Centralized payment fulfillment for all Kenyan gateways (SMS, Daraja, PayHero, KopoKopo).
+     *
+     * 1. Dedupes transaction code (idempotent).
+     * 2. Records collection summary & payment records.
+     * 3. Calculates prorated or monthly renewal and auto_disable_date.
+     * 4. Updates billing info and customer status to active.
+     * 5. Dispatches queued job to enable PPPoE/Hotspot secret on MikroTik.
+     * 6. Marks unmatched payment record as matched.
+     * 7. Sends SMS payment receipt.
+     */
+    public function fulfill(CustomersInfo $customer, float $amount, string $gateway, string $trxId, array $metadata = []): bool
+    {
+        // ── 1. Idempotency Check ────────────────────────────────────────────────
+        if (CollectionSummary::where('transaction_id', $trxId)->exists()) {
+            Log::info("PaymentService: Duplicate transaction [{$trxId}] detected for customer [{$customer->customer_unique_id}]. Idempotent pass.");
+            return true;
+        }
+
         DB::beginTransaction();
         try {
             $billing = $customer->billing;
@@ -177,46 +200,24 @@ class PaymentService
                 }
             }
 
-            // 7. Enable customer on Mikrotik Router
-            if ($customer->pppUser) {
-                if ($customer->status === 'active') {
-                    // Enable secret (calls router via API/SSH)
-                    app(MikrotikController::class)->enablePPPSecret(
-                        $customer->customer_unique_id,
-                        $customer->pppUser->router_name,
-                        $customer->pppUser->username
-                    );
-
-                    // Restore their original plan profile
-                    app(MikrotikController::class)->updatePPPSecret(
-                        $customer->pppUser->router_name,
-                        $customer->pppUser->username,
-                        'profile',
-                        $customer->pppUser->profile
-                    );
-
-                    // Kick any current session to force reconnect with the active profile
-                    try {
-                        app(MikrotikController::class)->singleWrite(
-                            $customer->pppUser->router_name,
-                            '/ppp active remove [find name="'.$customer->pppUser->username.'"]'
-                        );
-                    } catch (\Exception $e) {
-                        Log::debug('PaymentService session kick skipped: '.$e->getMessage());
-                    }
-
-                    // Sync the local PPPSecrets status
-                    PPPSecrets::where('id', $customer->ppp_user_id)->update(['status' => 'active']);
-                } else {
-                    // Disable secret on router if not active
-                    app(MikrotikController::class)->disablePPPSecret(
-                        $customer->customer_unique_id,
-                        $customer->pppUser->router_name,
-                        $customer->pppUser->username
-                    );
-                    PPPSecrets::where('id', $customer->ppp_user_id)->update(['status' => 'disabled']);
-                }
+            // 7. Enable customer on Mikrotik Router via Queued Job (Async)
+            if ($customer->status === 'active' && $customer->ppp_user_id) {
+                // Update local status immediately
+                PPPSecrets::where('id', $customer->ppp_user_id)->update(['status' => 'active']);
+                
+                // Dispatch queued worker job to provision router without blocking HTTP response
+                ProvisionMikrotikUserJob::dispatch($customer->id);
             }
+
+            // 8. Reconcile matching unmatched payment record if present
+            UnmatchedPayment::where('transaction_code', $trxId)
+                ->where('status', 'pending')
+                ->update([
+                    'status' => 'matched',
+                    'customer_id' => $customer->id,
+                    'customer_unique_id' => $customer->customer_unique_id,
+                    'assigned_at' => now(),
+                ]);
 
             DB::commit();
 

@@ -425,7 +425,7 @@ class ScheduledTasksController extends Controller
                                 $template->template
                             );
                         } else {
-                            $message = 'Dear '.$customer->customer_name.', Your ID '.$customer->customer_unique_id.'('.($customer->pppUser->username ?? '').') is EXPIRED on: '.Carbon::parse($expiredDate)->format('d-M-Y').', Your Due amount: '.$customer->billing->due_amount.'TK, Please Pay it before '.Carbon::parse($expiredDate)->format('d-M-Y').' to avoid Disconnection. Regards, '.siteUrlSettings('site_name').', Mobile: '.siteUrlSettings('site_phone');
+                            $message = 'Dear '.$customer->customer_name.', Your ID '.$customer->customer_unique_id.'('.($customer->pppUser->username ?? '').') is EXPIRED on: '.Carbon::parse($expiredDate)->format('d-M-Y').', Your Due amount: KES '.$customer->billing->due_amount.', Please Pay it before '.Carbon::parse($expiredDate)->format('d-M-Y').' to avoid Disconnection. Regards, '.siteUrlSettings('site_name').', Mobile: '.siteUrlSettings('site_phone');
                         }
 
                         $response = SmsBridge::to($customer->mobile)
@@ -463,7 +463,7 @@ class ScheduledTasksController extends Controller
 
     public function userDisable()
     {
-        $tz = config('app.timezone') ?: 'Asia/Dhaka';
+        $tz = config('app.timezone') ?: 'Africa/Nairobi';
         $today = Carbon::now($tz)->startOfDay();
         $successfulIDs = [];
         $errorIDs = [];
@@ -590,7 +590,7 @@ class ScheduledTasksController extends Controller
                                     $successfulSMS = '->{sms disabled}';
                                 }
                             } else {
-                                $message = 'Dear '.$customer->customer_name.', Your ID '.$customer->customer_unique_id.'('.($customer->pppUser->username ?? '').') is temporarily disconnected, Your Due amount: '.$due.'TK. Regards, '.siteUrlSettings('site_name').', Mobile: '.siteUrlSettings('site_phone');
+                                $message = 'Dear '.$customer->customer_name.', Your ID '.$customer->customer_unique_id.'('.($customer->pppUser->username ?? '').') is temporarily disconnected, Your Due amount: KES '.$due.'. Regards, '.siteUrlSettings('site_name').', Mobile: '.siteUrlSettings('site_phone');
 
                                 // Send SMS
                                 $responseSms = SmsBridge::to($customer->mobile)

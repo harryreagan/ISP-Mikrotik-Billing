@@ -24,7 +24,7 @@
                             @forelse($vouchers as $voucher)
                                 <tr>
                                     <td class="fw-bold text-dark ps-3"><code>{{ $voucher->code }}</code></td>
-                                    <td class="fw-semibold text-success">৳{{ number_format($voucher->value, 2) }}</td>
+                                    <td class="fw-semibold text-success">KES {{ number_format($voucher->value, 2) }}</td>
                                     <td>
                                         @if($voucher->type === 'package_based')
                                             <span class="badge bg-primary-subtle text-primary">{{ __('Package: :package', ['package' => $voucher->package->package ?? 'N/A']) }}</span>

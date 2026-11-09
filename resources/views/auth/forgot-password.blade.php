@@ -1,47 +1,333 @@
-<x-guest-layout>
-    <x-authentication-card class="box__sm">
-        <x-slot name="logo">
-            <x-authentication-card-logo />
-        </x-slot>
+@php
+    $siteName = siteUrlSettings('site_name') ?? 'HSmart WiFi Billing';
+@endphp
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Reset Password – {{ $siteName }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --font-sans: 'Jost', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --bg-page: #FAFAF8;
+            --ink: #111111;
+            --secondary: #666666;
+            --primary: #F47B06;
+            --primary-hover: #E86F00;
+            --accent: #6D3FE0;
+            --navy: #161B2E;
+            --border: #E6E3F5;
+        }
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: var(--font-sans);
+            color: var(--ink);
+            background-color: var(--bg-page);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+        .auth-container {
+            display: flex;
+            width: 100%;
+            min-height: 100vh;
+        }
+        .hero-panel {
+            flex: 1 1 50%;
+            min-height: 100vh;
+            background-color: var(--navy);
+            background-image: url('{{ asset('images/gallery/rack.jpg') }}');
+            background-position: center center;
+            background-size: cover;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 48px 56px;
+            color: #ffffff;
+            overflow: hidden;
+        }
+        .hero-overlay {
+            position: absolute;
+            inset: 0;
+            background-color: rgba(22, 27, 46, 0.90);
+            z-index: 1;
+        }
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100%;
+            gap: 36px;
+        }
+        .brand-badge {
+            display: inline-flex;
+            align-items: center;
+            background: #ffffff;
+            padding: 10px 22px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            align-self: flex-start;
+        }
+        .brand-badge img {
+            height: 44px;
+            width: auto;
+            object-fit: contain;
+            display: block;
+        }
+        .hero-middle {
+            max-width: 520px;
+        }
+        .hero-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(244, 123, 6, 0.16);
+            border: 1px solid rgba(244, 123, 6, 0.45);
+            color: #F47B06;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 6px 16px;
+            border-radius: 999px;
+            margin-bottom: 20px;
+        }
+        .hero-title {
+            font-size: clamp(32px, 3.2vw, 44px);
+            font-weight: 800;
+            line-height: 1.15;
+            color: #ffffff;
+            margin-bottom: 16px;
+            letter-spacing: -0.02em;
+        }
+        .hero-text {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #D1D5DB;
+        }
 
-        <div class="box__right">
-            <form class="form" method="POST" action="{{ route('password.email') }}">
-                @if (!siteUrlSettings('site_logo') && !siteUrlSettings('site_icon'))
-                    <div class="d-desktop-only" style="text-align: center; margin-bottom: 20px;">
-                        <h2 class="neon-text audiowide-bold" style="font-size: 2rem; color: #06ad73; text-shadow: 0 0 5px #06ad73;">{{ siteUrlSettings('site_name') ?? 'Code Pagol' }}</h2>
-                    </div>
-                @endif
-                <h2 class="form__title">{{ __('Forget Password') }}</h2>
+        .form-panel {
+            flex: 1 1 50%;
+            min-height: 100vh;
+            background: var(--bg-page);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 32px;
+        }
+        .form-card {
+            width: 100%;
+            max-width: 440px;
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 20px 45px rgba(22, 27, 46, 0.06);
+        }
+        .mobile-brand {
+            display: none;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        .mobile-brand img {
+            height: 42px;
+            width: auto;
+            object-fit: contain;
+        }
+        .back-link {
+            display: inline-block;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--accent);
+            text-decoration: none;
+            margin-bottom: 20px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .form-header h1 {
+            font-size: 30px;
+            font-weight: 800;
+            color: var(--ink);
+            letter-spacing: -0.02em;
+            margin-bottom: 8px;
+        }
+        .form-header p {
+            font-size: 14px;
+            color: var(--secondary);
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--ink);
+            margin-bottom: 8px;
+        }
+        .form-input {
+            width: 100%;
+            height: 52px;
+            padding: 0 16px;
+            font-family: inherit;
+            font-size: 15px;
+            color: var(--ink);
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(109, 63, 224, 0.15);
+        }
+        .btn-submit {
+            width: 100%;
+            height: 52px;
+            background: var(--primary);
+            color: var(--ink);
+            border: none;
+            border-radius: 14px;
+            font-family: inherit;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-submit:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(244, 123, 6, 0.35);
+        }
+        .alert-box {
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            margin-bottom: 18px;
+        }
+        .alert-error {
+            background: #FEF2F2;
+            border: 1px solid #FECACA;
+            color: #B91C1C;
+        }
+        .alert-success {
+            background: #ECFDF5;
+            border: 1px solid #A7F3D0;
+            color: #047857;
+        }
+        .field-error {
+            display: block;
+            color: #DC2626;
+            font-size: 13px;
+            font-weight: 600;
+            margin-top: 6px;
+        }
+
+        @media (max-width: 960px) {
+            .hero-panel {
+                display: none;
+            }
+            .form-panel {
+                flex: 1 1 100%;
+                padding: 32px 20px;
+            }
+            .mobile-brand {
+                display: block;
+            }
+            .form-card {
+                padding: 30px 20px;
+                border: none;
+                box-shadow: none;
+                background: transparent;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="auth-container">
+    <div class="hero-panel">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+            <div class="brand-badge">
+                <img src="{{ asset('images/hsmart-isp-logo.jpg') }}" alt="HSmart ISP">
+            </div>
+
+            <div class="hero-middle">
+                <div class="hero-pill">
+                    <span>🔒 Account Security</span>
+                </div>
+                <h1 class="hero-title">Reset your password quickly & securely.</h1>
+                <p class="hero-text">
+                    Regain access to your router management, customer profiles, and real-time M-Pesa collections in seconds.
+                </p>
+            </div>
+
+            <div style="font-size: 13px; color: #9CA3AF;">
+                Need assistance? Contact support@hsmart.co.ke
+            </div>
+        </div>
+    </div>
+
+    <div class="form-panel">
+        <div class="form-card">
+            <div class="mobile-brand">
+                <img src="{{ asset('images/hsmart-isp-logo.jpg') }}" alt="HSmart ISP">
+            </div>
+
+            <a href="{{ route('login') }}" class="back-link">← Back to Sign In</a>
+
+            <div class="form-header">
+                <h1>Forgot Password</h1>
+                <p>Enter your email address and we will send you a secure link to reset your password.</p>
+            </div>
+
+            @if(session('status'))
+                <div class="alert-box alert-success">{{ session('status') }}</div>
+            @endif
+
+            <form method="POST" action="{{ route('password.email') }}">
                 @csrf
-
-                <div class="mb-4 form__text">
-                    {{ __('Forgot your password? No problem. Just let us know your email address and we will email you a password reset link that will allow you to choose a new one.') }}
+                <div class="form-group">
+                    <label class="form-label" for="email">Email address</label>
+                    <input class="form-input {{ $errors->has('email') ? 'is-invalid' : '' }}" 
+                           id="email" 
+                           type="email" 
+                           name="email" 
+                           value="{{ old('email') }}" 
+                           required 
+                           autofocus 
+                           placeholder="you@hsmart.co.ke" 
+                           autocomplete="username">
+                    @if($errors->has('email'))
+                        <span class="field-error">{{ $errors->first('email') }}</span>
+                    @endif
                 </div>
 
-                <div class="input-group">
-                    <x-input class="form-control" id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus  placeholder="E-mail" autocomplete="username" />
-                    <span class="icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-bounding-box" viewBox="0 0 16 16">
-                            <path d="M1.5 1a.5.5 0 0 0-.5.5v3a.5.5 0 0 1-1 0v-3A1.5 1.5 0 0 1 1.5 0h3a.5.5 0 0 1 0 1zM11 .5a.5.5 0 0 1 .5-.5h3A1.5 1.5 0 0 1 16 1.5v3a.5.5 0 0 1-1 0v-3a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 1-.5-.5M.5 11a.5.5 0 0 1 .5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 1 0 1h-3A1.5 1.5 0 0 1 0 14.5v-3a.5.5 0 0 1 .5-.5m15 0a.5.5 0 0 1 .5.5v3a1.5 1.5 0 0 1-1.5 1.5h-3a.5.5 0 0 1 0-1h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 1 .5-.5"/>
-                            <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm8-9a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>
-                        </svg>
-                    </span>
-                </div>
-
-                @session('status')
-                    <div class="mb-4 font-medium text-sm text-green-600 dark:text-green-400">
-                        {{ $value }}
-                    </div>
-                @endsession
-
-                <x-validation-errors class="mb-4" />
-
-                <button type="submit" class="form__button">{{ __('Email Password Reset Link') }}</button>
-
-                <a wire:navigate.hover wire:current="active" class="form__text" href="{{ route('login') }}">
-                    {{ __('Back to Login Page?') }}
-                </a>
+                <button type="submit" class="btn-submit">Send Reset Link</button>
             </form>
         </div>
-    </x-authentication-card>
-</x-guest-layout>
+    </div>
+</div>
+
+</body>
+</html>

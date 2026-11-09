@@ -177,6 +177,14 @@
                             href="{{ route('payment-invoice') }}">
                             {{ __('Payment Invoice') }}
                         </a>
+                        <a wire:navigate.hover wire:current="active" class="dropdown-item link-600 fw-medium"
+                            href="{{ route('admin.unmatched-payments') }}">
+                            {{ __('Unmatched Payments') }}
+                        </a>
+                        <a wire:navigate.hover wire:current="active" class="dropdown-item link-600 fw-medium"
+                            href="{{ route('admin.payment-gateways') }}">
+                            {{ __('Payment Gateways') }}
+                        </a>
                     </div>
                 </div>
             </li>

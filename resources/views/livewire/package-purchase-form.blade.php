@@ -27,7 +27,7 @@
                                     </div>
                                     <div class="text-end">
                                         <small class="d-block text-uppercase fs-11">Price</small>
-                                        <strong class="fs-6 text-success">{{ number_format($price, 0) }} ৳ /
+                                        <strong class="fs-6 text-success">{{ number_format($price, 0) }} KES  /
                                             Month</strong>
                                     </div>
                                 </div>

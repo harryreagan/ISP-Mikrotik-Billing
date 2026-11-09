@@ -55,10 +55,11 @@ class PPPSecrets extends Authenticatable implements FilamentUser, HasAvatar
 
     /**
      * Determine if the user can access the Filament panel.
+     * End-users (PPP Secrets) are strictly confined to the customer 'portal' panel.
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        return true; // You can add logic here to restrict access if needed
+        return $panel->getId() === 'portal' && !in_array($this->status, ['terminated', 'deleted'], true);
     }
 
     /**

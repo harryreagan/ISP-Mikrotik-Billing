@@ -175,81 +175,211 @@ class WebhookPaymentController extends Controller
     }
 
     /**
-     * Handle MFS SMS Forwarder webhooks.
+     * Handle M-Pesa SMS Forwarder webhooks.
+     *
+     * Kenya M-Pesa Forwarder rules:
+     * - Auth with Bearer token in header ONLY (reject ?api_token= or query token).
+     * - Sender must be "MPESA" only.
+     * - Reject any SMS containing OTP/PIN/password/secret code.
+     * - Extract transaction code, amount, phone, name, account reference using MpesaSmsParser.
+     * - Unique check on transaction code.
+     * - Store raw SMS.
+     * - Match customer by account ref / PPP username / customer ID / phone.
+     * - If matched: PaymentService::fulfill().
+     * - If unmatched: store in unmatched_payments for manual assignment.
      */
     public function handleSmsReceiver(Request $request)
     {
-        // Log the SMS payload (Sanctum auth handles token verification)
-        Log::info('MFS SMS Forwarder Webhook received payload: ' . json_encode($request->all()));
+        // 1. Gate 1: Reject query string token authentication explicitly
+        if ($request->has('api_token') || $request->has('token')) {
+            Log::warning('SMS Receiver rejected: Query string token authentication attempted.');
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Query string token authentication is disabled. Provide Bearer token in Authorization header.'
+            ], 401);
+        }
 
-        $sender = $request->input('sender') ?? $request->input('from') ?? $request->input('sender_name') ?? '';
+        // 2. Gate 2: Header Bearer token authentication ONLY
+        $bearerToken = $request->bearerToken();
+        if (empty($bearerToken)) {
+            Log::warning('SMS Receiver rejected: Missing Authorization Bearer header.');
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Authorization header with Bearer token is required.'
+            ], 401);
+        }
+
+        $expectedToken = siteUrlSettings('sms_receiver_token') ?: config('services.sms_forwarder.token', env('SMS_RECEIVER_TOKEN'));
+        $authorized = false;
+
+        if (! empty($expectedToken) && hash_equals($expectedToken, $bearerToken)) {
+            $authorized = true;
+        } else {
+            // Alternatively check Sanctum personal access token
+            $pat = \Laravel\Sanctum\PersonalAccessToken::findToken($bearerToken);
+            if ($pat && $pat->tokenable) {
+                $authorized = true;
+            }
+        }
+
+        if (! $authorized) {
+            Log::warning('SMS Receiver rejected: Invalid Bearer token provided.');
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized: Invalid Bearer token.'
+            ], 401);
+        }
+
+        // Log the received SMS payload safely with secrets redacted
+        \App\Services\Security\SafePayloadLogger::info('M-Pesa SMS Forwarder Webhook received payload', $request->all());
+
+        // 3. Gate 3: Sender verification — accept "MPESA" only
+        $rawSender = $request->input('sender') ?? $request->input('from') ?? $request->input('sender_name') ?? '';
+        $cleanSender = strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', (string) $rawSender));
+
+        if ($cleanSender !== 'MPESA') {
+            Log::warning("SMS Receiver rejected: Non-MPESA sender '{$rawSender}'");
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Sender must be MPESA'
+            ], 403);
+        }
+
         $message = $request->input('message') ?? $request->input('text') ?? $request->input('body') ?? $request->input('msg') ?? '';
-
-        if (empty($message)) {
+        if (empty(trim((string) $message))) {
             return response()->json(['status' => 'ignored', 'message' => 'Empty message content'], 200);
         }
 
-        // 2. Parse SMS parameters
-        $parsed = $this->parseSms($sender, $message);
-        $amount = $parsed['amount'];
-        $trxId = $parsed['trxId'];
-        $ref = $parsed['ref'];
-        $senderMobile = $parsed['senderMobile'];
-        $gateway = $parsed['gateway'];
-
-        if (!$amount || !$trxId) {
-            Log::warning("Could not extract amount or transaction ID from MFS SMS. Parsed Amount: '{$amount}', TrxID: '{$trxId}'");
-            return response()->json(['status' => 'error', 'message' => 'Failed to parse SMS content'], 422);
+        // 4. Gate 4: Reject sensitive security keywords (OTP / PIN / password / verification code)
+        if (preg_match('/\b(otp|pin|password|secret\s*code|verification\s*code|one\s*time\s*pin)\b/i', $message)) {
+            Log::warning('SMS Receiver rejected: Message contains sensitive OTP/PIN/Password keyword.');
+            return response()->json([
+                'status' => 'ignored',
+                'message' => 'Security keyword detected in SMS content'
+            ], 422);
         }
 
+        // 5. Gate 5: Parse M-Pesa SMS using MpesaSmsParser
+        $parsed = \App\Services\MpesaSmsParser::parse($message);
+        if (! $parsed) {
+            Log::warning('SMS Receiver: Failed to parse M-Pesa parameters from SMS: ' . $message);
+            return response()->json(['status' => 'error', 'message' => 'Failed to parse M-Pesa SMS format'], 422);
+        }
+
+        $trxId            = $parsed['transaction_code'];
+        $amount           = $parsed['amount'];
+        $senderPhone      = $parsed['phone'];
+        $senderName       = $parsed['sender_name'];
+        $accountReference = $parsed['account_reference'];
+
+        // 6. Gate 6: Idempotency check — reject already-processed transactions
+        if (CollectionSummary::where('transaction_id', $trxId)->exists()) {
+            Log::info("SMS Receiver duplicate transaction ignored: {$trxId}");
+            return response()->json(['status' => 'ignored', 'message' => 'Transaction already processed'], 200);
+        }
+
+        // 7. Customer Matching Strategy
         $customer = null;
 
-        // Step 1: Match by reference in SMS (customer unique ID)
-        if ($ref) {
-            $customer = CustomersInfo::where('customer_unique_id', $ref)->first();
+        // A. Match by Account Reference -> Customer Unique ID
+        if ($accountReference) {
+            $customer = CustomersInfo::where('customer_unique_id', $accountReference)->first();
         }
 
-        // Step 2: Match by reference in SMS (PPP secret username)
-        if (!$customer && $ref) {
-            $customer = CustomersInfo::whereHas('pppUser', function ($query) use ($ref) {
-                $query->where('username', $ref);
+        // B. Match by Account Reference -> PPP Secret Username
+        if (! $customer && $accountReference) {
+            $customer = CustomersInfo::whereHas('pppUser', function ($query) use ($accountReference) {
+                $query->where('username', $accountReference);
             })->first();
         }
 
-        // Step 3: Match by sender's mobile number
-        if (!$customer && $senderMobile) {
-            // Clean up 88/+88 prefixes for matching
-            $cleanMobile = $senderMobile;
-            if (str_starts_with($cleanMobile, '88')) {
-                $cleanMobile = substr($cleanMobile, 2);
-            } elseif (str_starts_with($cleanMobile, '+88')) {
-                $cleanMobile = substr($cleanMobile, 3);
-            }
+        // C. Match by Sender's Mobile Number (254 format)
+        if (! $customer && $senderPhone) {
+            $normalizedMobile = normalizeKenyanPhone($senderPhone);
+            $local0 = $normalizedMobile ? ('0' . substr($normalizedMobile, 3)) : null;
 
-            $customer = CustomersInfo::where('mobile', $cleanMobile)
-                ->orWhere('mobile', '88' . $cleanMobile)
-                ->orWhere('mobile', '+88' . $cleanMobile)
+            $customer = CustomersInfo::where('mobile', $normalizedMobile)
+                ->orWhere('mobile', '+' . $normalizedMobile)
+                ->when($local0, fn($q) => $q->orWhere('mobile', $local0))
+                ->orWhere('alternative_mobile', $normalizedMobile)
                 ->first();
         }
 
-        if (!$customer) {
-            Log::warning("No matching customer found for MFS SMS. Ref: '{$ref}', SenderMobile: '{$senderMobile}', TrxID: '{$trxId}'");
-            return response()->json(['status' => 'error', 'message' => 'No matching customer found'], 404);
+        // 8. If Customer Not Matched -> Store in unmatched_payments for manual assignment
+        if (! $customer) {
+            Log::warning("No matching customer found for M-Pesa SMS. TrxID: {$trxId}, Ref: {$accountReference}, Phone: {$senderPhone}. Logging to unmatched_payments.");
+
+            \App\Models\UnmatchedPayment::updateOrCreate(
+                ['transaction_code' => $trxId],
+                [
+                    'source'            => 'mpesa_sms',
+                    'sender'            => $rawSender ?: 'MPESA',
+                    'amount'            => $amount,
+                    'phone'             => $senderPhone,
+                    'sender_name'       => $senderName,
+                    'account_reference' => $accountReference,
+                    'raw_message'       => $message,
+                    'raw_payload'       => $request->all(),
+                    'status'            => 'pending',
+                ]
+            );
+
+            return response()->json([
+                'status'           => 'unmatched',
+                'message'          => 'Payment logged to unmatched payments for manual assignment',
+                'transaction_code' => $trxId,
+                'amount'           => $amount,
+            ], 200);
         }
 
+        // 9. If Customer Matched -> Fulfill payment and mark record matched
         try {
-            $this->paymentService->processSuccessPayment($customer, (float)$amount, $gateway, $trxId);
+            // First record raw unmatched record as matched for tracking
+            \App\Models\UnmatchedPayment::updateOrCreate(
+                ['transaction_code' => $trxId],
+                [
+                    'source'             => 'mpesa_sms',
+                    'sender'             => $rawSender ?: 'MPESA',
+                    'amount'             => $amount,
+                    'phone'              => $senderPhone,
+                    'sender_name'        => $senderName,
+                    'account_reference'  => $accountReference,
+                    'raw_message'        => $message,
+                    'raw_payload'        => $request->all(),
+                    'status'             => 'matched',
+                    'customer_id'        => $customer->id,
+                    'customer_unique_id' => $customer->customer_unique_id,
+                    'assigned_at'        => now(),
+                ]
+            );
+
+            $this->paymentService->fulfill(
+                $customer,
+                (float) $amount,
+                'mpesa_sms',
+                $trxId,
+                [
+                    'sender_phone'       => $senderPhone,
+                    'sender_name'        => $senderName,
+                    'account_reference'  => $accountReference,
+                    'raw_sms'            => $message,
+                ]
+            );
+
             return response()->json([
-                'status' => 'success',
-                'message' => 'Payment processed successfully',
-                'customer' => $customer->customer_unique_id,
-                'amount' => $amount,
-                'gateway' => $gateway,
-                'transaction_id' => $trxId
+                'status'           => 'success',
+                'message'          => 'Payment fulfilled and customer renewed successfully',
+                'customer'         => $customer->customer_unique_id,
+                'amount'           => $amount,
+                'gateway'          => 'mpesa_sms',
+                'transaction_code' => $trxId,
             ]);
         } catch (\Exception $e) {
-            Log::error("Failed to process MFS SMS payment: " . $e->getMessage());
-            return response()->json(['status' => 'error', 'message' => 'Payment process exception: ' . $e->getMessage()], 500);
+            Log::error("Failed to fulfill M-Pesa SMS payment: " . $e->getMessage());
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Payment fulfillment error: ' . $e->getMessage(),
+            ], 500);
         }
     }
 

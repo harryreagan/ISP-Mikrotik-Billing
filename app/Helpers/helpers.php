@@ -11,13 +11,18 @@ use App\Models\MainSiteData;
  */
 
 if (! function_exists('siteUrlSettings')) {
-    function siteUrlSettings($key)
+    function siteUrlSettings($key, $fresh = false)
     {
         static $hasTable = null;
         static $runtimeCache = [];
 
+        if ($fresh || app()->environment('testing')) {
+            $hasTable = null;
+            $runtimeCache = [];
+        }
+
         try {
-            if ($hasTable === null) {
+            if ($hasTable === null || $hasTable === false) {
                 $hasTable = \Illuminate\Support\Facades\Schema::hasTable('main_site_data');
             }
             if (! $hasTable) {
@@ -119,3 +124,43 @@ if (! function_exists('site_image')) {
         return asset($path);
     }
 }
+
+if (! function_exists('normalizeKenyanPhone')) {
+    /**
+     * Normalize a phone number to standard Kenyan format (2547XXXXXXXX or 2541XXXXXXXX).
+     */
+    function normalizeKenyanPhone(?string $phone): ?string
+    {
+        if (! $phone) {
+            return null;
+        }
+
+        // Strip non-digit characters
+        $digits = preg_replace('/\D+/', '', $phone);
+
+        // 07XXXXXXXX or 01XXXXXXXX (10 digits) -> 2547XXXXXXXX / 2541XXXXXXXX
+        if (strlen($digits) === 10 && str_starts_with($digits, '0')) {
+            $digits = '254' . substr($digits, 1);
+        }
+
+        // 7XXXXXXXX or 1XXXXXXXX (9 digits) -> 2547XXXXXXXX / 2541XXXXXXXX
+        if (strlen($digits) === 9 && (str_starts_with($digits, '7') || str_starts_with($digits, '1'))) {
+            $digits = '254' . $digits;
+        }
+
+        // 25407XXXXXXXX or 25401XXXXXXXX (13 digits) -> 2547XXXXXXXX / 2541XXXXXXXX
+        if (strlen($digits) === 13 && (str_starts_with($digits, '25407') || str_starts_with($digits, '25401'))) {
+            $digits = '254' . substr($digits, 4);
+        }
+
+        return $digits;
+    }
+}
+
+if (! function_exists('format_currency')) {
+    function format_currency($amount, $currency = 'KES'): string
+    {
+        return $currency . ' ' . number_format((float) $amount, 2);
+    }
+}
+

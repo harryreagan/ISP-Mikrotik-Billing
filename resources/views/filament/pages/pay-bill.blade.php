@@ -95,7 +95,7 @@
                 <div class="{{ $dueAmount > 0 ? 'cp-bg-gradient-to-br cp-from-rose-500 cp-to-red-600 dark:cp-from-rose-600 dark:cp-to-red-700 cp-shadow-rose-500/10' : 'cp-bg-gradient-to-br cp-from-slate-500 cp-to-slate-600 dark:cp-from-slate-600 dark:cp-to-slate-700 cp-shadow-slate-500/10' }} cp-text-white cp-shadow-lg cp-rounded-3xl cp-p-5 cp-flex cp-items-center cp-justify-between">
                     <div>
                         <span class="cp-text-white/80 cp-text-xs cp-font-semibold cp-uppercase cp-tracking-wider cp-block">Current Due Balance</span>
-                        <span class="cp-text-2xl cp-font-black cp-mt-1.5 cp-block">৳ {{ number_format($dueAmount, 2) }}</span>
+                        <span class="cp-text-2xl cp-font-black cp-mt-1.5 cp-block">KES {{ number_format($dueAmount, 2) }}</span>
                     </div>
                     <div class="cp-p-3 cp-bg-white/10 cp-rounded-2xl">
                         <svg style="width: 28px; height: 28px; min-width: 28px; min-height: 28px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -108,7 +108,7 @@
                 <div class="cp-bg-gradient-to-br cp-from-emerald-500 cp-to-teal-600 dark:cp-from-emerald-600 dark:cp-to-teal-700 cp-text-white cp-shadow-lg cp-shadow-emerald-500/10 cp-rounded-3xl cp-p-5 cp-flex cp-items-center cp-justify-between">
                     <div>
                         <span class="cp-text-white/80 cp-text-xs cp-font-semibold cp-uppercase cp-tracking-wider cp-block">Monthly Plan Cost</span>
-                        <span class="cp-text-2xl cp-font-black cp-mt-1.5 cp-block">৳ {{ number_format($billing->monthly_rent ?? 0, 2) }}</span>
+                        <span class="cp-text-2xl cp-font-black cp-mt-1.5 cp-block">KES {{ number_format($billing->monthly_rent ?? 0, 2) }}</span>
                     </div>
                     <div class="cp-p-3 cp-bg-white/10 cp-rounded-2xl">
                         <svg style="width: 28px; height: 28px; min-width: 28px; min-height: 28px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -256,11 +256,11 @@
                             
                             <!-- Amount Input -->
                             <div class="cp-text-left">
-                                <label for="payment_amount" class="cp-text-[11px] cp-font-bold cp-tracking-wider cp-text-gray-500 dark:cp-text-slate-400 cp-block cp-mb-2.5 cp-uppercase">Amount to Pay (BDT)</label>
+                                <label for="payment_amount" class="cp-text-[11px] cp-font-bold cp-tracking-wider cp-text-gray-500 dark:cp-text-slate-400 cp-block cp-mb-2.5 cp-uppercase">Amount to Pay (KES)</label>
                                 <div class="cp-relative cp-rounded-2xl cp-overflow-hidden cp-bg-gray-50 dark:cp-bg-slate-950 cp-border cp-border-gray-200 dark:cp-border-white/10 focus-within:cp-border-indigo-500 focus-within:cp-ring-2 focus-within:cp-ring-indigo-500/15 cp-transition-all cp-duration-300">
-                                    <span class="cp-absolute cp-inset-y-0 cp-left-0 cp-pl-4 cp-flex cp-items-center cp-text-gray-400 dark:cp-text-slate-500 cp-font-bold cp-text-lg cp-select-none">৳</span>
+                                    <span class="cp-absolute cp-inset-y-0 cp-left-0 cp-pl-3 cp-flex cp-items-center cp-text-gray-400 dark:cp-text-slate-500 cp-font-bold cp-text-sm cp-select-none">KES</span>
                                     <input type="number" step="0.01" min="1" id="payment_amount" wire:model="amount" 
-                                        class="cp-w-full cp-bg-transparent cp-border-0 cp-py-4 cp-pl-9 cp-pr-4 cp-text-gray-900 dark:cp-text-white focus:cp-outline-none focus:cp-ring-0 cp-text-lg cp-font-bold"
+                                        class="cp-w-full cp-bg-transparent cp-border-0 cp-py-4 cp-pl-14 cp-pr-4 cp-text-gray-900 dark:cp-text-white focus:cp-outline-none focus:cp-ring-0 cp-text-lg cp-font-bold"
                                         placeholder="Enter amount..." required>
                                 </div>
                                 @error('amount') <span class="cp-text-xs cp-text-rose-500 cp-mt-2 cp-block cp-font-medium">{{ $message }}</span> @enderror
@@ -270,13 +270,13 @@
                                     @if($dueAmount > 0)
                                         <button type="button" wire:click="$set('amount', {{ $dueAmount }})"
                                             class="cp-text-xs cp-font-semibold cp-px-3 cp-py-1.5 cp-rounded-xl cp-border cp-border-rose-500/20 cp-bg-rose-500/5 cp-text-rose-500 hover:cp-bg-rose-500/10 hover:cp-border-rose-500/40 cp-transition-all cp-duration-200">
-                                            Pay Full Due (৳{{ number_format($dueAmount, 0) }})
+                                            Pay Full Due (KES {{ number_format($dueAmount, 0) }})
                                         </button>
                                     @endif
                                     @if(($billing->monthly_rent ?? 0) > 0)
                                         <button type="button" wire:click="$set('amount', {{ $billing->monthly_rent }})"
                                             class="cp-text-xs cp-font-semibold cp-px-3 cp-py-1.5 cp-rounded-xl cp-border cp-border-gray-200 dark:cp-border-white/10 cp-bg-gray-50 dark:cp-bg-white/5 cp-text-gray-600 dark:cp-text-slate-300 hover:cp-bg-gray-100 dark:hover:cp-bg-white/10 hover:cp-border-gray-300 dark:hover:cp-border-white/20 cp-transition-all cp-duration-200">
-                                            Pay Plan Rent (৳{{ number_format($billing->monthly_rent, 0) }})
+                                            Pay Plan Rent (KES {{ number_format($billing->monthly_rent, 0) }})
                                         </button>
                                     @endif
                                 </div>
@@ -332,57 +332,34 @@
                                             </label>
                                         @endforeach
                                     @else
-                                        {{-- Legacy fallback if no PayBridge gateway is active --}}
-                                        @if(siteUrlSettings('payment_bkash_enabled'))
-                                            <label class="cp-relative cp-flex cp-items-center cp-justify-between cp-p-4 cp-rounded-2xl cp-border cp-transition-all cp-duration-300 cp-cursor-pointer cp-group {{ $paymentMethod === 'bkash' ? 'cp-border-pink-500 cp-bg-pink-500/5 cp-shadow-[0_0_20px_rgba(236,72,153,0.15)] cp-ring-1 cp-ring-pink-500/50' : 'cp-border-gray-200 dark:cp-border-white/5 cp-bg-gray-50/50 dark:cp-bg-slate-950/20 hover:cp-border-gray-300 dark:hover:cp-border-white/15' }}">
-                                                <div class="cp-flex cp-items-center cp-gap-3">
-                                                    <input type="radio" name="gateway" value="bkash" wire:model.live="paymentMethod" 
-                                                        class="cp-text-pink-600 focus:cp-ring-pink-500/20 cp-bg-white dark:cp-bg-slate-950 cp-border-gray-300 dark:cp-border-white/10 cp-h-4.5 cp-w-4.5">
-                                                    <span class="cp-text-sm cp-font-bold cp-text-gray-900 dark:cp-text-white group-hover:cp-text-pink-500 cp-transition-colors">bKash Checkout</span>
-                                                </div>
-                                                <div class="cp-px-2.5 cp-py-1 cp-bg-pink-600/10 cp-text-pink-500 cp-text-[10px] cp-tracking-wider cp-font-extrabold cp-rounded-lg cp-uppercase">bKash</div>
-                                            </label>
-                                        @endif
-
-                                        @if(siteUrlSettings('payment_nagad_enabled'))
-                                            <label class="cp-relative cp-flex cp-items-center cp-justify-between cp-p-4 cp-rounded-2xl cp-border cp-transition-all cp-duration-300 cp-cursor-pointer cp-group {{ $paymentMethod === 'nagad' ? 'cp-border-orange-500 cp-bg-orange-500/5 cp-shadow-[0_0_20px_rgba(249,115,22,0.15)] cp-ring-1 cp-ring-orange-500/50' : 'cp-border-gray-200 dark:cp-border-white/5 cp-bg-gray-50/50 dark:cp-bg-slate-950/20 hover:cp-border-gray-300 dark:hover:cp-border-white/15' }}">
-                                                <div class="cp-flex cp-items-center cp-gap-3">
-                                                    <input type="radio" name="gateway" value="nagad" wire:model.live="paymentMethod" 
-                                                        class="cp-text-orange-600 focus:cp-ring-orange-500/20 cp-bg-white dark:cp-bg-slate-950 cp-border-gray-300 dark:cp-border-white/10 cp-h-4.5 cp-w-4.5">
-                                                    <span class="cp-text-sm cp-font-bold cp-text-gray-900 dark:cp-text-white group-hover:cp-text-orange-500 cp-transition-colors">Nagad Pay</span>
-                                                </div>
-                                                <div class="cp-px-2.5 cp-py-1 cp-bg-orange-600/10 cp-text-orange-500 cp-text-[10px] cp-tracking-wider cp-font-extrabold cp-rounded-lg cp-uppercase">Nagad</div>
-                                            </label>
-                                        @endif
-
-                                        @if(siteUrlSettings('payment_sslcommerz_enabled'))
-                                            <label class="cp-relative cp-flex cp-items-center cp-justify-between cp-p-4 cp-rounded-2xl cp-border cp-transition-all cp-duration-300 cp-cursor-pointer cp-group {{ $paymentMethod === 'sslcommerz' ? 'cp-border-blue-500 cp-bg-blue-500/5 cp-shadow-[0_0_20px_rgba(59,130,246,0.15)] cp-ring-1 cp-ring-blue-500/50' : 'cp-border-gray-200 dark:cp-border-white/5 cp-bg-gray-50/50 dark:cp-bg-slate-950/20 hover:cp-border-gray-300 dark:hover:cp-border-white/15' }}">
-                                                <div class="cp-flex cp-items-center cp-gap-3">
-                                                    <input type="radio" name="gateway" value="sslcommerz" wire:model.live="paymentMethod" 
-                                                        class="cp-text-blue-600 focus:cp-ring-blue-500/20 cp-bg-white dark:cp-bg-slate-950 cp-border-gray-300 dark:cp-border-white/10 cp-h-4.5 cp-w-4.5">
-                                                    <span class="cp-text-sm cp-font-bold cp-text-gray-900 dark:cp-text-white group-hover:cp-text-blue-500 cp-transition-colors">SSLCommerz</span>
-                                                </div>
-                                                <div class="cp-px-2.5 cp-py-1 cp-bg-blue-600/10 cp-text-blue-500 cp-text-[10px] cp-tracking-wider cp-font-extrabold cp-rounded-lg cp-uppercase">SSL</div>
-                                            </label>
-                                        @endif
+                                        {{-- Kenyan Payment Option: M-Pesa --}}
+                                        <label class="cp-relative cp-flex cp-items-center cp-justify-between cp-p-4 cp-rounded-2xl cp-border cp-transition-all cp-duration-300 cp-cursor-pointer cp-group cp-border-emerald-500 cp-bg-emerald-500/5 cp-shadow-[0_0_20px_rgba(16,185,129,0.15)] cp-ring-1 cp-ring-emerald-500/50">
+                                            <div class="cp-flex cp-items-center cp-gap-3">
+                                                <input type="radio" name="gateway" value="mpesa" wire:model.live="paymentMethod" 
+                                                    class="cp-text-emerald-600 focus:cp-ring-emerald-500/20 cp-bg-white dark:cp-bg-slate-950 cp-border-gray-300 dark:cp-border-white/10 cp-h-4.5 cp-w-4.5" checked>
+                                                <span class="cp-text-sm cp-font-bold cp-text-gray-900 dark:cp-text-white group-hover:cp-text-emerald-500 cp-transition-colors">M-Pesa Express / STK Push</span>
+                                            </div>
+                                            <div class="cp-px-2.5 cp-py-1 cp-bg-emerald-600/10 cp-text-emerald-500 cp-text-[10px] cp-tracking-wider cp-font-extrabold cp-rounded-lg cp-uppercase">M-PESA</div>
+                                        </label>
                                     @endif
                                     
                                     @error('paymentMethod') <span class="cp-text-xs cp-text-rose-500 cp-mt-2 cp-block cp-font-medium">{{ $message }}</span> @enderror
                                 </div>
                             </div>
 
-                            <!-- Pay Button -->
+                            <!-- Pay Button (Orange #F47B06 with dark text #111) -->
                             <button type="submit" wire:loading.attr="disabled"
-                                class="btn-shimmer cp-relative cp-w-full cp-bg-gradient-to-r cp-from-indigo-600 cp-to-purple-600 hover:cp-from-indigo-500 hover:cp-to-purple-500 cp-text-white cp-font-bold cp-py-4 cp-px-6 cp-rounded-2xl cp-shadow-xl cp-shadow-indigo-950/25 cp-transition-all cp-duration-200 hover:cp--translate-y-0.5 active:cp-translate-y-0 cp-flex cp-items-center cp-justify-center cp-gap-2 cp-overflow-hidden cp-group">
+                                style="background: #F47B06 !important; color: #111111 !important;"
+                                class="btn-shimmer cp-relative cp-w-full hover:cp-brightness-95 cp-font-bold cp-py-4 cp-px-6 cp-rounded-2xl cp-shadow-xl cp-shadow-amber-500/20 cp-transition-all cp-duration-200 hover:cp--translate-y-0.5 active:cp-translate-y-0 cp-flex cp-items-center cp-justify-center cp-gap-2 cp-overflow-hidden cp-group">
                                 
-                                <span wire:loading.remove class="cp-flex cp-items-center cp-gap-2.5">
-                                    Proceed to Checkout
-                                    <svg style="width: 20px; height: 20px; min-width: 20px; min-height: 20px;" class="group-hover:cp-translate-x-1 cp-transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <span wire:loading.remove class="cp-flex cp-items-center cp-gap-2.5" style="color: #111111 !important; font-weight: 800;">
+                                    Pay with M-Pesa / Secure Checkout
+                                    <svg style="width: 20px; height: 20px; min-width: 20px; min-height: 20px; color: #111111;" class="group-hover:cp-translate-x-1 cp-transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
                                     </svg>
                                 </span>
-                                <span wire:loading class="cp-inline-block cp-w-5 cp-h-5 cp-border-2 cp-border-white/30 cp-border-t-white cp-rounded-full cp-animate-spin"></span>
-                                <span wire:loading>Redirecting to secure gateway...</span>
+                                <span wire:loading class="cp-inline-block cp-w-5 cp-h-5 cp-border-2 cp-border-black/30 cp-border-t-black cp-rounded-full cp-animate-spin"></span>
+                                <span wire:loading style="color: #111111 !important; font-weight: 700;">Redirecting to secure gateway...</span>
                             </button>
 
                         </form>

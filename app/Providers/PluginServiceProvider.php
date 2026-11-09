@@ -36,6 +36,10 @@ class PluginServiceProvider extends ServiceProvider
      */
     protected function registerFilamentExtensions(PluginManager $manager): void
     {
+        if (! $this->app->bound('filament')) {
+            return;
+        }
+
         // Filament panel registration happens via panel provider — we inject here
         // by hooking into Filament's booting lifecycle.
         \Filament\Facades\Filament::serving(function () use ($manager) {

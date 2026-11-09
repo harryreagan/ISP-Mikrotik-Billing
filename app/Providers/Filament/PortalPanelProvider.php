@@ -34,27 +34,19 @@ class PortalPanelProvider extends PanelProvider
             ->default()
             ->spa(hasPrefetching: true)
             ->id('portal')
-            ->path('')
-            ->domain('portal.'.$baseDomain)
+            ->path('portal')
             ->favicon(site_image(siteUrlSettings('site_favicon'), 'images/favicon.png'))
             ->brandLogo(site_image(siteUrlSettings('site_logo'), 'images/favicon.png'))
-            ->brandName(siteUrlSettings('site_name') ?? 'Code Pagol')
+            ->brandName('HSmart WiFi Billing')
             ->brandLogoHeight('3.5rem')
+            ->font('Jost')
             ->login(Login::class)
             ->registration((siteUrlSettings('portal_registration_enabled') ?? 1) ? Register::class : null)
             ->authGuard('ppp')
             ->profile(EditProfile::class)
             ->maxContentWidth(Width::Full)
             ->colors([
-                'primary' => match(siteUrlSettings('portal_theme_preset') ?? 'indigo') {
-                    'emerald' => Color::Emerald,
-                    'blue'    => Color::Blue,
-                    'orange'  => Color::Orange,
-                    'dark'    => Color::Slate,
-                    'indigo'  => Color::Indigo,
-                    'custom'  => Color::hex(siteUrlSettings('portal_primary_color') ?? '#6366f1'),
-                    default   => Color::hex('#06ad73'),
-                },
+                'primary' => Color::hex('#F47B06'),
             ])
             ->sidebarCollapsibleOnDesktop()
             ->navigationItems([

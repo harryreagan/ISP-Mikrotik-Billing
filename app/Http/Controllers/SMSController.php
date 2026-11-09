@@ -84,4 +84,67 @@ class SMSController extends Controller
             ->message($message)
             ->send();
     }
+
+    public function billReminderSMS(array $data)
+    {
+        $template = SmsTemplate::where('template_name', 'area_wise_customer_due_list')->first()
+            ?: SmsTemplate::where('template_name', 'all_customers')->first();
+
+        $companyName = $data['company_name'] ?? (siteUrlSettings('site_name') ?: config('app.name'));
+        $companyMobile = $data['company_mobile'] ?? (siteUrlSettings('site_phone') ?: '');
+
+        if ($template && $template->is_active) {
+            $message = str_replace(
+                ['{CUSTOMER_NAME}', '{AMOUNT}', '{CUSTOMER_ID}', '{LAST_DAY_DUE_DATE}', '{AUTO_TEMPORARY_DAY}', '{COMPANY_NAME}', '{COMPANY_MOBILE}'],
+                [
+                    $data['customer_name'] ?? 'Customer',
+                    $data['due_amount'] ?? 0,
+                    $data['customer_id'] ?? '',
+                    $data['due_date'] ?? $data['auto_temporary_day'] ?? 'soon',
+                    $data['auto_temporary_day'] ?? $data['due_date'] ?? 'soon',
+                    $companyName,
+                    $companyMobile,
+                ],
+                $template->template
+            );
+        } else {
+            $message = "Dear {$data['customer_name']}, your Internet bill of KES {$data['due_amount']} is due on {$data['due_date']}. Please pay to avoid disconnection. - {$companyName}";
+        }
+
+        $recipient = normalizeKenyanPhone($data['recipient']) ?? $data['recipient'];
+
+        return SmsBridge::to($recipient)
+            ->message($message)
+            ->send();
+    }
+
+    public function expiryNoticeSMS(array $data)
+    {
+        $template = SmsTemplate::where('template_name', 'auto_temporary_disable_alert')->first();
+
+        $companyName = $data['company_name'] ?? (siteUrlSettings('site_name') ?: config('app.name'));
+        $companyMobile = $data['company_mobile'] ?? (siteUrlSettings('site_phone') ?: '');
+
+        if ($template && $template->is_active) {
+            $message = str_replace(
+                ['{CUSTOMER_NAME}', '{CUSTOMER_ID}', '{DUE_AMOUNT}', '{COMPANY_NAME}', '{COMPANY_MOBILE}'],
+                [
+                    $data['customer_name'] ?? 'Customer',
+                    $data['customer_id'] ?? '',
+                    $data['due_amount'] ?? 0,
+                    $companyName,
+                    $companyMobile,
+                ],
+                $template->template
+            );
+        } else {
+            $message = "Dear {$data['customer_name']}, ID {$data['customer_id']} has expired and is disconnected. Due: KES {$data['due_amount']}. Please pay to restore service. - {$companyName}";
+        }
+
+        $recipient = normalizeKenyanPhone($data['recipient']) ?? $data['recipient'];
+
+        return SmsBridge::to($recipient)
+            ->message($message)
+            ->send();
+    }
 }

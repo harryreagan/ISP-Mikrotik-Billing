@@ -39,6 +39,15 @@ class CustomersInfo extends Model
     {
         parent::boot();
 
+        static::saving(function ($customer) {
+            if (! empty($customer->mobile)) {
+                $customer->mobile = normalizeKenyanPhone($customer->mobile) ?? $customer->mobile;
+            }
+            if (! empty($customer->alternative_mobile)) {
+                $customer->alternative_mobile = normalizeKenyanPhone($customer->alternative_mobile) ?? $customer->alternative_mobile;
+            }
+        });
+
         static::deleting(function ($customer) {
             if ($customer->pppUser()->exists()) {
                 throw new \Exception('Cannot delete customer because they are associated with an active PPPoE user. Please remove the PPPoE user first.');

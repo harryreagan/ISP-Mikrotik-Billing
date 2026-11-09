@@ -40,3 +40,4 @@ class HubSupportController extends Controller
         ], 500);
     }
 }
+

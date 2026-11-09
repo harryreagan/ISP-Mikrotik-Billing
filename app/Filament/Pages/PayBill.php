@@ -24,7 +24,7 @@ class PayBill extends Page
 
     public $amount;
 
-    public $paymentMethod = 'bkash';
+    public $paymentMethod = 'mpesa';
 
     public ?string $connectionStatus = 'checking...';
 
@@ -66,12 +66,8 @@ class PayBill extends Page
             $this->paymentMethod = $pbDefault;
         } elseif ($pbFirst) {
             $this->paymentMethod = $pbFirst;
-        } elseif (siteUrlSettings('payment_bkash_enabled')) {
-            $this->paymentMethod = 'bkash';
-        } elseif (siteUrlSettings('payment_nagad_enabled')) {
-            $this->paymentMethod = 'nagad';
-        } elseif (siteUrlSettings('payment_sslcommerz_enabled')) {
-            $this->paymentMethod = 'sslcommerz';
+        } else {
+            $this->paymentMethod = 'mpesa';
         }
 
         $this->connectionStatus = 'checking...';
@@ -146,11 +142,11 @@ class PayBill extends Page
             $payload = [
                 'amount'         => (float) $this->amount,
                 'transaction_id' => $trxId,
-                'currency'       => 'BDT',
+                'currency'       => 'KES',
                 'payer_reference'=> $this->customer->customer_unique_id,
                 'customer_name'  => $this->customer->customer_name ?: 'Customer',
                 'customer_email' => $this->customer->email ?: 'customer@isp.local',
-                'customer_phone' => $this->customer->mobile ?: '01700000000',
+                'customer_phone' => normalizeKenyanPhone($this->customer->mobile) ?: '254700000000',
                 'callback_url'   => $callbackUrl,
                 'success_url'    => $callbackUrl,
                 'fail_url'       => $callbackUrl,
@@ -194,13 +190,9 @@ class PayBill extends Page
             $routeParams['mock'] = 'true';
         }
 
-        if ($this->paymentMethod === 'bkash') {
-            return redirect()->route('payment.bkash.initiate', $routeParams);
-        } elseif ($this->paymentMethod === 'nagad') {
-            return redirect()->route('payment.nagad.initiate', $routeParams);
-        } elseif ($this->paymentMethod === 'sslcommerz') {
-            return redirect()->route('payment.sslcommerz.initiate', $routeParams);
-        }
+        // Fallback message if gateway driver is not active
+        session()->flash('error', 'Selected payment gateway is currently unavailable or under maintenance.');
+        return;
 
         session()->flash('error', 'Selected payment gateway is currently unavailable.');
     }
