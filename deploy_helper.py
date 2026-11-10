@@ -79,7 +79,7 @@ php artisan migrate --force && \
 php artisan optimize:clear && \
 php artisan test:smoke-routes
 """
-    code = run_cmd(["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=30", VPS_HOST, remote_post], timeout=90)
+    code = run_cmd(["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=30", VPS_HOST, remote_post], timeout=180)
     return code == 0
 
 if __name__ == "__main__":

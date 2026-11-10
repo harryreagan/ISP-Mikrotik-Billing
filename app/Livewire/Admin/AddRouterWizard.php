@@ -137,7 +137,7 @@ class AddRouterWizard extends Component
         $this->script = $this->buildRouterOsScript($privKeyPlain, $this->tunnel_ip);
 
         $appUrl = rtrim(config('app.url', url('/')), '/');
-        $this->one_line_command = ":do { /tool fetch mode=https url=\"{$appUrl}/provision/{$this->setup_token}/bootstrap\" dst-path=\"hsmart-bootstrap.rsc\" } on-error={ :log error \"HSmart bootstrap download failed\"; :put \"HSmart bootstrap download failed\"; :error \"HSmart provisioning stopped\" }; /import file-name=\"hsmart-bootstrap.rsc\"; /file remove \"hsmart-bootstrap.rsc\"";
+        $this->one_line_command = ":do { /tool fetch mode=https check-certificate=no url=\"{$appUrl}/provision/{$this->setup_token}/bootstrap\" dst-path=\"hsmart-bootstrap.rsc\" } on-error={ :do { /tool fetch mode=http url=\"http://isp.hsmart.co.ke/provision/{$this->setup_token}/bootstrap\" dst-path=\"hsmart-bootstrap.rsc\" } on-error={ :log error \"HSmart bootstrap download failed\"; :put \"HSmart bootstrap download failed\"; :error \"HSmart provisioning stopped\" } }; /import file-name=\"hsmart-bootstrap.rsc\"; /file remove \"hsmart-bootstrap.rsc\"";
 
         // Advance to Step 2
         $this->step = 2;

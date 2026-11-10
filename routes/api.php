@@ -38,9 +38,7 @@ Route::get('/router-hello/{token}', function (string $token) {
         return response()->json(['status' => 'ignored'], 200);
     }
 
-    $router = \App\Models\Router::where('setup_token', $cleanToken)
-        ->orWhere('provision_token', $cleanToken)
-        ->first();
+    $router = \App\Services\ProvisioningTokenService::validateToken($cleanToken);
 
     if ($router) {
         $router->update([

@@ -177,33 +177,52 @@
                     </div>
                 </div>
 
-                {{-- Live Connection Polling Status --}}
-                <div class="card border border-primary bg-primary bg-opacity-10 text-center p-4 mb-4">
-                    <div class="d-flex align-items-center justify-content-center mb-2">
-                        <div class="spinner-border text-primary me-3" role="status">
-                            <span class="visually-hidden">Waiting...</span>
+                {{-- Live Connection Polling Status with Premium Glassmorphism & Blur --}}
+                <div class="card mb-4 overflow-hidden border-0 shadow-sm" 
+                     style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1.5px solid rgba(244, 123, 6, 0.28) !important; border-radius: 18px;">
+                    <div class="card-body p-4 text-center">
+                        <div class="d-flex align-items-center justify-content-center mb-3">
+                            <div class="position-relative me-3" style="width: 46px; height: 46px;">
+                                <span class="position-absolute top-0 start-0 w-100 h-100 rounded-circle bg-warning opacity-25 animate-ping"></span>
+                                <div class="w-100 h-100 rounded-circle d-flex align-items-center justify-content-center" style="background: rgba(244, 123, 6, 0.15); border: 2px solid #F47B06;">
+                                    <i class="bi bi-broadcast fs-5" style="color: #F47B06;"></i>
+                                </div>
+                            </div>
+                            <div class="text-start">
+                                <h5 class="fw-bold text-dark mb-0" style="letter-spacing: -0.2px;">Waiting for Router Connection...</h5>
+                                <small class="text-muted">Listening for live heartbeat over WireGuard tunnel</small>
+                            </div>
                         </div>
-                        <h5 class="fw-bold text-primary mb-0">Waiting for your router to connect...</h5>
-                    </div>
-                    <p class="text-muted small mb-3">
-                        As soon as your router executes the script and contacts our cloud gateway, this page will advance automatically.
-                    </p>
-                    <div class="d-flex flex-wrap justify-content-center gap-3 small text-muted">
-                        <div><i class="bi bi-shield-lock me-1"></i>Setup Token: <span class="font-monospace text-dark fw-bold">{{ substr($setup_token, 0, 10) }}...</span></div>
-                        <div><i class="bi bi-diagram-3 me-1"></i>Cloud IP: <span class="font-monospace text-dark fw-bold">{{ $tunnel_ip }}</span></div>
+
+                        <p class="text-secondary small mb-3 mx-auto" style="max-width: 580px; line-height: 1.6;">
+                            Once you paste the command into Winbox Terminal and press <kbd class="bg-dark text-white px-2 py-0.5 rounded" style="font-size: 11px;">Enter</kbd>, your router will download the script, activate the tunnel, and this page will advance automatically.
+                        </p>
+
+                        <div class="d-flex flex-wrap justify-content-center gap-2 mt-2">
+                            <div class="d-inline-flex align-items-center gap-1.5 px-3 py-1.5 rounded-pill bg-white border border-light-subtle shadow-2xs">
+                                <i class="bi bi-shield-lock-fill text-warning fs-9"></i>
+                                <span class="text-muted fs-11">Token:</span>
+                                <span class="font-monospace fw-bold text-dark fs-11">{{ $setup_token }}</span>
+                            </div>
+                            <div class="d-inline-flex align-items-center gap-1.5 px-3 py-1.5 rounded-pill bg-white border border-light-subtle shadow-2xs">
+                                <i class="bi bi-diagram-3-fill fs-9" style="color: #6D3FE0;"></i>
+                                <span class="text-muted fs-11">Gateway Tunnel IP:</span>
+                                <span class="font-monospace fw-bold text-dark fs-11">{{ $tunnel_ip }}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 @if($check_message)
-                    <div class="alert alert-warning text-start mb-4 d-flex align-items-start">
-                        <i class="bi bi-info-circle-fill fs-5 me-2 mt-1"></i>
-                        <div>{{ $check_message }}</div>
+                    <div class="alert alert-warning text-start mb-4 d-flex align-items-start border-0 shadow-sm" style="border-radius: 14px; background: #FFFBEB; border: 1px solid #FDE68A !important;">
+                        <i class="bi bi-info-circle-fill fs-5 text-warning me-2 mt-0.5"></i>
+                        <div class="text-dark small">{{ $check_message }}</div>
                     </div>
                 @endif
 
                 <div class="d-flex justify-content-center gap-2">
-                    <button type="button" wire:click="manualCheckConnection" class="btn btn-primary px-4">
-                        <i class="bi bi-arrow-repeat me-1"></i>Check Connection Now
+                    <button type="button" wire:click="manualCheckConnection" class="btn btn-primary px-4 py-2.5 rounded-pill shadow-sm fw-bold">
+                        <i class="bi bi-arrow-repeat me-1.5"></i>Check Connection Now
                     </button>
                 </div>
             </div>
@@ -433,18 +452,27 @@ function copyBootstrapCommand() {
     if (!copyText) return;
     copyText.select();
     copyText.setSelectionRange(0, 99999);
-    navigator.clipboard.writeText(copyText.value).then(() => {
+    const feedback = () => {
         const btnText = document.getElementById("copyCmdText");
         const icon = document.getElementById("copyCmdIcon");
         if (btnText && icon) {
             btnText.innerText = "Copied to Clipboard!";
-            icon.className = "bi bi-check-lg me-1";
+            icon.className = "bi bi-check2-circle me-1";
             setTimeout(() => {
                 btnText.innerText = "Copy Command";
                 icon.className = "bi bi-clipboard me-1";
             }, 3000);
         }
-    });
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(copyText.value).then(feedback).catch(() => {
+            document.execCommand('copy');
+            feedback();
+        });
+    } else {
+        document.execCommand('copy');
+        feedback();
+    }
 }
 
 function copyScriptCode() {

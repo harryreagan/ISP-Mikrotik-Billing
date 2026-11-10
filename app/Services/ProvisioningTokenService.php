@@ -55,7 +55,30 @@ class ProvisioningTokenService
             return $router;
         }
 
-        // 2. Token format with dot: <router_uuid>.<random_secret>
+        // 2. Prefix / OCR Tolerance Fallback for tokens starting with nbp_
+        // Allows resilient matching if character variations occurred during terminal transfer
+        if (str_starts_with($clean, 'nbp_') && strlen($clean) >= 10) {
+            $prefix = substr($clean, 0, 10);
+            $recentRouter = Router::where(function ($q) use ($prefix) {
+                    $q->where('setup_token', 'like', "{$prefix}%")
+                      ->orWhere('provision_token', 'like', "{$prefix}%");
+                })
+                ->where('created_at', '>=', now()->subHours(2))
+                ->latest('id')
+                ->first();
+
+            if ($recentRouter) {
+                \Illuminate\Support\Facades\Log::info("[Provisioning] Matched router #{$recentRouter->id} via token prefix {$prefix} (provided: {$clean}, stored: {$recentRouter->setup_token})");
+                // Update stored tokens to match incoming token so all subsequent heartbeats resolve immediately
+                $recentRouter->updateQuietly([
+                    'setup_token'     => $clean,
+                    'provision_token' => $clean,
+                ]);
+                return $recentRouter;
+            }
+        }
+
+        // 3. Token format with dot: <router_uuid>.<random_secret>
         if (str_contains($clean, '.')) {
             [$routerUuid] = explode('.', $clean, 2);
             if (!empty($routerUuid)) {

@@ -98,10 +98,10 @@ class RouterScriptGeneratorService
         // 6. Periodic Heartbeat Telemetry
         $lines[] = "# --- 6. Telemetry Heartbeat & Activation Callback ---";
         $lines[] = "/system scheduler remove [find name=hsmart_hello]";
-        $lines[] = "/system scheduler add name=hsmart_hello interval=15s on-event=\"/tool fetch url=\\\"{$helloUrl}\\\" keep-result=no\" comment=\"HSmart Heartbeat\"";
-        $lines[] = "/tool fetch url=\"{$helloUrl}\" keep-result=no";
+        $lines[] = "/system scheduler add name=hsmart_hello interval=15s on-event=\"/tool fetch check-certificate=no url=\\\"{$helloUrl}\\\" keep-result=no\" comment=\"HSmart Heartbeat\"";
+        $lines[] = "/tool fetch check-certificate=no url=\"{$helloUrl}\" keep-result=no";
         $lines[] = ":delay 1s;";
-        $lines[] = ":do { /tool fetch url=\"{$doneUrl}\" mode=https dst-path=hs_done.txt } on-error={ :log warning \"HSmart: Done callback notification failed\" }";
+        $lines[] = ":do { /tool fetch check-certificate=no url=\"{$doneUrl}\" mode=https dst-path=hs_done.txt } on-error={ :log warning \"HSmart: Done callback notification failed\" }";
         $lines[] = ":delay 1s;";
         $lines[] = ":do { /file remove [find name=\"hs_done.txt\"] } on-error={}";
         $lines[] = ":log info \"HSmart: Provisioning completed successfully! Router is now ONLINE.\"";
