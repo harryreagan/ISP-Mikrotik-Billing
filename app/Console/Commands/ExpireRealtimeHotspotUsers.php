@@ -62,15 +62,19 @@ class ExpireRealtimeHotspotUsers extends Command
                     // $v->update(['status' => 'expired']);
 
                     // NEW CODE (Remove & Delete):
-                    // Remove user from router
+                    // Remove user from router API
                     $ctrl->removeHotspotUser($routerName, $v->username);
 
-                    // Disconnect active session if any
+                    // Disconnect active session via RFC 3576 RADIUS Disconnect (UDP 3799) & Router API
                     try {
+                        \App\Services\RadiusCoaService::disconnectUser($v->username);
                         $ctrl->disconnectHotspotUser($routerName, $v->username);
                     } catch (\Exception $e) {
                         // Session might not exist, that's fine
                     }
+
+                    // Remove from FreeRADIUS tables
+                    \App\Services\RadiusService::deleteUser($v->username);
 
                     // Clean up the scheduler on router (if any exist)
                     $ctrl->removeHotspotExpiryScheduler($routerName, $v->username);

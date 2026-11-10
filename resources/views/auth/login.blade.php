@@ -429,10 +429,9 @@
     <div class="hero-panel">
         <div class="hero-overlay"></div>
         <div class="hero-content">
-            <!-- Official HSmart ISP Logo Card -->
-            <div class="brand-badge" style="background:#ffffff;padding:8px 20px;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.25);display:inline-flex;align-items:center;gap:10px;">
-                <div style="width:34px;height:34px;background:linear-gradient(135deg,#F47B06,#E86F00);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#ffffff;font-weight:900;font-size:18px;">H</div>
-                <span style="font-size:20px;font-weight:800;color:#111111;letter-spacing:-0.5px;">HSmart <span style="color:#6D3FE0;">ISP</span></span>
+            <!-- Official HSmart ISP Logo -->
+            <div style="margin-bottom: 24px;">
+                <x-hsmart-logo color="light" height="44px" />
             </div>
 
             <div class="hero-middle">
@@ -475,11 +474,8 @@
     <div class="form-panel">
         <div class="form-card">
             <!-- Mobile Brand Logo -->
-            <div class="mobile-brand" style="margin-bottom:24px;">
-                <div style="display:inline-flex;align-items:center;gap:10px;">
-                    <div style="width:36px;height:36px;background:linear-gradient(135deg,#F47B06,#E86F00);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#ffffff;font-weight:900;font-size:18px;">H</div>
-                    <span style="font-size:22px;font-weight:800;color:#111111;letter-spacing:-0.5px;">HSmart <span style="color:#6D3FE0;">ISP</span></span>
-                </div>
+            <div class="mobile-brand" style="margin-bottom:24px; text-align: center;">
+                <x-hsmart-logo color="dark" height="40px" />
             </div>
 
             <div class="form-header">

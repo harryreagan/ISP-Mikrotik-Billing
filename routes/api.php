@@ -16,11 +16,13 @@ Route::get('/user', function (Request $request) {
 // 1. M-Pesa SMS Forwarder Webhook
 Route::middleware(['throttle:60,1', 'webhook.log'])->post('/payment/mfs/sms-receiver', [WebhookPaymentController::class, 'handleSmsReceiver']);
 
-// 2. M-Pesa Daraja (STK Callback & C2B)
-Route::prefix('payment/daraja')->middleware(['throttle:60,1', 'webhook.log'])->group(function () {
-    Route::post('/stk-callback', [DarajaPaymentController::class, 'handleStkCallback']);
-    Route::post('/validation', [DarajaPaymentController::class, 'handleC2bValidation']);
-    Route::post('/confirmation', [DarajaPaymentController::class, 'handleC2bConfirmation']);
+// 2. M-Pesa Daraja (STK Callback, C2B, STK Push & Polling Status)
+Route::prefix('payment/daraja')->group(function () {
+    Route::post('/stk-callback', [DarajaPaymentController::class, 'handleStkCallback'])->middleware(['throttle:60,1', 'webhook.log']);
+    Route::post('/validation', [DarajaPaymentController::class, 'handleC2bValidation'])->middleware(['throttle:60,1', 'webhook.log']);
+    Route::post('/confirmation', [DarajaPaymentController::class, 'handleC2bConfirmation'])->middleware(['throttle:60,1', 'webhook.log']);
+    Route::post('/stk-push', [DarajaPaymentController::class, 'initiateStkPush'])->middleware('throttle:30,1');
+    Route::get('/status', [DarajaPaymentController::class, 'checkPaymentStatus'])->middleware('throttle:120,1');
 });
 
 // 3. PayHero Webhook

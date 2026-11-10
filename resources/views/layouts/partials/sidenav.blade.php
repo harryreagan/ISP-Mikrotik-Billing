@@ -13,12 +13,7 @@
                     @if (siteUrlSettings('site_logo'))
                         <img class="me-2" style="width: 150px; height: auto; max-height: 45px; max-width: 100%; object-fit: contain; flex-shrink: 0;" src="{{ site_image(siteUrlSettings('site_logo')) }}" alt="logo"/>
                     @else
-                        @if (siteUrlSettings('site_icon'))
-                            <img class="me-2" src="{{ site_image(siteUrlSettings('site_icon')) }}" alt="" width="40" />
-                            <span class="font-sans-serif text-success">{{ siteUrlSettings('site_name') ?? 'Code Pagol' }}</span>
-                        @else
-                            <span class="font-sans-serif text-success">{{ siteUrlSettings('site_name') ?? 'Code Pagol' }}</span>
-                        @endif
+                        <x-hsmart-logo color="dark" height="34px" />
                     @endif
                 </div>
             </a>
@@ -45,12 +40,7 @@
             @if (siteUrlSettings('site_logo'))
                 <img class="me-2" style="width: 150px; height: auto; max-height: 45px; max-width: 100%; object-fit: contain; flex-shrink: 0;" src="{{ site_image(siteUrlSettings('site_logo')) }}" alt="logo"/>
             @else
-                @if (siteUrlSettings('site_icon'))
-                    <img class="me-2" src="{{ site_image(siteUrlSettings('site_icon')) }}" alt="" width="40" />
-                    <span class="font-sans-serif text-success">{{ siteUrlSettings('site_name') ?? 'Code Pagol' }}</span>
-                @else
-                    <span class="font-sans-serif text-success">{{ siteUrlSettings('site_name') ?? 'Code Pagol' }}</span>
-                @endif
+                <x-hsmart-logo color="dark" height="34px" />
             @endif
         </div>
     </a>
@@ -75,10 +65,9 @@
                 </span>
             </button>
         </div>
-        <a class="navbar-brand" href="{{url('/')}}">
+        <a class="navbar-brand" href="{{url('/')}}" style="text-decoration: none;">
             <div class="d-flex align-items-center py-2 px-1">
-                <span class="lm" style="width:34px;height:34px;border-radius:10px;background:#F47B06;display:inline-flex;align-items:center;justify-content:center;color:#111;font-weight:800;font-size:17px;margin-right:10px;flex-shrink:0;">H</span>
-                <span style="font-weight:800;font-size:16px;color:#111;letter-spacing:-0.02em;white-space:nowrap;">HSmart WiFi Billing</span>
+                <x-hsmart-logo color="dark" height="34px" />
             </div>
         </a>
     </div>

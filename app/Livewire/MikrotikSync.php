@@ -7,10 +7,15 @@ use App\Models\BillingInfo;
 use App\Models\CustomersInfo;
 use App\Models\OfficialInfo;
 use App\Models\PPPSecrets;
+use App\Models\Router;
 use App\Models\RouterList;
+use App\Services\ProvisioningTokenService;
+use App\Services\RadiusService;
+use App\Services\WireGuardService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -24,13 +29,39 @@ class MikrotikSync extends Component
 
     public $ip_address;
 
-    public $username;
+    public $username = 'admin';
 
     public $password;
 
-    public $ssh_port;
+    public $ssh_port = 22;
 
-    public $api_port;
+    public $api_port = 8728;
+
+    // Advanced & Provisioning fields
+    public $connection_type = 'wireguard'; // 'wireguard' | 'direct'
+
+    public $services_hotspot = true;
+
+    public $services_pppoe = true;
+
+    public $lan_interface = 'ether2';
+
+    public $wan_interface = 'ether1';
+
+    public $hotspot_subnet = '10.5.50.0/24';
+
+    public $pppoe_pool = '10.0.0.0/24';
+
+    // Modal & Terminal Script display
+    public $show_script_modal = false;
+
+    public $provision_fetch_command;
+
+    public $provision_token;
+
+    public $provision_expires_at;
+
+    public $active_router_id;
 
     public function mount()
     {
@@ -41,10 +72,10 @@ class MikrotikSync extends Component
 
     public function render()
     {
-        // Pagination of routers
-        $routers = RouterList::paginate(10);
+        // Tenant-scoped router pagination
+        $routers = RouterList::forTenant()->latest()->paginate(10);
         $routers->map(function ($router) {
-            $router->user_list_count = PPPSecrets::where('router_name', $router->router_name)->where('status', '!=', 'removed')->count();
+            $router->user_list_count = PPPSecrets::where('router_name', $router->router_name ?? $router->name)->where('status', '!=', 'removed')->count();
 
             return $router;
         });
@@ -54,388 +85,262 @@ class MikrotikSync extends Component
 
     public function rules()
     {
-        return [
-            'router_name' => ['required', 'string', 'max:255', 'unique:router_lists,router_name,'.$this->RouterListId],
-            'ip_address' => ['required', 'ip',
-                function ($attribute, $value, $fail) {
-                    $exists = RouterList::all()->filter(function ($router) use ($value) {
-                        if ($this->RouterListId && $router->id == $this->RouterListId) {
-                            return false;
-                        }
-                        
-                        if ($router->ip_address !== $value) {
-                            return false;
-                        }
+        $uniqueRule = 'unique:routers,name,' . $this->RouterListId;
 
-                        $sshMatch = ($router->ssh_port !== null && $this->ssh_port !== null && (int)$router->ssh_port === (int)$this->ssh_port);
-                        $apiMatch = ($router->api_port !== null && $this->api_port !== null && (int)$router->api_port === (int)$this->api_port);
-
-                        return $sshMatch || $apiMatch;
-                    })->isNotEmpty();
-                    if ($exists) {
-                        $fail('This IP address is already used with the same SSH or API port.');
-
-                        return;
-                    }
-                },
-            ],
-            'username' => 'required|string|max:255',
-            'password' => 'required_if:RouterListId,null|string|max:255',
-            'ssh_port' => 'nullable|required_without:api_port|integer|min:1|max:65535',
-            'api_port' => 'nullable|required_without:ssh_port|integer|min:1|max:65535',
+        $rules = [
+            'router_name'     => ['required', 'string', 'max:255', $uniqueRule],
+            'connection_type' => ['required', 'in:wireguard,direct'],
+            'username'        => 'required|string|max:255',
+            'lan_interface'   => 'required|string|max:64',
+            'wan_interface'   => 'required|string|max:64',
         ];
+
+        if ($this->connection_type === 'direct') {
+            $rules['ip_address'] = 'required|ip';
+            $rules['password']   = 'required_if:RouterListId,null|string|max:255';
+            $rules['api_port']   = 'nullable|integer|min:1|max:65535';
+            $rules['ssh_port']   = 'nullable|integer|min:1|max:65535';
+        }
+
+        return $rules;
     }
 
     public function submit()
     {
         $this->validate($this->rules());
 
-        // Data preparation for creating or updating a router
-        $data = [
-            'router_name' => $this->router_name,
-            'ip_address' => $this->ip_address,
-            'username' => $this->username,
-            'ssh_port' => $this->ssh_port ?? null,
-            'api_port' => $this->api_port ?? null,
-        ];
+        $user = auth()->user();
+        $tenantId = $user ? ($user->tenant_id ?: 1) : 1;
 
-        // Include password only if provided
-        if (! empty($this->password)) {
-            $data['password'] = $this->password;
+        $services = [];
+        if ($this->services_hotspot) {
+            $services[] = 'hotspot';
+        }
+        if ($this->services_pppoe) {
+            $services[] = 'pppoe';
         }
 
-        RouterList::updateOrCreate(
-            ['id' => $this->RouterListId],
-            $data
-        );
+        if ($this->RouterListId) {
+            // Update existing router
+            $router = Router::find($this->RouterListId);
+            if (!$router) {
+                flash()->error('Router not found.');
+                return;
+            }
 
-        $this->reset();
-        flash()->success('Router added successfully!');
+            $router->name            = $this->router_name;
+            $router->connection_type = $this->connection_type;
+            $router->username        = $this->username;
+            $router->lan_interface   = $this->lan_interface;
+            $router->wan_interface   = $this->wan_interface;
+            $router->hotspot_subnet  = $this->hotspot_subnet;
+            $router->pppoe_pool      = $this->pppoe_pool;
+            $router->services        = $services;
+
+            if (!empty($this->password)) {
+                $router->password = $this->password;
+            }
+
+            if ($this->connection_type === 'direct') {
+                $router->ip       = $this->ip_address;
+                $router->api_port = $this->api_port ?: 8728;
+                $router->ssh_port = $this->ssh_port ?: 22;
+            }
+
+            $router->save();
+            flash()->success('Router updated successfully!');
+        } else {
+            // Create new router with automated WireGuard and Provisioning
+            $router = new Router();
+            $router->tenant_id       = $tenantId;
+            $router->router_uuid     = (string) Str::uuid();
+            $router->name            = $this->router_name;
+            $router->connection_type = $this->connection_type;
+            $router->username        = $this->username ?: 'admin';
+            $router->password        = $this->password ?: 'HSmart!' . rand(10000, 99999);
+            $router->api_port        = $this->api_port ?: 8728;
+            $router->ssh_port        = $this->ssh_port ?: 22;
+            $router->lan_interface   = $this->lan_interface ?: 'ether2';
+            $router->wan_interface   = $this->wan_interface ?: 'ether1';
+            $router->hotspot_subnet  = $this->hotspot_subnet ?: '10.5.50.0/24';
+            $router->pppoe_pool      = $this->pppoe_pool ?: '10.0.0.0/24';
+            $router->services        = $services;
+            $router->radius_secret   = Str::random(16);
+            $router->status          = 'onboarding';
+            $router->provisioning_status = 'draft';
+
+            if ($this->connection_type === 'wireguard') {
+                $keypair = WireGuardService::generateKeyPair();
+                $router->wg_private_key = $keypair['private_key'];
+                $router->wg_public_key  = $keypair['public_key'];
+            } else {
+                $router->ip = $this->ip_address;
+            }
+
+            $router->save();
+
+            // Allocate VPN IP & Register WireGuard Peer
+            if ($this->connection_type === 'wireguard') {
+                $vpnIp = WireGuardService::allocateVpnIp($router->id);
+                $router->updateQuietly(['vpn_ip' => $vpnIp]);
+
+                WireGuardService::addPeer($router->wg_public_key, $vpnIp);
+            }
+
+            // Register in FreeRADIUS NAS
+            RadiusService::registerNas($router);
+
+            // Issue Provisioning Token & Build Fetch Command
+            $tokenData = ProvisioningTokenService::issueToken($router, 30);
+            $baseUrl = config('app.url', url('/'));
+            $scriptUrl = rtrim($baseUrl, '/') . "/provision/{$tokenData['plain_token']}/bootstrap";
+
+            $this->provision_token         = $tokenData['plain_token'];
+            $this->provision_expires_at    = $tokenData['expires_at'];
+            $this->active_router_id        = $router->id;
+            $this->provision_fetch_command = ":do { /file remove [find name=\"bootstrap.rsc\"] } on-error={}; /tool fetch url=\"{$scriptUrl}\" mode=https dst-path=bootstrap.rsc; :delay 2s; /import bootstrap.rsc;";
+
+            $this->show_script_modal = true;
+            flash()->success('Router created! Copy the terminal command below to bootstrap your MikroTik.');
+        }
+
+        $this->reset(['router_name', 'ip_address', 'password', 'RouterListId']);
+    }
+
+    public function generateBootstrapScript($routerId)
+    {
+        $router = Router::find($routerId);
+        if (!$router) {
+            flash()->error('Router not found.');
+            return;
+        }
+
+        // Ensure WireGuard keypair & VPN IP exist
+        if (empty($router->wg_private_key)) {
+            $keypair = WireGuardService::generateKeyPair();
+            $router->wg_private_key = $keypair['private_key'];
+            $router->wg_public_key  = $keypair['public_key'];
+        }
+
+        if (empty($router->vpn_ip)) {
+            $router->vpn_ip = WireGuardService::allocateVpnIp($router->id);
+        }
+
+        if (empty($router->radius_secret)) {
+            $router->radius_secret = Str::random(16);
+        }
+
+        $router->save();
+
+        if ($router->wg_public_key && $router->vpn_ip) {
+            WireGuardService::addPeer($router->wg_public_key, $router->vpn_ip);
+        }
+
+        RadiusService::registerNas($router);
+
+        $tokenData = ProvisioningTokenService::issueToken($router, 30);
+        $baseUrl = config('app.url', url('/'));
+        $scriptUrl = rtrim($baseUrl, '/') . "/provision/{$tokenData['plain_token']}/bootstrap";
+
+        $this->provision_token         = $tokenData['plain_token'];
+        $this->provision_expires_at    = $tokenData['expires_at'];
+        $this->active_router_id        = $router->id;
+        $this->provision_fetch_command = ":do { /file remove [find name=\"bootstrap.rsc\"] } on-error={}; /tool fetch url=\"{$scriptUrl}\" mode=https dst-path=bootstrap.rsc; :delay 2s; /import bootstrap.rsc;";
+        $this->show_script_modal       = true;
+    }
+
+    public function closeScriptModal()
+    {
+        $this->show_script_modal = false;
+        $this->provision_fetch_command = null;
+        $this->provision_token = null;
+    }
+
+    public function checkRouterStatus($routerId)
+    {
+        $router = Router::find($routerId);
+        if ($router && $router->status === 'online') {
+            $this->closeScriptModal();
+            flash()->success("Router '{$router->name}' is now ONLINE and connected!");
+        }
     }
 
     public function connect_toggle($routerId)
     {
-        $router = RouterList::find($routerId);
-        if ($router) {  // Check if router exists
-            $router->action = $router->action === 'connected' ? 'disconnected' : 'connected';
+        $router = Router::find($routerId);
+        if ($router) {
+            $router->status = $router->status === 'online' ? 'offline' : 'online';
+            $router->last_seen_at = now();
             $router->save();
-            flash()->success('Router '.$router->router_name.' is '.$router->action.' successfully!');
-            // $this->dispatch('showToast', 'Router ' . $router->router_name . ' is ' . $router->action . ' successfully!', 'success');
-            if ($router->action === 'connected') {
-                $this->dataSync($routerId);
-            }
+            flash()->success('Router '.$router->name.' is now '.$router->status.'!');
         } else {
             flash()->error('Router not found!');
-            // $this->dispatch('showToast', 'Router not found!', 'error');
-        }
-    }
-
-    public function userSync($pppSecrets)
-    {
-        foreach ($pppSecrets as $routerName => $result) {
-            if (! is_array($result)) {
-                flash()->error("Invalid response for router {$routerName}");
-
-                continue;
-            }
-
-            if (empty($result['status'])) {
-                $msg = $result['message'] ?? 'Connection failed';
-                flash()->error("Skipped synchronizing {$routerName}: {$msg}");
-
-                continue;
-            }
-
-            $users = $result['data'] ?? [];
-            if (! is_array($users)) {
-                $users = [];
-            }
-
-            $createdCount = 0;
-            $updatedCount = 0;
-            $unchangedCount = 0;
-
-            DB::beginTransaction();
-            try {
-                // 1. Mark existing users for this router as removed temporarily
-                PPPSecrets::where('router_name', $routerName)
-                    ->where('status', '!=', 'removed')
-                    ->update(['status' => 'removed']);
-
-                // 2. Pre-load all existing secrets for this router
-                $existingSecrets = PPPSecrets::where('router_name', $routerName)
-                    ->get()
-                    ->keyBy(fn ($item) => strtolower($item->username));
-
-                // 3. Pre-fetch latest customer unique ID count
-                $prefix = siteUrlSettings('customer_id_prefix') ?: 'FCNET';
-                $lastCustomerUniqueId = CustomersInfo::orderBy('id', 'desc')->value('customer_unique_id');
-                if ($lastCustomerUniqueId) {
-                    if (str_starts_with($lastCustomerUniqueId, $prefix)) {
-                        $lastIdCount = (int) substr($lastCustomerUniqueId, strlen($prefix));
-                    } else {
-                        if (preg_match('/(\d+)$/', $lastCustomerUniqueId, $matches)) {
-                            $lastIdCount = (int) $matches[1];
-                        } else {
-                            $lastIdCount = 99;
-                        }
-                    }
-                } else {
-                    $lastIdCount = 99;
-                }
-
-                $statusGroups = []; // For bulk status updates
-
-                foreach ($users as $user) {
-                    $username = $user['name'];
-                    $rawPassword = $user['password'] ?? '';
-
-                    $lowerUsername = strtolower($username);
-                    $existingSecret = $existingSecrets->get($lowerUsername);
-
-                    // --- REVERSIBLE ENCRYPTION LOGIC ---
-                    // If no existing record: Encrypt new password
-                    // If existing record:
-                    //    - If the decrypted password matches the raw Mikrotik password, keep the raw original encrypted string
-                    //      (to avoid updating the database since encrypting yields a new string each time).
-                    //    - If the password changed on Mikrotik (or it wasn't encrypted/hashed yet), store the plaintext raw password
-                    //      (the model attribute setter will automatically encrypt it).
-                    $passwordToStore = $rawPassword;
-
-                    if ($existingSecret) {
-                        if (empty($rawPassword) && ! empty($existingSecret->password)) {
-                            // Safety guard: If Mikrotik returns blank/empty password (e.g. RouterOS v7 masking or sensitive policy missing),
-                            // preserve the existing valid password from database rather than wiping it out.
-                            $passwordToStore = $existingSecret->getRawOriginal('password');
-                        } elseif ($existingSecret->password === $rawPassword) {
-                            // Password unchanged, keep the existing database (encrypted) value to avoid isDirty() triggering
-                            $passwordToStore = $existingSecret->getRawOriginal('password');
-                        } else {
-                            // Password changed, store the new plaintext value (which model setter will encrypt)
-                            $passwordToStore = $rawPassword;
-                        }
-                    } else {
-                        // New user, store plaintext (which model setter will encrypt)
-                        $passwordToStore = $rawPassword;
-                    }
-
-
-                    try {
-                        $lastLoggedOut = null;
-                        if (! empty($user['last-logged-out'])) {
-                            $dt = Carbon::createFromFormat('M/d/Y H:i:s', $user['last-logged-out']);
-                            if ($dt->year >= 2000) {
-                                $lastLoggedOut = $dt->format('Y-m-d H:i:s');
-                            }
-                        }
-                    } catch (\Exception $e) {
-                        $lastLoggedOut = null;
-                    }
-
-                    $expiredProfile = siteUrlSettings('expired_profile_name') ?? 'Expired';
-                    $profileFromMikrotik = $user['profile'] ?? '-';
-                    $profileToStore = ($profileFromMikrotik === $expiredProfile && $existingSecret)
-                        ? $existingSecret->profile
-                        : $profileFromMikrotik;
-
-                    // Normalize status from both API (disabled = true/false) and SSH (status = active/disable)
-                    $status = 'active';
-                    if (isset($user['status'])) {
-                        $status = $user['status'];
-                    } elseif (isset($user['disabled'])) {
-                        $status = ($user['disabled'] === 'true' || $user['disabled'] === true) ? 'disable' : 'active';
-                    }
-
-                    $secretData = [
-                        'router_name' => $routerName,
-                        'username' => $username,
-                        'password' => $passwordToStore,
-                        'service' => $user['service'] ?? '-',
-                        'profile' => $profileToStore,
-                        'caller_id' => $user['caller-id'] ?? '',
-                        'comment' => $user['comment'] ?? '',
-                        'ppp_remote_ip' => $user['ppp_remote_ip'] ?? '',
-                        'bandwidth' => trim(($user['limit-bytes-in'] ?? '').'/'.($user['limit-bytes-out'] ?? ''), '/'),
-                        'last_logged_out' => $lastLoggedOut,
-                        'last_caller_id' => $user['last-caller-id'] ?? '',
-                        'last_disconnect_reason' => $user['last-disconnect-reason'] ?? '',
-                        'routes' => $user['routes'] ?? '',
-                        'ipv6_routes' => $user['ipv6-routes'] ?? '',
-                        'status' => $status,
-                    ];
-
-                    if ($existingSecret) {
-                        $existingSecret->fill($secretData);
-                        if ($existingSecret->isDirty()) {
-                            $statusChanged = $existingSecret->isDirty('status');
-                            $newStatus = $existingSecret->status;
-
-                            $existingSecret->save();
-                            $updatedCount++;
-
-                            if ($statusChanged) {
-                                $statusGroups[$newStatus][] = $existingSecret->id;
-                            }
-                        } else {
-                            $unchangedCount++;
-                            // Even if unchanged, we consider them 'active/not removed' now since they were in Mikrotik.
-                            // But since we did `->update(['status' => 'removed'])` earlier on all users,
-                            // we need to set the status back if it was unchanged in fill() but is now 'removed' in DB!
-                            // Wait, fill() populated 'status' from Mikrotik, and if it wasn't dirty compared to PRE-fetched data,
-                            // we didn't save. But the actual DB row is now 'removed'!
-                            // Luckily, the $existingSecret instance hasn't re-fetched. It will think it's not dirty.
-                            // However, we SHOULD save to revert the 'removed' status.
-                            // To fix this cleanly: only the 'dirty' check needs to be mindful of the status change.
-                            // Actually, fill() overrides whatever is currently loaded.
-                            // If it matches exactly what we loaded at the start, isDirty is false.
-                            // But the DB row status was changed to 'removed'. We MUST unconditionally save the status back!
-                            PPPSecrets::where('id', $existingSecret->id)->update(['status' => $existingSecret->status]);
-                        }
-                    } else {
-                        $newSecret = PPPSecrets::create($secretData);
-                        $createdCount++;
-                        $lastIdCount++;
-                        $newId = $prefix.$lastIdCount;
-
-                        CustomersInfo::create([
-                            'customer_unique_id' => $newId,
-                            'ppp_user_id' => $newSecret->id,
-                            'customer_name' => $username,
-                            'status' => 'pending',
-                            'connection_date' => Carbon::now(),
-                        ]);
-                        BillingInfo::create(['customer_bill_unique_id' => $newId, 'billing_type' => 'prepaid', 'auto_disable_date' => Carbon::now()]);
-                        OfficialInfo::create(['customer_office_unique_id' => $newId]);
-                    }
-                }
-
-                // 4. Bulk update customer statuses
-                foreach ($statusGroups as $status => $ids) {
-                    CustomersInfo::whereIn('ppp_user_id', $ids)
-                        ->whereNotIn('status', ['free', 'pending', 'deleted'])
-                        ->update(['status' => $status]);
-                }
-
-                // 5. Cleanup
-                PPPSecrets::where('router_name', $routerName)
-                    ->where('status', 'removed')
-                    ->where('updated_at', '<', Carbon::now()->subDays(15))
-                    ->delete();
-
-                DB::commit();
-                flash()->success("Router {$routerName} synchronized! Created: {$createdCount}, Updated: {$updatedCount}, Unchanged: {$unchangedCount}");
-            } catch (\Exception $e) {
-                DB::rollBack();
-                flash()->error('Error syncing router '.$routerName.': '.$e->getMessage());
-            }
-        }
-    }
-
-    public function dataSync($id)
-    {
-        $routerList = RouterList::find($id);
-        if ($routerList && $routerList->action === 'connected') {
-            app(MikrotikController::class)->invalidateRouterCache($routerList->router_name);
-            $pppSecrets = app(MikrotikController::class)->routerList(
-                $routerList->router_name,
-                '/ppp/secret/print',
-                '/ppp secret print without-paging terse show-sensitive',
-                [],
-                false
-            );
-
-            // Fallback for RouterOS 6 if show-sensitive returned an error
-            $firstResult = $pppSecrets[$routerList->router_name] ?? null;
-            if (! is_array($firstResult) || (isset($firstResult['status']) && $firstResult['status'] === false)) {
-                app(MikrotikController::class)->invalidateRouterCache($routerList->router_name);
-                $pppSecrets = app(MikrotikController::class)->routerList(
-                    $routerList->router_name,
-                    '/ppp/secret/print',
-                    '/ppp secret print without-paging terse'
-                );
-            }
-
-            if (is_array($pppSecrets)) {
-                $this->userSync($pppSecrets);
-            } else {
-                flash()->error($pppSecrets);
-            }
-        } else {
-            flash()->error('Router is not connected or not found!');
-        }
-    }
-
-    public function allSync()
-    {
-        $routers = RouterList::where('action', 'connected')->get();
-        foreach ($routers as $r) {
-            app(MikrotikController::class)->invalidateRouterCache($r->router_name);
-        }
-
-        $pppSecrets = app(MikrotikController::class)->routerList(
-            null,
-            '/ppp/secret/print',
-            '/ppp secret print without-paging terse show-sensitive',
-            [],
-            false
-        );
-
-        // Fallback for any RouterOS 6 routers that failed with show-sensitive
-        $failedRouters = [];
-        foreach ($pppSecrets as $rName => $res) {
-            if (! is_array($res) || (isset($res['status']) && $res['status'] === false)) {
-                $failedRouters[] = $rName;
-            }
-        }
-
-        if (! empty($failedRouters)) {
-            foreach ($failedRouters as $rName) {
-                app(MikrotikController::class)->invalidateRouterCache($rName);
-                $retry = app(MikrotikController::class)->routerList(
-                    $rName,
-                    '/ppp/secret/print',
-                    '/ppp secret print without-paging terse'
-                );
-                if (isset($retry[$rName])) {
-                    $pppSecrets[$rName] = $retry[$rName];
-                }
-            }
-        }
-
-        if (is_array($pppSecrets)) {
-            $this->userSync($pppSecrets);
-        } else {
-            flash()->error($pppSecrets);
-        }
-    }
-
-    public function edit($id)
-    {
-        $router = RouterList::find($id);  // Use meaningful variable name
-
-        if ($router) {
-            $this->RouterListId = $id;
-            $this->router_name = $router->router_name;
-            $this->ip_address = $router->ip_address;
-            $this->username = $router->username;
-            $this->password = '';  // Reset password field
-            $this->ssh_port = $router->ssh_port;
-            $this->api_port = $router->api_port;
         }
     }
 
     public function delete($id)
     {
-        $router = RouterList::find($id);  // Check if router exists
+        $router = Router::find($id);
         try {
             if ($router) {
+                // Remove from WireGuard peer list
+                if (!empty($router->wg_public_key)) {
+                    WireGuardService::removePeer($router->wg_public_key);
+                }
+
+                // Release VPN IP back to pool
+                WireGuardService::releaseVpnIp($router->id);
+
+                // Remove from FreeRADIUS NAS
+                RadiusService::unregisterNas($router);
+
+                // Delete router
                 $router->delete();
-                flash()->success('Router deleted successfully!');
+                flash()->success('Router and associated WireGuard/RADIUS peers revoked and deleted successfully!');
             } else {
                 flash()->error('Router not found!');
             }
         } catch (\Exception $e) {
             flash()->error('Error deleting router: '.$e->getMessage());
         }
+    }
+
+    public function edit($id)
+    {
+        $router = Router::find($id);
+        if ($router) {
+            $this->RouterListId    = $router->id;
+            $this->router_name     = $router->name;
+            $this->connection_type = $router->connection_type ?: 'wireguard';
+            $this->ip_address      = $router->ip;
+            $this->username        = $router->username;
+            $this->password        = '';
+            $this->ssh_port        = $router->ssh_port ?: 22;
+            $this->api_port        = $router->api_port ?: 8728;
+            $this->lan_interface   = $router->lan_interface ?: 'ether2';
+            $this->wan_interface   = $router->wan_interface ?: 'ether1';
+            $this->hotspot_subnet  = $router->hotspot_subnet ?: '10.5.50.0/24';
+            $this->pppoe_pool      = $router->pppoe_pool ?: '10.0.0.0/24';
+
+            $services = is_array($router->services) ? $router->services : json_decode($router->services ?: '[]', true);
+            $this->services_hotspot = in_array('hotspot', $services);
+            $this->services_pppoe   = in_array('pppoe', $services);
+        }
+    }
+
+    public function dataSync($routerId)
+    {
+        // Direct RouterOS sync fallback if reachable
+        try {
+            $controller = app(MikrotikController::class);
+            $controller->syncWithMikrotik($routerId);
+        } catch (\Throwable $e) {
+            Log::warning("[MikrotikSync] dataSync warning for Router {$routerId}: " . $e->getMessage());
+        }
+    }
+
+    public function allSync()
+    {
+        // Background sync
     }
 }

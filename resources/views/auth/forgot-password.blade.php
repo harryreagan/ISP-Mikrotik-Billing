@@ -268,8 +268,8 @@
     <div class="hero-panel">
         <div class="hero-overlay"></div>
         <div class="hero-content">
-            <div class="brand-badge">
-                <img src="{{ asset('images/hsmart-isp-logo.jpg') }}" alt="HSmart ISP">
+            <div style="margin-bottom: 24px;">
+                <x-hsmart-logo color="light" height="44px" />
             </div>
 
             <div class="hero-middle">
@@ -290,8 +290,8 @@
 
     <div class="form-panel">
         <div class="form-card">
-            <div class="mobile-brand">
-                <img src="{{ asset('images/hsmart-isp-logo.jpg') }}" alt="HSmart ISP">
+            <div class="mobile-brand" style="margin-bottom: 24px; text-align: center;">
+                <x-hsmart-logo color="dark" height="40px" />
             </div>
 
             <a href="{{ route('login') }}" class="back-link">← Back to Sign In</a>

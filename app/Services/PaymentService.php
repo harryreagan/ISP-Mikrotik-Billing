@@ -207,6 +207,26 @@ class PaymentService
                 
                 // Dispatch queued worker job to provision router without blocking HTTP response
                 ProvisionMikrotikUserJob::dispatch($customer->id);
+
+                // 7b. Immediately sync into FreeRADIUS (radcheck & radreply)
+                try {
+                    $pppSecret = PPPSecrets::find($customer->ppp_user_id);
+                    $package = \App\Models\PackageList::find($customer->package_id);
+                    $speed = $package?->mikrotik_rate_limit ?: $package?->speed;
+                    $username = $pppSecret?->name ?: $customer->customer_unique_id;
+                    $password = $pppSecret?->password ?: '123456';
+                    $expiry = $billing->auto_disable_date;
+
+                    \App\Services\RadiusService::upsertUser(
+                        $username,
+                        $password,
+                        $speed,
+                        $expiry,
+                        1
+                    );
+                } catch (\Throwable $re) {
+                    \Illuminate\Support\Facades\Log::warning('[PaymentService] RADIUS user activation warning: ' . $re->getMessage());
+                }
             }
 
             // 8. Reconcile matching unmatched payment record if present

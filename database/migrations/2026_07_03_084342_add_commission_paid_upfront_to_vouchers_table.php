@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('vouchers', function (Blueprint $table) {
-            $table->boolean('commission_paid_upfront')->default(false)->after('reseller_id');
+            if (! Schema::hasColumn('vouchers', 'commission_paid_upfront')) {
+                $table->boolean('commission_paid_upfront')->default(false)->after('reseller_id');
+            }
         });
     }
 

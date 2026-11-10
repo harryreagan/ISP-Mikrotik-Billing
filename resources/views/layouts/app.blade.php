@@ -245,7 +245,20 @@
     </script>
 </head>
 
+
 <body class="font-sans antialiased fi-body">
+    @if(session('is_impersonating'))
+        <div style="background: linear-gradient(90deg, #1e1b4b 0%, #312e81 100%); color: #ffffff; padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; z-index: 99999; position: sticky; top: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.2); border-bottom: 2px solid #818cf8;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="background: #ef4444; color: #fff; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.5px;">Impersonating</span>
+                <span>You are currently managing <strong>{{ Auth::user()->name }}</strong> (ISP Admin &bull; {{ Auth::user()->email }})</span>
+            </div>
+            <a href="{{ route('sso.exit-impersonation') }}" style="background: #ffffff; color: #1e1b4b; padding: 6px 14px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.2s;">
+                <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                <span>Exit & Return to Super Admin</span>
+            </a>
+        </div>
+    @endif
     <!-- ===============================================-->
     <!--    Main Content-->
     <!-- ===============================================-->

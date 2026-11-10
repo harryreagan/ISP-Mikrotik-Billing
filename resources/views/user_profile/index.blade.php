@@ -40,6 +40,8 @@
                                             <h4>Act as : {{ ucfirst($role->name) }}</h4>
                                         @endif
                                     @endforeach
+                                @elseif(!empty($user->role))
+                                    <h4>Act as : {{ ucfirst($user->role) }}</h4>
                                 @else
                                     <p class="p-0 m-0 pt-2">Hi, Your Registration is Completed.</p>
                                     <p class="p-1 m-0 fw-semibold">But No Role Assigned.</p>

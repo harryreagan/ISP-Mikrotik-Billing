@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en" class="theme-modern" id="portal-root">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HSmart WiFi Billing — Captive Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --font-sans: 'Jost', system-ui, -apple-system, sans-serif;
+            --page-bg: #FAFAF8;
+            --card-bg: #FFFFFF;
+            --card-border: #E6E3F5;
+            --ink: #111111;
+            --ink-secondary: #666666;
+            --primary-orange: #F47B06;
+            --primary-orange-hover: #E86F00;
+            --accent-purple: #6D3FE0;
+            --dark-navy: #161B2E;
+            --radius-card: 20px;
+            --radius-btn: 12px;
+            --shadow-card: 0 12px 35px rgba(22, 27, 46, 0.06);
+        }
+        html.theme-modern { --page-bg: #FAFAF8; --card-bg: #FFFFFF; --card-border: #E6E3F5; --ink: #111111; --ink-secondary: #666666; --primary-orange: #F47B06; --primary-orange-hover: #E86F00; --accent-purple: #6D3FE0; }
+        html.theme-dark { --page-bg: #0C101A; --card-bg: #161B2E; --card-border: rgba(109, 63, 224, 0.25); --ink: #F8FAFC; --ink-secondary: #94A3B8; --primary-orange: #F47B06; --primary-orange-hover: #FF881A; --accent-purple: #A78BFA; }
+        html.theme-hotel { --page-bg: #F7F5F0; --card-bg: #FFFFFF; --card-border: #EADBCC; --ink: #2C2621; --ink-secondary: #7A7067; --primary-orange: #D96B0B; --primary-orange-hover: #C25A00; --accent-purple: #78350F; }
+        html.theme-glass { --page-bg: radial-gradient(circle at 10% 20%, #7C3AED 0%, #3B82F6 40%, #0EA5E9 80%, #059669 100%); --card-bg: rgba(255, 255, 255, 0.88); --card-border: rgba(255, 255, 255, 0.5); --ink: #111111; --ink-secondary: #475569; --primary-orange: #F47B06; --primary-orange-hover: #E86F00; --accent-purple: #6D3FE0; }
+        html.theme-voucher { --page-bg: #F0F4F8; --card-bg: #FFFFFF; --card-border: #CBD5E1; --ink: #0F172A; --ink-secondary: #475569; --primary-orange: #EA580C; --primary-orange-hover: #C2410C; --accent-purple: #4F46E5; }
+        html.theme-corporate { --page-bg: #F8FAFC; --card-bg: #FFFFFF; --card-border: #E2E8F0; --ink: #1E293B; --ink-secondary: #64748B; --primary-orange: #0284C7; --primary-orange-hover: #0369A1; --accent-purple: #0F172A; }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--font-sans); background: var(--page-bg); color: var(--ink); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 1rem 1rem 3rem; }
+
+        /* Toolbar */
+        .template-toolbar { width: 100%; max-width: 520px; margin-bottom: 1rem; background: rgba(22, 27, 46, 0.88); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 999px; padding: 6px 10px; display: flex; align-items: center; gap: 6px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+        .template-toolbar::-webkit-scrollbar { display: none; }
+        .toolbar-label { font-size: 0.72rem; font-weight: 700; color: #A78BFA; padding: 0 6px 0 4px; text-transform: uppercase; }
+        .template-pill { font-family: var(--font-sans); font-size: 0.75rem; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1px solid transparent; background: rgba(255, 255, 255, 0.08); color: #E2E8F0; cursor: pointer; }
+        .template-pill.active { background: #F47B06; color: #111; font-weight: 700; }
+
+        /* Card */
+        .portal-card { width: 100%; max-width: 480px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 1.75rem 1.5rem; position: relative; overflow: hidden; }
+        .card-top-bar { position: absolute; top: 0; left: 0; right: 0; height: 5px; background: linear-gradient(90deg, #F47B06, #6D3FE0, #10B981); }
+        .portal-header { text-align: center; margin-bottom: 1.5rem; padding-top: 0.5rem; }
+        .brand-badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(109, 63, 224, 0.08); border: 1px solid rgba(109, 63, 224, 0.16); padding: 5px 12px; border-radius: 999px; margin-bottom: 0.75rem; font-size: 0.75rem; font-weight: 700; color: var(--accent-purple); text-transform: uppercase; }
+        .portal-title { font-size: 1.65rem; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); margin-bottom: 0.35rem; }
+        .portal-title span { color: var(--accent-purple); }
+        .portal-subtitle { font-size: 0.88rem; color: var(--ink-secondary); font-weight: 500; }
+
+        /* Tabs */
+        .tab-switcher { display: flex; background: rgba(0, 0, 0, 0.05); border-radius: 12px; padding: 4px; margin-bottom: 1.25rem; gap: 4px; }
+        .tab-btn { flex: 1; font-family: var(--font-sans); font-size: 0.85rem; font-weight: 700; padding: 10px 12px; border-radius: 9px; border: none; background: transparent; color: var(--ink-secondary); cursor: pointer; }
+        .tab-btn.active { background: #111; color: #FFF; }
+
+        /* Packages */
+        .packages-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+        .pkg-card { background: var(--card-bg); border: 1.5px solid var(--card-border); border-radius: 14px; padding: 12px; cursor: pointer; transition: all 0.2s ease; position: relative; }
+        .pkg-card.selected { border-color: var(--primary-orange); background: rgba(244, 123, 6, 0.06); box-shadow: 0 0 0 2px var(--primary-orange); }
+        .pkg-duration { font-size: 0.82rem; font-weight: 700; color: var(--ink); }
+        .pkg-speed { font-size: 0.72rem; font-weight: 600; color: var(--accent-purple); margin-top: 2px; }
+        .pkg-price { font-size: 1.18rem; font-weight: 800; color: var(--ink); margin-top: 8px; }
+        .pkg-price span { font-size: 0.75rem; font-weight: 700; color: var(--ink-secondary); }
+
+        /* Form */
+        .form-group { margin-bottom: 1.1rem; text-align: left; }
+        .form-label { display: block; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-secondary); margin-bottom: 0.4rem; }
+        .input-control { width: 100%; font-family: var(--font-sans); font-size: 1rem; font-weight: 600; color: var(--ink); background: rgba(0, 0, 0, 0.02); border: 1.5px solid var(--card-border); border-radius: var(--radius-btn); padding: 12px 14px; outline: none; }
+        .input-control:focus { border-color: var(--primary-orange); box-shadow: 0 0 0 3px rgba(244, 123, 6, 0.15); }
+
+        /* Button */
+        .btn-primary-orange { width: 100%; min-height: 48px; font-family: var(--font-sans); font-size: 1rem; font-weight: 700; color: #111; background: var(--primary-orange); border: none; border-radius: var(--radius-btn); padding: 14px 20px; cursor: pointer; box-shadow: 0 6px 20px rgba(244, 123, 6, 0.28); }
+        .btn-primary-orange:hover { background: var(--primary-orange-hover); }
+
+        .portal-footer { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--card-border); text-align: center; font-size: 0.82rem; color: var(--ink-secondary); }
+    </style>
+</head>
+<body>
+
+    <!-- Theme Toolbar for ISP Owner Preview -->
+    <aside class="template-toolbar">
+        <span class="toolbar-label">Theme</span>
+        <button type="button" class="template-pill active" onclick="switchTheme('modern', this)">1. Modern Clean</button>
+        <button type="button" class="template-pill" onclick="switchTheme('dark', this)">2. Dark Cyber</button>
+        <button type="button" class="template-pill" onclick="switchTheme('hotel', this)">3. Hotel &amp; Cafe</button>
+        <button type="button" class="template-pill" onclick="switchTheme('glass', this)">4. Glass Gradient</button>
+        <button type="button" class="template-pill" onclick="switchTheme('voucher', this)">5. Express Kiosk</button>
+        <button type="button" class="template-pill" onclick="switchTheme('corporate', this)">6. Corporate Fiber</button>
+    </aside>
+
+    <main class="portal-card">
+        <div class="card-top-bar"></div>
+
+        <header class="portal-header">
+            <div class="brand-badge">● Fast &amp; Secure Hotspot</div>
+            <h1 class="portal-title">HSmart WiFi <span>Billing</span></h1>
+            <p class="portal-subtitle">Connect instantly to unlimited high-speed internet.</p>
+        </header>
+
+        <!-- Tab Switcher -->
+        <nav class="tab-switcher">
+            <button type="button" class="tab-btn active" id="tab-buy" onclick="showTab('buy')">Buy WiFi Access</button>
+            <button type="button" class="tab-btn" id="tab-voucher" onclick="showTab('voucher')">Enter Voucher / PIN</button>
+        </nav>
+
+        <!-- Buy WiFi Tab -->
+        <section id="panel-buy">
+            <div class="packages-grid">
+                <div class="pkg-card" onclick="selectPkg('10', '1 Hour Turbo', this)">
+                    <div class="pkg-duration">1 Hour Turbo</div>
+                    <div class="pkg-speed">10 Mbps</div>
+                    <div class="pkg-price"><span>KES</span> 10</div>
+                </div>
+                <div class="pkg-card" onclick="selectPkg('20', '3 Hours Super', this)">
+                    <div class="pkg-duration">3 Hours Super</div>
+                    <div class="pkg-speed">15 Mbps</div>
+                    <div class="pkg-price"><span>KES</span> 20</div>
+                </div>
+                <div class="pkg-card selected" onclick="selectPkg('50', '24 Hours Unlimited', this)">
+                    <div class="pkg-duration">24 Hours Unlimited</div>
+                    <div class="pkg-speed">20 Mbps</div>
+                    <div class="pkg-price"><span>KES</span> 50</div>
+                </div>
+                <div class="pkg-card" onclick="selectPkg('250', '7 Days Pass', this)">
+                    <div class="pkg-duration">7 Days Pass</div>
+                    <div class="pkg-speed">20 Mbps</div>
+                    <div class="pkg-price"><span>KES</span> 250</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">M-Pesa Phone Number</label>
+                <input type="tel" id="phone" class="input-control" placeholder="0712 345 678" maxlength="10">
+            </div>
+
+            <button type="button" class="btn-primary-orange" onclick="payMpesa()">
+                Pay with M-Pesa — <span id="cta-val">KES 50</span>
+            </button>
+        </section>
+
+        <!-- Voucher Tab (MikroTik Form Action $(link-login-only)) -->
+        <section id="panel-voucher" style="display: none;">
+            <form name="login" action="$(link-login-only)" method="post">
+                <input type="hidden" name="dst" value="$(link-orig)" />
+                <input type="hidden" name="popup" value="true" />
+
+                <div class="form-group">
+                    <label class="form-label">Voucher PIN or Username</label>
+                    <input type="text" name="username" class="input-control" placeholder="Enter voucher code or PIN" style="text-transform: uppercase;" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Password (Optional)</label>
+                    <input type="password" name="password" class="input-control" placeholder="Leave empty for voucher pins">
+                </div>
+
+                <button type="submit" class="btn-primary-orange">
+                    Connect to Internet
+                </button>
+            </form>
+        </section>
+
+        <footer class="portal-footer">
+            Need help? Contact Support at <strong>+254 743 606 108</strong>
+        </footer>
+    </main>
+
+    <script>
+        function switchTheme(t, btn) {
+            document.getElementById('portal-root').className = 'theme-' + t;
+            document.querySelectorAll('.template-pill').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+        }
+        function showTab(tab) {
+            document.getElementById('panel-buy').style.display = tab === 'buy' ? 'block' : 'none';
+            document.getElementById('panel-voucher').style.display = tab === 'voucher' ? 'block' : 'none';
+            document.getElementById('tab-buy').className = tab === 'buy' ? 'tab-btn active' : 'tab-btn';
+            document.getElementById('tab-voucher').className = tab === 'voucher' ? 'tab-btn active' : 'tab-btn';
+        }
+        function selectPkg(p, d, el) {
+            document.querySelectorAll('.pkg-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            document.getElementById('cta-val').innerText = 'KES ' + p;
+        }
+        function payMpesa() {
+            var phone = document.getElementById('phone').value.trim();
+            if (!phone) { alert('Please enter your M-Pesa phone number.'); return; }
+            alert('Prompt sent to ' + phone + '! Please enter your M-Pesa PIN on your phone.');
+        }
+    </script>
+</body>
+</html>
+

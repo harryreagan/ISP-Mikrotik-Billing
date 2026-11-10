@@ -1,4 +1,4 @@
-@if (auth()->user()->roles()->exists() || auth()->user()->permissions()->exists())
+@if (auth()->user()->roles()->exists() || auth()->user()->permissions()->exists() || in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'superadmin', 'super_admin']))
     @if (auth()->user()->hasRole('Reseller'))
         <ul class="navbar-nav flex-column mb-3" id="navbarVerticalNav">
 
@@ -339,7 +339,14 @@
                     <div class="d-flex align-items-center">
                         <span class="nav-link-icon"><i class="bi bi-patch-question-fill text-warning"></i></span>
                         <span class="nav-link-text ps-1">{{ __('Unmatched Payments') }}</span>
-                        @php $pendingUnmatchedCount = \App\Models\UnmatchedPayment::where('status', 'pending')->count(); @endphp
+                        @php
+                            $pendingUnmatchedCount = 0;
+                            try {
+                                if (\Illuminate\Support\Facades\Schema::hasTable('unmatched_payments')) {
+                                    $pendingUnmatchedCount = \App\Models\UnmatchedPayment::where('status', 'pending')->count();
+                                }
+                            } catch (\Throwable $e) {}
+                        @endphp
                         @if($pendingUnmatchedCount > 0)
                             <span class="badge rounded-pill ms-auto bg-warning text-dark">{{ $pendingUnmatchedCount }}</span>
                         @endif

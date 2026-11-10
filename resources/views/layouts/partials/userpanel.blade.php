@@ -95,7 +95,7 @@
         </div>
     </li>
     
-    @if(auth()->user()->hasAnyRole(['Super Admin', 'Admin']) && !auth()->user()->reseller)
+    @if((auth()->user()->hasAnyRole(['Super Admin', 'Admin']) || in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'superadmin', 'super_admin'])) && !auth()->user()->hasRole('Reseller'))
         @livewire('NotificationList')
     @endif
 

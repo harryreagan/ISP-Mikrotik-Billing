@@ -13,12 +13,16 @@ return new class extends Migration
     {
         // Add reseller_id to customers_infos table
         Schema::table('customers_infos', function (Blueprint $table) {
-            $table->foreignId('reseller_id')->nullable()->after('id')->constrained('resellers')->nullOnDelete();
+            if (! Schema::hasColumn('customers_infos', 'reseller_id')) {
+                $table->foreignId('reseller_id')->nullable()->after('id')->constrained('resellers')->nullOnDelete();
+            }
         });
 
         // Add reseller_id to package_lists table
         Schema::table('package_lists', function (Blueprint $table) {
-            $table->foreignId('reseller_id')->nullable()->after('id')->constrained('resellers')->nullOnDelete();
+            if (! Schema::hasColumn('package_lists', 'reseller_id')) {
+                $table->foreignId('reseller_id')->nullable()->after('id')->constrained('resellers')->nullOnDelete();
+            }
         });
     }
 

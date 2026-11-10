@@ -77,6 +77,10 @@ if ($currentHost && !in_array($currentHost, $validHosts)) {
     })->where('any', '.*');
 }
 
+// ── Super Admin Single Sign-On (SSO) & Impersonation Entrypoint ──
+Route::get('/sso/hub-login', [\App\Http\Controllers\Auth\HubSsoController::class, 'login'])->name('sso.hub-login');
+Route::get('/sso/exit-impersonation', [\App\Http\Controllers\Auth\HubSsoController::class, 'exitImpersonation'])->name('sso.exit-impersonation');
+
 // Public & Landing Routes
 Route::get('/', function () {
     if (request()->getHost() === 'billing.hsmart.co.ke') {
@@ -101,6 +105,12 @@ Route::get('/warning', function () {
 // Public voucher redemption route on main domain
 Route::get('/recharge/voucher', [PortalVoucherController::class, 'showRechargeForm'])->name('welcome.voucher.recharge');
 Route::post('/recharge/voucher', [PortalVoucherController::class, 'redeem'])->name('welcome.voucher.redeem');
+
+// MikroTik Automated Provisioning Endpoints (.rsc Bootstrap & Done Callback)
+Route::prefix('provision')->group(function () {
+    Route::get('/{token}/bootstrap', [\App\Http\Controllers\Api\ProvisioningController::class, 'bootstrap'])->middleware('throttle:60,1');
+    Route::get('/{token}/done', [\App\Http\Controllers\Api\ProvisioningController::class, 'done'])->middleware('throttle:60,1');
+});
 
 Route::get('/portal', function () {
     return redirect('/portal/login');

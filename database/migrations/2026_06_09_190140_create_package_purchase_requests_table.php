@@ -11,19 +11,21 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('package_purchase_requests', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('phone');
-            $table->string('email')->nullable();
-            $table->text('address');
-            $table->string('package_name');
-            $table->decimal('price', 10, 2);
-            $table->string('status')->default('pending'); // pending, contacted, completed, cancelled
-            $table->string('ip_address')->nullable();
-            $table->text('notes')->nullable();
-            $table->timestamps();
-        });
+        if (! Schema::hasTable('package_purchase_requests')) {
+            Schema::create('package_purchase_requests', function (Blueprint $table) {
+                $table->id();
+                $table->string('name');
+                $table->string('phone');
+                $table->string('email')->nullable();
+                $table->text('address');
+                $table->string('package_name');
+                $table->decimal('price', 10, 2);
+                $table->string('status')->default('pending'); // pending, contacted, completed, cancelled
+                $table->string('ip_address')->nullable();
+                $table->text('notes')->nullable();
+                $table->timestamps();
+            });
+        }
     }
 
     /**

@@ -49,4 +49,19 @@ return [
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI', env('APP_URL', 'http://localhost:8095') . '/auth/google/callback'),
     ],
+
+    'wireguard' => [
+        'interface_name' => env('WIREGUARD_INTERFACE', 'wg0'),
+        'server_public_key' => env('WIREGUARD_SERVER_PUBLIC_KEY', 'DuZQaTGDe95eAhT6+OFgFaI+rsP/n6iaIxjWSvtTRx4='),
+        'server_endpoint' => env('WIREGUARD_SERVER_ENDPOINT', '213.199.49.216:51820'),
+        'gateway_ip' => env('WIREGUARD_GATEWAY_IP', '10.10.0.1'),
+    ],
+
+    'radius' => [
+        'server_ip' => env('RADIUS_SERVER_IP', '10.10.0.1'),
+        'auth_port' => env('RADIUS_AUTH_PORT', 1812),
+        'acct_port' => env('RADIUS_ACCT_PORT', 1813),
+        'coa_port' => env('RADIUS_COA_PORT', 3799),
+        'secret' => env('RADIUS_SHARED_SECRET', 'hsmart_rad_secret'),
+    ],
 ];

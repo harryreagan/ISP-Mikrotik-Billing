@@ -713,12 +713,13 @@ h2 {
 
 @media (max-width: 480px) {
   .w { padding: 0 16px; }
-  .nav { flex-direction: column; align-items: flex-start; gap: 14px; }
-  .nl { width: 100%; justify-content: flex-start; gap: 12px; }
+  .nav { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+  .nl { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 13px; }
+  .nl .btn { width: auto; padding: 8px 16px; }
   .hero { padding-top: 24px; padding-bottom: 36px; gap: 28px; }
   .fl { position: static; margin-top: 14px; }
   .pc.hl { transform: none; }
-  .btn { width: 100%; }
+  .hero .btn { width: 100%; }
   .row { gap: 16px; }
 }
 
@@ -742,8 +743,8 @@ html {
 
 <div class="pg">
 <header class="w nav">
-    <a href="#top" class="logo">
-        <span class="lm">H</span>HSmart ISP
+    <a href="#top" style="text-decoration: none;">
+        <x-hsmart-logo color="dark" height="38px" />
     </a>
     <nav class="nl">
         <a href="#features">Features</a>
@@ -751,7 +752,7 @@ html {
         <a href="#pricing">Pricing</a>
         <a href="#faq">FAQ</a>
         <a href="{{ $loginUrl }}">Login</a>
-        <a href="{{ $registerUrl }}" class="btn y" style="padding:12px 22px">Start free trial</a>
+        <a href="{{ $registerUrl }}" class="btn y" style="padding:10px 20px; font-size: 14px;">Start free trial</a>
     </nav>
 </header>
 
@@ -1040,8 +1041,8 @@ html {
     <div class="w">
         <div class="row" style="gap:40px;justify-content:space-between">
             <div style="flex:1 1 280px;max-width:340px">
-                <div class="logo" style="color:#fff">
-                    <span class="lm">H</span>HSmart ISP
+                <div style="margin-bottom: 12px;">
+                    <x-hsmart-logo color="light" height="36px" />
                 </div>
                 <p style="line-height:1.7;font-size:14px;color:#aab">
                     Automated MikroTik ISP and hotspot billing, built in Kenya for instant local M-Pesa payments.

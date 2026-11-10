@@ -11,14 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('permitted_urls', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('router_id')->nullable()->constrained('router_lists')->onDelete('cascade');
-            $table->string('url_or_ip');
-            $table->enum('type', ['url', 'ip'])->default('url');
-            $table->string('comment')->nullable();
-            $table->timestamps();
-        });
+        if (! Schema::hasTable('permitted_urls')) {
+            Schema::create('permitted_urls', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('router_id')->nullable()->constrained('router_lists')->onDelete('cascade');
+                $table->string('url_or_ip');
+                $table->enum('type', ['url', 'ip'])->default('url');
+                $table->string('comment')->nullable();
+                $table->timestamps();
+            });
+        }
     }
 
     /**

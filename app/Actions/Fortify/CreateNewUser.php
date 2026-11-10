@@ -29,13 +29,52 @@ class CreateNewUser implements CreatesNewUsers
         ])->validate();
 
         return DB::transaction(function () use ($input) {
-            return tap(User::create([
+            $user = User::create([
                 'name' => $input['name'],
                 'email' => $input['email'],
                 'password' => Hash::make($input['password']),
-            ]), function (User $user) {
-                $this->createTeam($user);
-            });
+                'role' => 'admin',
+                'status' => 'active',
+                'is_super_admin' => 0,
+            ]);
+
+            // Assign Admin role
+            try {
+                if (\Spatie\Permission\Models\Role::where('name', 'Admin')->exists()) {
+                    $user->assignRole('Admin');
+                }
+            } catch (\Throwable $e) {
+                // Ignore role assignment failure if table not ready
+            }
+
+            // Create dedicated Tenant for this ISP Admin if none assigned
+            if (empty($user->tenant_id)) {
+                try {
+                    $baseSlug = \Illuminate\Support\Str::slug($user->name);
+                    $subdomain = $baseSlug . '-' . $user->id;
+                    $billingCode = strtoupper(\Illuminate\Support\Str::random(6));
+
+                    $tenantId = DB::table('tenants')->insertGetId([
+                        'name' => $user->name . ' Networks',
+                        'subdomain' => $subdomain,
+                        'billing_code' => $billingCode,
+                        'country' => 'Kenya',
+                        'county' => 'Nairobi',
+                        'is_active' => 1,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                    $user->tenant_id = $tenantId;
+                    $user->save();
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning("Auto-create tenant failed for user {$user->id}: " . $e->getMessage());
+                }
+            }
+
+            $this->createTeam($user);
+
+            return $user;
         });
     }
 

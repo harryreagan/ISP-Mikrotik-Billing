@@ -9,33 +9,39 @@ return new class extends Migration
     public function up(): void
     {
         // 1. Create user_login_logs table
-        Schema::create('user_login_logs', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('authenticatable_id');
-            $table->string('authenticatable_type');
-            $table->string('username');
-            $table->string('ip_address')->nullable();
-            $table->text('user_agent')->nullable();
-            $table->string('action'); // 'login' or 'logout'
-            $table->timestamps();
+        if (! Schema::hasTable('user_login_logs')) {
+            Schema::create('user_login_logs', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('authenticatable_id');
+                $table->string('authenticatable_type');
+                $table->string('username');
+                $table->string('ip_address')->nullable();
+                $table->text('user_agent')->nullable();
+                $table->string('action'); // 'login' or 'logout'
+                $table->timestamps();
 
-            $table->index(['authenticatable_id', 'authenticatable_type']);
-        });
+                $table->index(['authenticatable_id', 'authenticatable_type']);
+            });
+        }
 
         // 2. Create customer_reviews table
-        Schema::create('customer_reviews', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('ppp_user_id')->constrained('p_p_p_secrets')->onDelete('cascade');
-            $table->integer('rating');
-            $table->text('comment');
-            $table->integer('edit_count')->default(0);
-            $table->boolean('show_on_site')->default(false);
-            $table->timestamps();
-        });
+        if (! Schema::hasTable('customer_reviews')) {
+            Schema::create('customer_reviews', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('ppp_user_id')->constrained('p_p_p_secrets')->onDelete('cascade');
+                $table->integer('rating');
+                $table->text('comment');
+                $table->integer('edit_count')->default(0);
+                $table->boolean('show_on_site')->default(false);
+                $table->timestamps();
+            });
+        }
 
         // 3. Add login_count to p_p_p_secrets table
         Schema::table('p_p_p_secrets', function (Blueprint $table) {
-            $table->integer('login_count')->default(0);
+            if (! Schema::hasColumn('p_p_p_secrets', 'login_count')) {
+                $table->integer('login_count')->default(0);
+            }
         });
     }
 

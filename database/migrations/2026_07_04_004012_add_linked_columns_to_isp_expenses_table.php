@@ -13,12 +13,16 @@ return new class extends Migration
             $table->string('category', 100)->change();
 
             // Link to a system user (e.g. employee salary recipient)
-            $table->unsignedBigInteger('linked_user_id')->nullable()->after('added_by');
-            $table->foreign('linked_user_id')->references('id')->on('users')->nullOnDelete();
+            if (! Schema::hasColumn('isp_expenses', 'linked_user_id')) {
+                $table->unsignedBigInteger('linked_user_id')->nullable()->after('added_by');
+                $table->foreign('linked_user_id')->references('id')->on('users')->nullOnDelete();
+            }
 
             // Link to a reseller (e.g. commission payout)
-            $table->unsignedBigInteger('linked_reseller_id')->nullable()->after('linked_user_id');
-            $table->foreign('linked_reseller_id')->references('id')->on('resellers')->nullOnDelete();
+            if (! Schema::hasColumn('isp_expenses', 'linked_reseller_id')) {
+                $table->unsignedBigInteger('linked_reseller_id')->nullable()->after('linked_user_id');
+                $table->foreign('linked_reseller_id')->references('id')->on('resellers')->nullOnDelete();
+            }
         });
     }
 

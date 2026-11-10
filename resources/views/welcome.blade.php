@@ -36,18 +36,12 @@
 	<header id="navigation" class="navbar sticky-top animated-header navbar-expand-md bg-light">
 		<div class="container text-center">
 			<!-- site logo or Site brand name -->
-			<a class="navbar-brand" href="">
+			<a class="navbar-brand" href="{{ url('/') }}" style="text-decoration: none;">
                 @if (siteUrlSettings('site_logo'))
                     <img class="d-inline-block align-text-top" style="width: 190px; height: 53px;" src="{{ site_image(siteUrlSettings('site_logo')) }}" alt="logo"/>
                 @else
-                    @if (siteUrlSettings('site_icon'))
-                        <img class="d-inline-block align-text-top" src="{{ site_image(siteUrlSettings('site_icon')) }}" alt="" width="40" />
-                        <span class="font-sans-serif text-success">{{ siteUrlSettings('site_name') ?? 'Code Pagol' }}</span>
-                    @else
-                        <span class="font-sans-serif text-success">{{ siteUrlSettings('site_name') ?? 'Code Pagol' }}</span>
-                    @endif
+                    <x-hsmart-logo color="dark" height="38px" />
                 @endif
-				{{-- <img src="{{ siteUrlSettings('site_logo') ?? asset('images/logo.png') }}" alt="Logo" width="164" height="40" class="d-inline-block align-text-top"> --}}
 			</a>
 
 			<!-- main nav panel -->
