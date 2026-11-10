@@ -185,19 +185,11 @@
                     </div>
                 </a>
 
-                {{-- New Customer --}}
-                <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('new-customer') }}" role="button">
-                    <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-person-fill-add"></i></span>
-                        <span class="nav-link-text ps-1">{{ __('New Customer') }}</span>
-                    </div>
-                </a>
-
-                {{-- Customer List --}}
-                <a wire:navigate.hover wire:current.exact="active" class="nav-link" href="{{ route('customers.index') }}" role="button">
+                {{-- Customers --}}
+                <a wire:navigate.hover wire:current="active" class="nav-link {{ request()->routeIs('admin.customers') || request()->routeIs('customers.index') || request()->routeIs('new-customer') ? 'active' : '' }}" href="{{ route('admin.customers') }}" role="button">
                     <div class="d-flex align-items-center">
                         <span class="nav-link-icon"><i class="bi bi-people-fill"></i></span>
-                        <span class="nav-link-text ps-1">{{ __('Customer List') }}</span>
+                        <span class="nav-link-text ps-1">{{ __('Customers') }}</span>
                     </div>
                 </a>
 
@@ -227,19 +219,11 @@
                     <div class="col ps-0"><hr class="mb-0 navbar-vertical-divider" /></div>
                 </div>
 
-                {{-- Add Router (Unified Wizard) --}}
-                <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.add-router') }}" role="button">
+                {{-- Routers --}}
+                <a wire:navigate.hover wire:current="active" class="nav-link {{ request()->routeIs('admin.routers') || request()->routeIs('mikrotik-sync') || request()->routeIs('admin.add-router') ? 'active' : '' }}" href="{{ route('admin.routers') }}" role="button">
                     <div class="d-flex align-items-center">
                         <span class="nav-link-icon"><i class="bi bi-router-fill text-warning"></i></span>
-                        <span class="nav-link-text ps-1">{{ __('Add Router') }}</span>
-                    </div>
-                </a>
-
-                {{-- Mikrotik Sync --}}
-                <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('mikrotik-sync') }}" role="button">
-                    <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-arrow-repeat text-primary"></i></span>
-                        <span class="nav-link-text ps-1">{{ __('MikroTik Sync') }}</span>
+                        <span class="nav-link-text ps-1">{{ __('Routers') }}</span>
                     </div>
                 </a>
 

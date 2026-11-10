@@ -160,14 +160,16 @@ Route::middleware([
         Route::get('customers/{id}/edit', [CustomerList::class, 'edit'])->name('customers.edit');
         Route::get('customers/{id}', [CustomerList::class, 'show'])->name('customers.show');
         Route::patch('customers/{id}', [CustomerList::class, 'update'])->name('customers.update');
-        Route::get('customers', CustomerList::class)->name('customers.index');
+        Route::get('/admin/customers', \App\Livewire\Admin\CustomersManager::class)->name('admin.customers');
+        Route::get('customers', \App\Livewire\Admin\CustomersManager::class)->name('customers.index');
 
-        Route::get('/new/customers', CustomerList::class)->name('customers-new');
+        Route::get('/new/customers', fn() => redirect()->route('admin.customers'))->name('customers-new');
         Route::get('/admin-users', ManageUser::class)->name('admin-users');
         Route::get('/admin-roles', ManageRole::class)->name('admin-roles');
         Route::get('/support-tickets', ManageTickets::class)->name('admin-tickets');
-        Route::get('/mikrotik', MikrotikSync::class)->name('mikrotik-sync');
-        Route::get('/routers', MikrotikSync::class)->name('mikrotik');
+        Route::get('/admin/routers', \App\Livewire\Admin\RoutersManager::class)->name('admin.routers');
+        Route::get('/mikrotik', \App\Livewire\Admin\RoutersManager::class)->name('mikrotik-sync');
+        Route::get('/routers', \App\Livewire\Admin\RoutersManager::class)->name('mikrotik');
         Route::get('/admin/packages', \App\Livewire\Admin\PackagesManager::class)->name('admin.packages');
         Route::get('/packages-list', fn() => redirect()->route('admin.packages'))->name('packages');
         Route::get('/packages', fn() => redirect()->route('admin.packages'))->name('package-list-setup');
