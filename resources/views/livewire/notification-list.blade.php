@@ -1,11 +1,15 @@
 
-<li class="nav-item dropdown">
+<li class="nav-item dropdown px-1">
     <a  x-data @mouseenter="$wire.call('loadNotifications')"
-        class="{{$notificationCount > 0 ? 'animate-ring' : ''}} nav-link px-0 notification-indicator notification-indicator-warning"
+        class="nav-link btn-toolbar-icon position-relative {{ $notificationCount > 0 ? 'text-primary' : 'text-secondary' }}"
         id="navbarDropdownNotification" role="button" data-bs-toggle="dropdown" aria-haspopup="true"
-        aria-expanded="false" data-hide-on-body-scroll="data-hide-on-body-scroll">
-        <span class="bi bi-bell-fill fs-7" style="font-size: 35px;"></span>
-        <span class="notification-indicator-number">{{$notificationCount}}</span>
+        aria-expanded="false" data-hide-on-body-scroll="data-hide-on-body-scroll" title="{{ __('Notifications') }}">
+        <span class="bi bi-bell-fill fs-8"></span>
+        @if($notificationCount > 0)
+            <span class="position-absolute top-1 end-1 translate-middle badge rounded-pill bg-danger border border-white" style="font-size: 9px; padding: 2px 4px; line-height: 1;">
+                {{ $notificationCount }}
+            </span>
+        @endif
     </a>
 
     <div wire:ignore.self class="dropdown-menu dropdown-caret dropdown-menu-end dropdown-menu-card dropdown-menu-notification dropdown-caret-bg" aria-labelledby="navbarDropdownNotification">

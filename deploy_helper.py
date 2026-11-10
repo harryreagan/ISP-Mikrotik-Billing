@@ -65,7 +65,7 @@ def deploy():
         return False
 
     print("\n--- 2. Unzipping on VPS ---")
-    remote_unzip = "unzip -o /tmp/deploy_update.zip -d /var/www/poss/isp-billing && rm -f /tmp/deploy_update.zip"
+    remote_unzip = "unzip -q -o /tmp/deploy_update.zip -d /var/www/poss/isp-billing && rm -f /tmp/deploy_update.zip"
     code = run_cmd(["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=15", VPS_HOST, remote_unzip], timeout=45)
     if code != 0:
         print("Unzip failed!")

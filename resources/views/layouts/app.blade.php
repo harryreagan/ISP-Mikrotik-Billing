@@ -99,7 +99,49 @@
             border-radius: 16px !important;
             margin: 14px 14px 14px 0 !important;
             box-shadow: 0 4px 20px rgba(0,0,0,0.03) !important;
-            padding: 10px 20px !important;
+            padding: 0 20px !important;
+            min-height: 58px !important;
+            height: 58px !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+
+        /* Toolbar Icon Buttons */
+        .btn-toolbar-icon {
+            width: 36px !important;
+            height: 36px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            border-radius: 10px !important;
+            color: #6B7280 !important;
+            background: transparent !important;
+            transition: all 0.2s ease !important;
+            text-decoration: none !important;
+            padding: 0 !important;
+            border: none !important;
+        }
+        .btn-toolbar-icon:hover {
+            background: #F3F4F6 !important;
+            color: #F47B06 !important;
+        }
+        .btn-toolbar-icon:focus {
+            box-shadow: none !important;
+        }
+        .dropdown-caret-none::after {
+            display: none !important;
+        }
+
+        .dark .navbar-top {
+            background: #1A2035 !important;
+            border-color: rgba(255, 255, 255, 0.08) !important;
+        }
+        .dark .btn-toolbar-icon {
+            color: #9CA3AF !important;
+        }
+        .dark .btn-toolbar-icon:hover {
+            background: rgba(255, 255, 255, 0.08) !important;
+            color: #F47B06 !important;
         }
 
         /* Cards Design System */

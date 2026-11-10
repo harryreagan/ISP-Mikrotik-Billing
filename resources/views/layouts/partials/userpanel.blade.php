@@ -21,55 +21,55 @@
                 hours = hours % 12 || 12;
                 this.timeString = `${pad(hours)}:${minutes}:${seconds} ${ampm}`;
                 this.dateString = this.current.toLocaleDateString('en-US', {
-                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                    weekday: 'short', month: 'short', day: 'numeric'
                 });
             }
         }"
         x-init="init()"
     >
         <!-- Mobile Clock Icon -->
-        <a class="d-block d-lg-none nav-link d-flex align-items-center fs-9 pe-1 py-0"
-        id="clockDropdown" role="button" data-bs-toggle="dropdown"
-        aria-haspopup="true" aria-expanded="false">
-            <i class="bi bi-clock fs-8"></i>
+        <a class="d-block d-lg-none nav-link btn-toolbar-icon"
+           id="clockDropdown" role="button" data-bs-toggle="dropdown"
+           aria-haspopup="true" aria-expanded="false" title="{{ __('Time') }}">
+            <i class="bi bi-clock fs-8 text-secondary"></i>
         </a>
 
         <!-- Dropdown for Mobile -->
         <div class="dropdown-menu dropdown-caret dropdown-menu-end dropdown-menu-card dropdown-menu-notification dropdown-caret-bg mt-3"
             aria-labelledby="clockDropdown">
-            <div class="card shadow-none py-4 text-center">
-                <div class="text-sm text-gray-500" x-text="dateString"></div>
-                <div class="text-2xl font-medium" x-text="timeString"></div>
+            <div class="card shadow-none py-3 px-4 text-center">
+                <div class="text-xs text-muted fw-medium" x-text="dateString"></div>
+                <div class="fs-8 fw-bold text-dark font-monospace my-1" x-text="timeString"></div>
                 <div class="text-xs text-muted">
-                    {{ __('TimeZone') }}: Africa/Nairobi (EAT)
+                    Africa/Nairobi (EAT)
                 </div>
             </div>
         </div>
 
-        <!-- Desktop Clock Display -->
-        <div class="text-center d-none d-lg-block">
-            <div class="text-sm text-gray-500" x-text="dateString"></div>
-            <div class="text-2xl font-medium" x-text="timeString"></div>
-            <div class="text-xs text-muted">
-                {{ __('TimeZone') }}: Africa/Nairobi (EAT)
-            </div>
+        <!-- Desktop Compact Telemetry Pill -->
+        <div class="d-none d-lg-flex align-items-center gap-2 px-3 py-1 me-2 rounded-pill bg-light border border-light-subtle" 
+             style="background: #F8F9FA !important; border-color: #E5E7EB !important; font-size: 13px;">
+            <span class="d-inline-block rounded-circle bg-success" style="width: 7px; height: 7px; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);"></span>
+            <span class="fw-bold text-dark font-monospace" x-text="timeString" style="font-size: 12.5px; letter-spacing: -0.2px;"></span>
+            <span class="text-muted" style="opacity: 0.4;">|</span>
+            <span class="text-secondary fw-medium" x-text="dateString" style="font-size: 12px;"></span>
+            <span class="badge bg-secondary-subtle text-secondary-emphasis px-1.5 py-0.5 rounded" style="font-size: 9px; font-weight: 700; letter-spacing: 0.5px;">EAT</span>
         </div>
     </li>
 
-
-    <li class="nav-item ps-2 pe-0">
-        <div x-data="themeToggle()" x-init="init()"  class="dropdown theme-control-dropdown">
-            <a class="nav-link d-flex align-items-center dropdown-toggle fs-9 pe-1 py-0"
+    <li class="nav-item px-1">
+        <div x-data="themeToggle()" x-init="init()" class="dropdown theme-control-dropdown">
+            <a class="nav-link btn-toolbar-icon dropdown-toggle dropdown-caret-none"
                 href="#" role="button" id="themeSwitchDropdown"
-                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="{{ __('Toggle theme') }}">
                 <template x-if="theme === 'light'">
-                    <i class="bi bi-sun fs-8" title="Light"></i>
+                    <i class="bi bi-sun fs-8 text-secondary"></i>
                 </template>
                 <template x-if="theme === 'dark'">
-                    <i class="bi bi-moon-stars-fill fs-8" title="Dark"></i>
+                    <i class="bi bi-moon-stars-fill fs-8 text-secondary"></i>
                 </template>
                 <template x-if="theme === 'auto'">
-                    <i class="bi bi-circle-half fs-8" title="Auto"></i>
+                    <i class="bi bi-circle-half fs-8 text-secondary"></i>
                 </template>
             </a>
 
@@ -99,34 +99,24 @@
         @livewire('NotificationList')
     @endif
 
-    <li class="nav-item ps-2 p-1" href="#settings-offcanvas" data-bs-toggle="offcanvas">
-        <div class="card-body d-flex align-items-center">
-            <div class="bg-primary-subtle position-relative rounded-start">
-                <div class="settings-popover">
-                    <span class="ripple">
-                        <span class="fa-spin position-absolute all-0 d-flex flex-center">
-                            <span class="icon-spin position-absolute all-0 d-flex flex-center">
-                                <i class="bi bi-gear-fill fs-8"></i>
-                            </span>
-                        </span>
-                    </span>
-                </div>
-            </div>
-        </div>
+    <li class="nav-item px-1">
+        <a class="nav-link btn-toolbar-icon" href="#settings-offcanvas" data-bs-toggle="offcanvas" role="button" title="{{ __('Settings') }}">
+            <i class="bi bi-gear-fill fs-8 text-secondary"></i>
+        </a>
     </li>
 
     <li class="nav-item dropdown px-1">
-        <a class="nav-link nine-dots p-1" id="navbarDropdownMenu" role="button" data-hide-on-body-scroll="data-hide-on-body-scroll" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="43" viewBox="0 0 16 16" fill="none">
-                <circle cx="2" cy="2" r="2" fill="#6C6E71"></circle>
-                <circle cx="2" cy="8" r="2" fill="#6C6E71"></circle>
-                <circle cx="2" cy="14" r="2" fill="#6C6E71"></circle>
-                <circle cx="8" cy="8" r="2" fill="#6C6E71"></circle>
-                <circle cx="8" cy="14" r="2" fill="#6C6E71"></circle>
-                <circle cx="14" cy="8" r="2" fill="#6C6E71"></circle>
-                <circle cx="14" cy="14" r="2" fill="#6C6E71"></circle>
-                <circle cx="8" cy="2" r="2" fill="#6C6E71"></circle>
-                <circle cx="14" cy="2" r="2" fill="#6C6E71"></circle>
+        <a class="nav-link btn-toolbar-icon" id="navbarDropdownMenu" role="button" data-hide-on-body-scroll="data-hide-on-body-scroll" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="{{ __('Quick Links') }}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="text-secondary">
+                <circle cx="2.5" cy="2.5" r="1.5"></circle>
+                <circle cx="2.5" cy="8" r="1.5"></circle>
+                <circle cx="2.5" cy="13.5" r="1.5"></circle>
+                <circle cx="8" cy="2.5" r="1.5"></circle>
+                <circle cx="8" cy="8" r="1.5"></circle>
+                <circle cx="8" cy="13.5" r="1.5"></circle>
+                <circle cx="13.5" cy="2.5" r="1.5"></circle>
+                <circle cx="13.5" cy="8" r="1.5"></circle>
+                <circle cx="13.5" cy="13.5" r="1.5"></circle>
             </svg>
         </a>
         <div class="dropdown-menu dropdown-caret dropdown-menu-end dropdown-menu-card dropdown-caret-bg" aria-labelledby="navbarDropdownMenu">
@@ -163,21 +153,17 @@
         </div>
     </li>
 
-    <li class="nav-item dropdown">
-        <a class="nav-link pe-0 ps-2" id="navbarDropdownUser" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-            @if (Laravel\Jetstream\Jetstream::managesProfilePhotos())
-                <div class="avatar avatar-xl">
-                    <img class="rounded-circle" src="{{ Auth::user()->profile_photo_url }}" alt="{{ Auth::user()->name }}" />
+    <li class="nav-item dropdown ps-1">
+        <a class="nav-link p-0 d-flex align-items-center" id="navbarDropdownUser" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            @if (Laravel\Jetstream\Jetstream::managesProfilePhotos() && Auth::user()->profile_photo_url)
+                <div class="avatar avatar-l" style="border: 2px solid #E6E3F5; border-radius: 50%; padding: 1px; transition: border-color 0.2s;">
+                    <img class="rounded-circle" src="{{ Auth::user()->profile_photo_url }}" alt="{{ Auth::user()->name }}" style="width: 34px; height: 34px; object-fit: cover;" />
                 </div>
             @else
-                <span class="inline-flex rounded-md">
-                    <button type="button" class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none focus:bg-gray-50 dark:focus:bg-gray-700 active:bg-gray-50 dark:active:bg-gray-700 transition ease-in-out duration-150">
-                        {{ Auth::user()->name }}
-                        <svg class="ms-2 -me-0.5 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </button>
-                </span>
+                <div class="avatar avatar-l d-flex align-items-center justify-content-center bg-primary text-dark fw-bold rounded-circle shadow-2xs" 
+                     style="width: 36px; height: 36px; font-size: 13px; border: 2px solid #FED7AA; color: #111111;">
+                    {{ strtoupper(substr(Auth::user()->name, 0, 2)) }}
+                </div>
             @endif
         </a>
 

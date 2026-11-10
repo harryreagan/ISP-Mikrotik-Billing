@@ -7,9 +7,16 @@
     <!-- Breadcrumb on Left -->
     <div class="d-none d-md-flex align-items-center me-3">
         <nav aria-label="breadcrumb">
-            <ol class="breadcrumb mb-0 py-0" style="font-size: 0.85rem; font-weight: 600;">
-                <li class="breadcrumb-item"><a href="{{ url('/') }}" style="color: #666; text-decoration: none;">HSmart</a></li>
-                <li class="breadcrumb-item active" aria-current="page" style="color: #111; font-weight: 700;">{{ $header ?? __('Dashboard') }}</li>
+            <ol class="breadcrumb mb-0 py-0 align-items-center" style="font-size: 0.85rem; font-weight: 600;">
+                <li class="breadcrumb-item d-flex align-items-center">
+                    <a href="{{ url('/') }}" class="text-secondary text-decoration-none d-flex align-items-center gap-1" style="color: #6B7280;">
+                        <span class="bi bi-house-door-fill" style="color: #9CA3AF; font-size: 13px;"></span>
+                        <span>HSmart</span>
+                    </a>
+                </li>
+                <li class="breadcrumb-item active text-dark fw-bold" aria-current="page" style="color: #111827;">
+                    {{ $header ?? __('Dashboard') }}
+                </li>
             </ol>
         </nav>
     </div>
@@ -33,9 +40,16 @@
     <!-- Breadcrumb on Left -->
     <div class="d-none d-md-flex align-items-center me-3">
         <nav aria-label="breadcrumb">
-            <ol class="breadcrumb mb-0 py-0" style="font-size: 0.85rem; font-weight: 600;">
-                <li class="breadcrumb-item"><a href="{{ url('/') }}" style="color: #666; text-decoration: none;">HSmart</a></li>
-                <li class="breadcrumb-item active" aria-current="page" style="color: #111; font-weight: 700;">{{ $header ?? __('Dashboard') }}</li>
+            <ol class="breadcrumb mb-0 py-0 align-items-center" style="font-size: 0.85rem; font-weight: 600;">
+                <li class="breadcrumb-item d-flex align-items-center">
+                    <a href="{{ url('/') }}" class="text-secondary text-decoration-none d-flex align-items-center gap-1" style="color: #6B7280;">
+                        <span class="bi bi-house-door-fill" style="color: #9CA3AF; font-size: 13px;"></span>
+                        <span>HSmart</span>
+                    </a>
+                </li>
+                <li class="breadcrumb-item active text-dark fw-bold" aria-current="page" style="color: #111827;">
+                    {{ $header ?? __('Dashboard') }}
+                </li>
             </ol>
         </nav>
     </div>
