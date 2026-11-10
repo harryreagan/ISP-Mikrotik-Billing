@@ -11,23 +11,16 @@
                         <div class="card-body profile-card pt-4 d-flex flex-column align-items-center">
                         <img src="{{ Auth::user()->profile_photo_url }}" alt="{{ Auth::user()->name }}" style="max-width: 10rem; min-width: 10rem; max-height: 10rem; min-height: 10rem;" alt="Profile Image" class="profileImagePreview rounded-circle">
                         <h3>{{ Auth::user()->name }}</h3> 
-                        @if(Auth::user()->roles->isNotEmpty())
-                            <h4>Act as : 
-                                @foreach (Auth::user()->roles as $role)
-                                    {{ $role->name }}
-                                    @if (!$loop->last)
-                                        ,
-                                    @endif
-                                @endforeach
-                            </h4>
-                        @elseif(!empty(Auth::user()->role))
-                            <h4>Act as : {{ ucfirst(Auth::user()->role) }}</h4>
-                        @else
-                            <p class="p-0 m-0 pt-2">Hi, Your Registration is Completed.</p>
-                            <p class="p-1 m-0 fw-semibold">But No Role Assigned.</p>
-                            <p class="p-0 m-0">Wait for Admin Approval.</p>
-                            <p class="p-0 m-0">OR Contact Super Admin for More Information</p>
-                        @endif
+                        @php
+                            $userRoles = Auth::user()->roles ? Auth::user()->roles->pluck('name')->toArray() : [];
+                            if (empty($userRoles) && !empty(Auth::user()->role)) {
+                                $userRoles = [ucfirst(Auth::user()->role)];
+                            }
+                            if (empty($userRoles)) {
+                                $userRoles = ['ISP Administrator'];
+                            }
+                        @endphp
+                        <h4>Act as : <span class="badge bg-primary text-white">{{ implode(', ', $userRoles) }}</span></h4>
 
                         <div class="social-links mt-2">
                             <a wire:navigate.hover wire:current="active" href="#" class="twitter"><i class="bi bi-twitter"></i></a>

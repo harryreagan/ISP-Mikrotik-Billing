@@ -141,7 +141,9 @@ class HubSsoController extends Controller
     {
         $returnUrl = session('super_admin_return_url', 'https://pos.hsmart.co.ke/super-admin/isp-hub/isps');
         session()->forget(['is_impersonating', 'impersonated_tenant_id', 'impersonated_tenant_name', 'super_admin_return_url']);
-        Auth::logout();
+        if (Auth::guard('web')->check()) {
+            Auth::guard('web')->logout();
+        }
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 

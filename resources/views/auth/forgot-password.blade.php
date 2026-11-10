@@ -44,10 +44,7 @@
         .hero-panel {
             flex: 1 1 50%;
             min-height: 100vh;
-            background-color: var(--navy);
-            background-image: url('{{ asset('images/gallery/rack.jpg') }}');
-            background-position: center center;
-            background-size: cover;
+            background: linear-gradient(165deg, #0F1424 0%, #161B2E 50%, #1A2035 100%);
             position: relative;
             display: flex;
             flex-direction: column;
@@ -59,7 +56,8 @@
         .hero-overlay {
             position: absolute;
             inset: 0;
-            background-color: rgba(22, 27, 46, 0.90);
+            background: radial-gradient(circle at 10% 20%, rgba(109, 63, 224, 0.12) 0%, transparent 60%),
+                        radial-gradient(circle at 90% 80%, rgba(244, 123, 6, 0.08) 0%, transparent 50%);
             z-index: 1;
         }
         .hero-content {
@@ -298,7 +296,7 @@
 
             <div class="form-header">
                 <h1>Forgot Password</h1>
-                <p>Enter your email address and we will send you a secure link to reset your password.</p>
+                <p>Enter your phone number or email address and we will dispatch a secure SMS verification code or password reset link.</p>
             </div>
 
             @if(session('status'))
@@ -308,22 +306,24 @@
             <form method="POST" action="{{ route('password.email') }}">
                 @csrf
                 <div class="form-group">
-                    <label class="form-label" for="email">Email address</label>
-                    <input class="form-input {{ $errors->has('email') ? 'is-invalid' : '' }}" 
-                           id="email" 
-                           type="email" 
-                           name="email" 
-                           value="{{ old('email') }}" 
+                    <label class="form-label" for="identity">Phone Number or Email Address</label>
+                    <input class="form-input {{ ($errors->has('identity') || $errors->has('email')) ? 'is-invalid' : '' }}" 
+                           id="identity" 
+                           type="text" 
+                           name="identity" 
+                           value="{{ old('identity', old('email')) }}" 
                            required 
                            autofocus 
-                           placeholder="you@hsmart.co.ke" 
+                           placeholder="e.g. 0712345678 or you@example.com" 
                            autocomplete="username">
-                    @if($errors->has('email'))
+                    @if($errors->has('identity'))
+                        <span class="field-error">{{ $errors->first('identity') }}</span>
+                    @elseif($errors->has('email'))
                         <span class="field-error">{{ $errors->first('email') }}</span>
                     @endif
                 </div>
 
-                <button type="submit" class="btn-submit">Send Reset Link</button>
+                <button type="submit" class="btn-submit">Continue to Reset</button>
             </form>
         </div>
     </div>

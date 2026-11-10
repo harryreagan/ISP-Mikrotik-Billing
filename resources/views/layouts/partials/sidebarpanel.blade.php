@@ -227,10 +227,18 @@
                     <div class="col ps-0"><hr class="mb-0 navbar-vertical-divider" /></div>
                 </div>
 
+                {{-- Add Router (Unified Wizard) --}}
+                <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.add-router') }}" role="button">
+                    <div class="d-flex align-items-center">
+                        <span class="nav-link-icon"><i class="bi bi-router-fill text-warning"></i></span>
+                        <span class="nav-link-text ps-1">{{ __('Add Router') }}</span>
+                    </div>
+                </a>
+
                 {{-- Mikrotik Sync --}}
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('mikrotik-sync') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-router-fill"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-arrow-repeat text-primary"></i></span>
                         <span class="nav-link-text ps-1">{{ __('MikroTik Sync') }}</span>
                     </div>
                 </a>
@@ -243,66 +251,13 @@
                     </div>
                 </a>
 
-                {{-- Mikrotik Setup Dropdown --}}
-                <a class="nav-link dropdown-indicator collapsed" href="#mikrotikSetup" role="button"
-                    data-bs-toggle="collapse" aria-expanded="false" aria-controls="mikrotikSetup">
+                {{-- Captive Portal Customizer --}}
+                <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.portal-customizer') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-tools"></i></span>
-                        <span class="nav-link-text ps-1">{{ __('MikroTik Setup') }}</span>
+                        <span class="nav-link-icon"><i class="bi bi-palette-fill text-info"></i></span>
+                        <span class="nav-link-text ps-1">{{ __('Captive Portal') }}</span>
                     </div>
                 </a>
-                <ul class="nav collapse" id="mikrotikSetup">
-                    <li class="nav-item">
-                        <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('mikrotik-ip-setup') }}">
-                            <div class="d-flex align-items-center"><span class="nav-link-text ps-1">{{ __('IP & Pool') }}</span></div>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('mikrotik-pppoe-setup') }}">
-                            <div class="d-flex align-items-center"><span class="nav-link-text ps-1">{{ __('PPPoE Server') }}</span></div>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('mikrotik-radius-setup') }}">
-                            <div class="d-flex align-items-center"><span class="nav-link-text ps-1">{{ __('RADIUS') }}</span></div>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('mikrotik-firewall-setup') }}">
-                            <div class="d-flex align-items-center"><span class="nav-link-text ps-1">{{ __('Firewall') }}</span></div>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('mikrotik-walled-garden') }}">
-                            <div class="d-flex align-items-center"><span class="nav-link-text ps-1">{{ __('Walled Garden') }}</span></div>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('mikrotik-queue-setup') }}">
-                            <div class="d-flex align-items-center"><span class="nav-link-text ps-1">{{ __('Queues') }}</span></div>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('mikrotik-vpn-setup') }}">
-                            <div class="d-flex align-items-center"><span class="nav-link-text ps-1">{{ __('VPN Server') }}</span></div>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('mikrotik-interface-setup') }}">
-                            <div class="d-flex align-items-center"><span class="nav-link-text ps-1">{{ __('Interfaces & VLAN') }}</span></div>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('mikrotik-traffic-monitor') }}">
-                            <div class="d-flex align-items-center"><span class="nav-link-text ps-1">{{ __('Live Traffic') }}</span></div>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('mikrotik-backup-setup') }}">
-                            <div class="d-flex align-items-center"><span class="nav-link-text ps-1">{{ __('Backup & Restore') }}</span></div>
-                        </a>
-                    </li>
-                </ul>
             </li>
 
             {{-- ══════════════════════════════════════════════════════════════ --}}
@@ -384,26 +339,13 @@
                     <div class="col ps-0"><hr class="mb-0 navbar-vertical-divider" /></div>
                 </div>
 
-                {{-- SMS Management Dropdown --}}
-                <a class="nav-link dropdown-indicator collapsed" href="#smsSetupDropdown" role="button"
-                    data-bs-toggle="collapse" aria-expanded="false" aria-controls="smsSetupDropdown">
+                {{-- SMS & Email Hub (Merged 5-Tab Interface) --}}
+                <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.sms-email') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-envelope-check"></i></span>
-                        <span class="nav-link-text ps-1">{{ __('SMS Management') }}</span>
+                        <span class="nav-link-icon"><i class="bi bi-chat-square-quote-fill text-warning"></i></span>
+                        <span class="nav-link-text ps-1">{{ __('SMS & Email') }}</span>
                     </div>
                 </a>
-                <ul class="nav collapse" id="smsSetupDropdown">
-                    <li class="nav-item">
-                        <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('sms-setup') }}">
-                            <div class="d-flex align-items-center"><span class="nav-link-text ps-1">{{ __('SMS Setup') }}</span></div>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('sms-bridge.index') }}">
-                            <div class="d-flex align-items-center"><span class="nav-link-text ps-1">{{ __('SMS Bridge') }}</span></div>
-                        </a>
-                    </li>
-                </ul>
 
                 {{-- Reseller Setup --}}
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.resellers.index') }}" role="button">
@@ -497,10 +439,10 @@
                 </div>
 
                 {{-- Package Setup --}}
-                <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('package-list-setup') }}" role="button">
+                <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.packages') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-box2"></i></span>
-                        <span class="nav-link-text ps-1">{{ __('Package Setup') }}</span>
+                        <span class="nav-link-icon"><i class="bi bi-box2 text-primary"></i></span>
+                        <span class="nav-link-text ps-1">{{ __('Packages') }}</span>
                     </div>
                 </a>
 

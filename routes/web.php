@@ -120,10 +120,18 @@ Route::get('/billing', function () {
     return auth()->check() ? redirect()->route('dashboard') : redirect()->route('login');
 });
 
-// Authentication & Verification Extensions (Email 6-digit Code & Google OAuth)
+// Authentication & Verification Extensions (Email/Phone OTP, Password Reset & Google OAuth)
+Route::post('/forgot-password', [\App\Http\Controllers\Auth\CustomAuthController::class, 'handleForgotPassword'])->name('password.email');
+Route::get('/reset-password-otp', [\App\Http\Controllers\Auth\CustomAuthController::class, 'showPasswordResetOtpForm'])->name('password.reset.otp');
+Route::post('/reset-password-otp', [\App\Http\Controllers\Auth\CustomAuthController::class, 'handlePasswordResetOtp'])->name('password.reset.otp.submit');
+
 Route::post('/auth/register-step1', [\App\Http\Controllers\Auth\CustomAuthController::class, 'registerStep1'])->name('auth.register.step1');
 Route::post('/auth/verify-code', [\App\Http\Controllers\Auth\CustomAuthController::class, 'verifyCode'])->name('auth.verify.code');
 Route::post('/auth/resend-code', [\App\Http\Controllers\Auth\CustomAuthController::class, 'resendCode'])->name('auth.verify.resend');
+Route::post('/auth/request-otp', [\App\Http\Controllers\Auth\CustomAuthController::class, 'requestLoginOtp'])->name('auth.request-otp');
+Route::post('/auth/login-otp', [\App\Http\Controllers\Auth\CustomAuthController::class, 'loginWithOtp'])->name('auth.login-otp');
+Route::post('/auth/forgot-password-otp', [\App\Http\Controllers\Auth\CustomAuthController::class, 'requestForgotPasswordOtp'])->name('auth.forgot-password-otp');
+Route::post('/auth/reset-password-otp', [\App\Http\Controllers\Auth\CustomAuthController::class, 'resetPasswordWithOtp'])->name('auth.reset-password-otp');
 Route::get('/auth/google/redirect', [\App\Http\Controllers\Auth\CustomAuthController::class, 'redirectToGoogle'])->name('auth.google');
 Route::get('/auth/google/callback', [\App\Http\Controllers\Auth\CustomAuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
 
@@ -159,18 +167,38 @@ Route::middleware([
         Route::get('/admin-roles', ManageRole::class)->name('admin-roles');
         Route::get('/support-tickets', ManageTickets::class)->name('admin-tickets');
         Route::get('/mikrotik', MikrotikSync::class)->name('mikrotik-sync');
+        Route::get('/routers', MikrotikSync::class)->name('mikrotik');
+        Route::get('/admin/packages', \App\Livewire\Admin\PackagesManager::class)->name('admin.packages');
+        Route::get('/packages-list', fn() => redirect()->route('admin.packages'))->name('packages');
+        Route::get('/packages', fn() => redirect()->route('admin.packages'))->name('package-list-setup');
+        Route::get('/admin/add-router', \App\Livewire\Admin\AddRouterWizard::class)->name('admin.add-router');
+        Route::get('/router-wizard', fn() => redirect()->route('admin.add-router'))->name('admin.router-wizard');
+        Route::get('/admin/router-wizard', fn() => redirect()->route('admin.add-router'))->name('router-wizard');
+        Route::get('/admin/sms-email', \App\Livewire\Admin\SmsEmailHub::class)->name('admin.sms-email');
+        Route::get('/admin/sms-gateways', fn() => redirect()->route('admin.sms-email', ['tab' => 'gateways']))->name('admin.sms-gateways');
+        Route::get('/sms', fn() => redirect()->route('admin.sms-email'))->name('sms-setup');
+        Route::get('/payment-gateways', fn() => redirect()->route('admin.payment-gateways'));
+        Route::get('/admin/portal-customizer', \App\Livewire\Admin\CaptivePortalCustomizer::class)->name('admin.portal-customizer');
+        Route::post('/captive-portal/preview', function(\Illuminate\Http\Request $request) {
+            $template = $request->input('template', 'midnight');
+            $settings = $request->input('settings', []);
+            $plans = \App\Models\PackageList::where('is_active', true)->orWhereNull('is_active')->take(6)->get()->toArray();
+            $html = \App\Services\CaptivePortalTemplates::render($template, $settings, $plans);
+            return response($html)->header('Content-Type', 'text/html');
+        })->name('captive-portal.preview');
 
-        // Mikrotik Setup Routes
+        // Mikrotik Setup Routes (Redirect old wizard/setup URLs to new Add Router wizard, keep HotspotManager intact)
         Route::prefix('mikrotik-setup')->group(function () {
-            Route::get('/ip', IpSetup::class)->name('mikrotik-ip-setup');
-            Route::get('/pppoe', PppoeSetup::class)->name('mikrotik-pppoe-setup');
-            Route::get('/queue', QueueSetup::class)->name('mikrotik-queue-setup');
-            Route::get('/firewall', FirewallSetup::class)->name('mikrotik-firewall-setup');
-            Route::get('/hotspot', HotspotManager::class)->name('mikrotik-hotspot-setup'); // merged → HotspotManager
+            Route::get('/', fn() => redirect()->route('admin.add-router'))->name('mikrotik-setup.index');
+            Route::get('/ip', fn() => redirect()->route('admin.add-router'))->name('mikrotik-ip-setup');
+            Route::get('/pppoe', fn() => redirect()->route('admin.add-router'))->name('mikrotik-pppoe-setup');
+            Route::get('/queue', fn() => redirect()->route('admin.add-router'))->name('mikrotik-queue-setup');
+            Route::get('/firewall', fn() => redirect()->route('admin.add-router'))->name('mikrotik-firewall-setup');
+            Route::get('/hotspot', HotspotManager::class)->name('mikrotik-hotspot-setup');
             Route::get('/hotspot-manager', HotspotManager::class)->name('mikrotik-hotspot-manager');
-            Route::get('/radius', RadiusSetup::class)->name('mikrotik-radius-setup');
-            Route::get('/vpn', VpnSetup::class)->name('mikrotik-vpn-setup');
-            Route::get('/interface', InterfaceSetup::class)->name('mikrotik-interface-setup');
+            Route::get('/radius', fn() => redirect()->route('admin.add-router'))->name('mikrotik-radius-setup');
+            Route::get('/vpn', fn() => redirect()->route('admin.add-router'))->name('mikrotik-vpn-setup');
+            Route::get('/interface', fn() => redirect()->route('admin.add-router'))->name('mikrotik-interface-setup');
             Route::get('/traffic', TrafficMonitor::class)->name('mikrotik-traffic-monitor');
             Route::get('/logs', RouterLogViewer::class)->name('mikrotik-log-viewer');
             Route::get('/backup', BackupManager::class)->name('mikrotik-backup-setup');
@@ -178,8 +206,6 @@ Route::middleware([
         });
 
         Route::get('/address', AddressSetup::class)->name('address-setup');
-        Route::get('/packages', PackageListSetup::class)->name('package-list-setup');
-        Route::get('/sms', SMSSetup::class)->name('sms-setup');
         Route::get('/create-customer', NewCustomer::class)->name('new-customer');
 
         // payment routes
@@ -247,7 +273,7 @@ Route::middleware([
             Route::get('vouchers', AdminVoucherList::class)->name('vouchers');
 
             // Kenyan Payment Gateways & Unmatched Payments
-            Route::get('payment-gateways', \App\Livewire\Admin\PaymentGatewaysSetup::class)->name('payment-gateways');
+            Route::get('payment-gateways', \App\Livewire\Admin\PaymentGatewaysManager::class)->name('payment-gateways');
             Route::get('unmatched-payments', \App\Livewire\Admin\UnmatchedPayments::class)->name('unmatched-payments');
 
             // Package purchase requests

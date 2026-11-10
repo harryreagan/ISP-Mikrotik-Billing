@@ -23,6 +23,96 @@
         </div>
     </div>
 
+    @php
+        $tenantId = auth()->user()->tenant_id;
+        $hasRouter = \App\Models\RouterList::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->exists();
+        $hasPayments = \Illuminate\Support\Facades\Schema::hasTable('payment_gateways') && \Illuminate\Support\Facades\DB::table('payment_gateways')->exists();
+        $hasSms = \Illuminate\Support\Facades\Schema::hasTable('isp_sms_gateways') && \Illuminate\Support\Facades\DB::table('isp_sms_gateways')->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->exists();
+        $hasPackage = \App\Models\PackageList::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->exists();
+        $hasPortal = \Illuminate\Support\Facades\Schema::hasTable('isp_portal_settings') && \Illuminate\Support\Facades\DB::table('isp_portal_settings')->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->exists();
+        $completedCount = ($hasRouter?1:0) + ($hasPayments?1:0) + ($hasSms?1:0) + ($hasPackage?1:0) + ($hasPortal?1:0);
+        $progressPct = round(($completedCount / 5) * 100);
+    @endphp
+
+    @if ($completedCount < 5)
+    {{-- ISP Fast-Track Launch Checklist --}}
+    <div class="card border-0 shadow-sm mb-4" style="border-radius: 18px; background: linear-gradient(135deg, #161B2E, #23224B); color: #fff;">
+        <div class="card-body p-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+                <div>
+                    <span class="badge mb-1" style="background: rgba(244,123,6,0.2); color: #FF9B38; border: 1px solid rgba(244,123,6,0.4); font-weight: 700; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase;">
+                        ★ Fast-Track Setup Checklist
+                    </span>
+                    <h4 class="fw-bold mb-0 text-white">Complete your ISP Network Configuration ({{ $completedCount }}/5)</h4>
+                </div>
+                <div class="text-end">
+                    <span class="fw-bold fs-5 text-white">{{ $progressPct }}%</span>
+                    <div class="progress" style="width: 140px; height: 8px; background: rgba(255,255,255,0.15); border-radius: 999px;">
+                        <div class="progress-bar" style="width: {{ $progressPct }}%; background: #F47B06; border-radius: 999px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-2 pt-2">
+                <!-- Step 1: Core Router -->
+                <div class="col-12 col-md-4 col-xl">
+                    <a href="{{ route('admin.router-wizard') }}" class="text-decoration-none d-block p-3 rounded-3 h-100" style="background: {{ $hasRouter ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.06)' }}; border: 1px solid {{ $hasRouter ? 'rgba(16, 185, 129, 0.35)' : 'rgba(255, 255, 255, 0.1)' }};">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="fw-bold text-white small">1. Add Router</span>
+                            <i class="bi {{ $hasRouter ? 'bi-check-circle-fill text-success' : 'bi-arrow-right-circle text-muted' }}"></i>
+                        </div>
+                        <p class="mb-0 text-white-50" style="font-size: 0.76rem;">{{ $hasRouter ? 'Connected & Synced' : 'Run 4-Step API Wizard' }}</p>
+                    </a>
+                </div>
+
+                <!-- Step 2: M-Pesa Gateways -->
+                <div class="col-12 col-md-4 col-xl">
+                    <a href="{{ route('admin.payment-gateways') }}" class="text-decoration-none d-block p-3 rounded-3 h-100" style="background: {{ $hasPayments ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.06)' }}; border: 1px solid {{ $hasPayments ? 'rgba(16, 185, 129, 0.35)' : 'rgba(255, 255, 255, 0.1)' }};">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="fw-bold text-white small">2. M-Pesa Setup</span>
+                            <i class="bi {{ $hasPayments ? 'bi-check-circle-fill text-success' : 'bi-arrow-right-circle text-muted' }}"></i>
+                        </div>
+                        <p class="mb-0 text-white-50" style="font-size: 0.76rem;">{{ $hasPayments ? 'Till / Paybill Active' : 'PayHero or Till Setup' }}</p>
+                    </a>
+                </div>
+
+                <!-- Step 3: SMS Gateway -->
+                <div class="col-12 col-md-4 col-xl">
+                    <a href="{{ route('admin.sms-gateways') }}" class="text-decoration-none d-block p-3 rounded-3 h-100" style="background: {{ $hasSms ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.06)' }}; border: 1px solid {{ $hasSms ? 'rgba(16, 185, 129, 0.35)' : 'rgba(255, 255, 255, 0.1)' }};">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="fw-bold text-white small">3. SMS & OTP</span>
+                            <i class="bi {{ $hasSms ? 'bi-check-circle-fill text-success' : 'bi-arrow-right-circle text-muted' }}"></i>
+                        </div>
+                        <p class="mb-0 text-white-50" style="font-size: 0.76rem;">{{ $hasSms ? 'Gateway Verified' : 'Blessed / Advanta / AT' }}</p>
+                    </a>
+                </div>
+
+                <!-- Step 4: Packages -->
+                <div class="col-12 col-md-6 col-xl">
+                    <a href="{{ route('admin.packages') }}" class="text-decoration-none d-block p-3 rounded-3 h-100" style="background: {{ $hasPackage ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.06)' }}; border: 1px solid {{ $hasPackage ? 'rgba(16, 185, 129, 0.35)' : 'rgba(255, 255, 255, 0.1)' }};">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="fw-bold text-white small">4. WiFi Packages</span>
+                            <i class="bi {{ $hasPackage ? 'bi-check-circle-fill text-success' : 'bi-arrow-right-circle text-muted' }}"></i>
+                        </div>
+                        <p class="mb-0 text-white-50" style="font-size: 0.76rem;">{{ $hasPackage ? 'Bandwidth Configured' : 'Hourly / Monthly Plans' }}</p>
+                    </a>
+                </div>
+
+                <!-- Step 5: Captive Portal -->
+                <div class="col-12 col-md-6 col-xl">
+                    <a href="{{ route('admin.portal-customizer') }}" class="text-decoration-none d-block p-3 rounded-3 h-100" style="background: {{ $hasPortal ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.06)' }}; border: 1px solid {{ $hasPortal ? 'rgba(16, 185, 129, 0.35)' : 'rgba(255, 255, 255, 0.1)' }};">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="fw-bold text-white small">5. Captive Portal</span>
+                            <i class="bi {{ $hasPortal ? 'bi-check-circle-fill text-success' : 'bi-arrow-right-circle text-muted' }}"></i>
+                        </div>
+                        <p class="mb-0 text-white-50" style="font-size: 0.76rem;">{{ $hasPortal ? 'Custom Brand Set' : 'Logo & Color Customizer' }}</p>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     {{-- Modern Stat Cards Row --}}
     <div class="row g-3 mb-4">
         <!-- Card 1: Active Users -->
@@ -211,10 +301,12 @@
         {{-- Clean Empty State when no active routers are syncing --}}
         @php
             $hasActiveRouters = false;
-            foreach ($systemOverview as $rData) {
-                if ($rData['status'] ?? false) {
-                    $hasActiveRouters = true;
-                    break;
+            if (is_array($systemOverview)) {
+                foreach ($systemOverview as $rData) {
+                    if (is_array($rData) && ($rData['status'] ?? false)) {
+                        $hasActiveRouters = true;
+                        break;
+                    }
                 }
             }
         @endphp
@@ -230,8 +322,8 @@
                         {{ __('Connect your MikroTik Core router via API (Port 8728) or WireGuard to monitor real-time CPU, RAM, and live PPPoE interfaces.') }}
                     </p>
                     <div>
-                        <a href="{{ route('mikrotik-sync') }}" class="btn btn-primary btn-sm px-3 py-2" style="font-weight: 700;">
-                            <i class="bi bi-plus-circle me-1"></i> {{ __('Sync MikroTik Router') }}
+                        <a href="{{ route('admin.router-wizard') }}" class="btn btn-primary btn-sm px-3 py-2" style="font-weight: 700;">
+                            <i class="bi bi-magic me-1"></i> {{ __('Add Router Wizard') }}
                         </a>
                     </div>
                 </div>
@@ -239,20 +331,26 @@
         @endif
 
         {{-- Unified Row for Routers and Graphs to allow dynamic "weight" adjustment --}}
-        @foreach ($systemOverview as $routerName => $routerData)
-            @php
-                if (! ($routerData['status'] ?? false)) {
-                    continue;
-                }
+        @if (is_array($systemOverview))
+            @foreach ($systemOverview as $routerName => $routerData)
+                @php
+                    if (!is_array($routerData) || !($routerData['status'] ?? false)) {
+                        continue;
+                    }
 
-                $info = $routerData['data'][0] ?? $routerData['data'] ?? [];
+                    $info = is_array($routerData['data'] ?? null) 
+                        ? ($routerData['data'][0] ?? $routerData['data']) 
+                        : [];
+                    if (!is_array($info)) {
+                        $info = [];
+                    }
 
-                $cpuLoad = (int) filter_var($info['cpu-load'] ?? 0, FILTER_SANITIZE_NUMBER_INT);
-                $cpuColor = $cpuLoad > 80 ? 'bg-danger' : ($cpuLoad > 50 ? 'bg-warning' : 'bg-success');
+                    $cpuLoad = (int) filter_var($info['cpu-load'] ?? 0, FILTER_SANITIZE_NUMBER_INT);
+                    $cpuColor = $cpuLoad > 80 ? 'bg-danger' : ($cpuLoad > 50 ? 'bg-warning' : 'bg-success');
 
-                // Memory Math
-                $memTotal = (int)($info['total-memory'] ?? 1);
-                $memFree = (int)($info['free-memory'] ?? 0);
+                    // Memory Math
+                    $memTotal = max(1, (int)($info['total-memory'] ?? 1));
+                    $memFree = (int)($info['free-memory'] ?? 0);
                 $memUsed = $memTotal - $memFree;
                 $memPct = $memTotal > 0 ? round(($memUsed / $memTotal) * 100) : 0;
 
@@ -413,6 +511,7 @@
                 </div>
             </div>
         @endforeach
+        @endif
 
         {{-- Analytical Graphs Section --}}
         <div class="col-12 col-md-6 col-lg-4 col-xxl-4 d-flex flex-fill">

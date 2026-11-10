@@ -24,7 +24,13 @@ class EnsureUserIsReseller
         
         // Check if user has the reseller relation and status is active
         if (!$user->reseller || !$user->reseller->isActive()) {
-            Auth::logout();
+            if ($user->hasRole('Admin') || $user->hasRole('Super Admin')) {
+                return redirect()->route('dashboard')->with('error', 'You must be logged in as a Reseller to access the Reseller Portal.');
+            }
+
+            if (Auth::guard('web')->check()) {
+                Auth::guard('web')->logout();
+            }
             
             $request->session()->invalidate();
             $request->session()->regenerateToken();

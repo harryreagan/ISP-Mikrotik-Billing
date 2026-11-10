@@ -1,0 +1,189 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Models\Router;
+use App\Services\MikrotikApiService;
+use App\Services\Notification\IspNotificationService;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class PollRouterTelemetryJob implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public int $timeout = 60;
+    public int $tries = 1;
+
+    public function handle(): void
+    {
+        $routers = Router::where('deleted_at', null)->get();
+
+        foreach ($routers as $router) {
+            $this->pollRouter($router);
+        }
+    }
+
+    protected function pollRouter(Router $router): void
+    {
+        $host = $router->vpn_ip ?: $router->ip;
+        if (empty($host)) {
+            return;
+        }
+
+        $port = (int) ($router->api_port ?: 8728);
+        $user = $router->username ?: 'admin';
+        $pass = $router->password ?: '';
+
+        try {
+            $api = new MikrotikApiService($host, $port, $user, $pass, 3);
+
+            // 1. Resource query (CPU, Memory, Uptime, Version, Board)
+            $res = $api->executeCommand('/system/resource/print');
+            $data = is_array($res) && !empty($res) ? $res[0] : null;
+
+            if ($data) {
+                $cpuLoad = (int) ($data['cpu-load'] ?? 0);
+                $freeMem = (int) ($data['free-memory'] ?? 0);
+                $totalMem = (int) ($data['total-memory'] ?? 0);
+                $memPercent = $totalMem > 0 ? (int) round((($totalMem - $freeMem) / $totalMem) * 100) : 0;
+                $uptime = (string) ($data['uptime'] ?? 'unknown');
+                $version = (string) ($data['version'] ?? $router->version);
+                $board = (string) ($data['board-name'] ?? $router->model);
+
+                // 2. Active hotspot users count
+                $hsActive = $api->executeCommand('/ip/hotspot/active/print');
+                $hsCount = is_array($hsActive) ? count($hsActive) : 0;
+
+                // 3. Active PPPoE sessions count
+                $pppoeActive = $api->executeCommand('/interface/pppoe-server/print');
+                $pppoeCount = is_array($pppoeActive) ? count($pppoeActive) : 0;
+
+                // 4. Traffic bytes
+                $ifaces = $api->executeCommand('/interface/print');
+                $bytesIn = 0;
+                $bytesOut = 0;
+                if (is_array($ifaces)) {
+                    foreach ($ifaces as $if) {
+                        $bytesIn += (int) ($if['rx-byte'] ?? 0);
+                        $bytesOut += (int) ($if['tx-byte'] ?? 0);
+                    }
+                }
+
+                // 5. Update Router Record
+                $router->updateQuietly([
+                    'status'                     => 'online',
+                    'cpu_load'                   => $cpuLoad,
+                    'memory_load'                => $memPercent,
+                    'uptime'                     => $uptime,
+                    'version'                    => $version,
+                    'model'                      => $board,
+                    'last_seen_at'               => now(),
+                    'last_polled_at'             => now(),
+                    'last_successful_sync_at'    => now(),
+                ]);
+
+                // 6. Record Telemetry Snapshot
+                DB::table('router_performance_snapshots')->insert([
+                    'router_id'      => $router->id,
+                    'cpu_load'       => $cpuLoad,
+                    'memory_load'    => $memPercent,
+                    'uptime'         => $uptime,
+                    'active_clients' => $hsCount + $pppoeCount,
+                    'bytes_in'       => $bytesIn,
+                    'bytes_out'      => $bytesOut,
+                    'created_at'     => now(),
+                ]);
+
+                // 7. Resolve any pending offline alert
+                DB::table('isp_router_alerts')
+                    ->where('router_id', $router->id)
+                    ->where('alert_type', 'offline')
+                    ->where('is_resolved', false)
+                    ->update([
+                        'is_resolved' => true,
+                        'resolved_at' => now(),
+                    ]);
+
+                // 8. High CPU alert check (> 90%)
+                if ($cpuLoad >= 90) {
+                    $this->triggerAlert($router, 'high_cpu', "Router {$router->name} CPU load critical: {$cpuLoad}%");
+                }
+            } else {
+                $this->handleRouterOffline($router, 'Router API returned empty response.');
+            }
+        } catch (\Throwable $e) {
+            $this->handleRouterOffline($router, $e->getMessage());
+        }
+    }
+
+    protected function handleRouterOffline(Router $router, string $reason): void
+    {
+        $router->updateQuietly([
+            'status'         => 'offline',
+            'last_polled_at' => now(),
+        ]);
+
+        $this->triggerAlert($router, 'offline', "Router {$router->name} is unreachable: {$reason}");
+    }
+
+    protected function triggerAlert(Router $router, string $type, string $message): void
+    {
+        $existing = DB::table('isp_router_alerts')
+            ->where('router_id', $router->id)
+            ->where('alert_type', $type)
+            ->where('is_resolved', false)
+            ->first();
+
+        if ($existing) {
+            // Deduplicate: Don't alert more than once every 30 minutes
+            $lastAlerted = strtotime($existing->last_alerted_at);
+            if ((time() - $lastAlerted) < 1800) {
+                return;
+            }
+
+            DB::table('isp_router_alerts')->where('id', $existing->id)->update([
+                'last_alerted_at' => now(),
+                'alert_count'     => $existing->alert_count + 1,
+            ]);
+        } else {
+            DB::table('isp_router_alerts')->insert([
+                'tenant_id'       => $router->tenant_id ?: 1,
+                'router_id'       => $router->id,
+                'alert_type'      => $type,
+                'message'         => $message,
+                'last_alerted_at' => now(),
+                'alert_count'     => 1,
+                'is_resolved'     => false,
+                'created_at'      => now(),
+                'updated_at'      => now(),
+            ]);
+        }
+
+        // Notify ISP Admin via Part 1 notifications
+        $adminUser = DB::table('users')
+            ->where('tenant_id', $router->tenant_id)
+            ->where('role', 'admin')
+            ->first();
+
+        if ($adminUser) {
+            IspNotificationService::notify(
+                $router->tenant_id ?: 1,
+                'router_offline_alert',
+                [
+                    'router'       => $router->name,
+                    'downtime'     => now()->format('H:i'),
+                    'active_users' => 0,
+                ],
+                $adminUser->phone ?: $adminUser->mobile,
+                $adminUser->email
+            );
+        }
+    }
+}
+

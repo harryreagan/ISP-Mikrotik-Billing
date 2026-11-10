@@ -35,9 +35,17 @@ class User extends Authenticatable implements HasAvatar, FilamentUser
     protected $fillable = [
         'name',
         'email',
+        'phone',
         'mobile',
         'address',
         'password',
+        'role',
+        'status',
+        'tenant_id',
+        'is_super_admin',
+        'otp_code',
+        'otp_expires_at',
+        'phone_verified_at',
         'google_id',
         'email_verified_at',
     ];
@@ -62,6 +70,16 @@ class User extends Authenticatable implements HasAvatar, FilamentUser
     protected $appends = [
         'profile_photo_url',
     ];
+
+    public function getPhoneAttribute($value)
+    {
+        return $value ?: ($this->attributes['mobile'] ?? null);
+    }
+
+    public function getMobileAttribute($value)
+    {
+        return $value ?: ($this->attributes['phone'] ?? null);
+    }
 
     /**
      * Get the attributes that should be cast.

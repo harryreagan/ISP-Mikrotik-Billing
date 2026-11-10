@@ -178,6 +178,7 @@ class ManageUser extends Component
             'roles' => 'required|exists:roles,name',
         ];
 
+        
         // Conditionally apply password rules
         if (! $this->userId) {
             $rules['password'] = 'required|string|min:8|confirmed';

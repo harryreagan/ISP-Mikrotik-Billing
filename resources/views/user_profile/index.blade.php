@@ -34,20 +34,16 @@
                                 <img src="{{ $imageUrl }}" style="max-width: 10rem; min-width: 10rem;" alt="Profile Image" class="profileImagePreview rounded-circle">
 
                                 <h3>{{ $user->name }}</h3>
-                                @if($user->roles->isNotEmpty())
-                                    @foreach($roles as $role)
-                                        @if($user->hasRole($role->name) == true)
-                                            <h4>Act as : {{ ucfirst($role->name) }}</h4>
-                                        @endif
-                                    @endforeach
-                                @elseif(!empty($user->role))
-                                    <h4>Act as : {{ ucfirst($user->role) }}</h4>
-                                @else
-                                    <p class="p-0 m-0 pt-2">Hi, Your Registration is Completed.</p>
-                                    <p class="p-1 m-0 fw-semibold">But No Role Assigned.</p>
-                                    <p class="p-0 m-0">Wait for Admin Approval.</p>
-                                    <p class="p-0 m-0">OR Contact Super Admin for More Information</p>
-                                @endif
+                                @php
+                                    $userRoles = $user->roles ? $user->roles->pluck('name')->toArray() : [];
+                                    if (empty($userRoles) && !empty($user->role)) {
+                                        $userRoles = [ucfirst($user->role)];
+                                    }
+                                    if (empty($userRoles)) {
+                                        $userRoles = ['ISP Administrator'];
+                                    }
+                                @endphp
+                                <h4>Act as : <span class="badge bg-primary text-white">{{ implode(', ', $userRoles) }}</span></h4>
 
                                 <div class="social-links mt-2">
                                   <a href="#" class="twitter"><i class="bi bi-twitter"></i></a>

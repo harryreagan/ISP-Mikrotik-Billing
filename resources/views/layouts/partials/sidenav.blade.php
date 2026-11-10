@@ -9,12 +9,7 @@
             </button>
             <a class="navbar-brand me-1 me-sm-3" href="{{url('/')}}">
                 <div class="d-flex align-items-center">
-                    {{-- Check if site logo exists and display it, otherwise show site icon or name --}}
-                    @if (siteUrlSettings('site_logo'))
-                        <img class="me-2" style="width: 150px; height: auto; max-height: 45px; max-width: 100%; object-fit: contain; flex-shrink: 0;" src="{{ site_image(siteUrlSettings('site_logo')) }}" alt="logo"/>
-                    @else
-                        <x-hsmart-logo color="dark" height="34px" />
-                    @endif
+                    <x-hsmart-logo color="dark" height="34px" />
                 </div>
             </a>
             @include('layouts.partials.searchbar')
@@ -37,11 +32,7 @@
     </button>
     <a class="navbar-brand me-1 me-sm-3" href="{{url('/')}}">
         <div class="d-flex align-items-center">
-            @if (siteUrlSettings('site_logo'))
-                <img class="me-2" style="width: 150px; height: auto; max-height: 45px; max-width: 100%; object-fit: contain; flex-shrink: 0;" src="{{ site_image(siteUrlSettings('site_logo')) }}" alt="logo"/>
-            @else
-                <x-hsmart-logo color="dark" height="34px" />
-            @endif
+            <x-hsmart-logo color="dark" height="34px" />
         </div>
     </a>
     <div class="collapse navbar-collapse scrollbar" id="navbarStandard">

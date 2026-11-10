@@ -61,9 +61,21 @@ class CreateNewUser implements CreatesNewUsers
                         'country' => 'Kenya',
                         'county' => 'Nairobi',
                         'is_active' => 1,
+                        'sms_balance' => 20.00,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
+
+                    // Award 20 free SMS credits in sms_wallets on onboarding
+                    try {
+                        DB::table('sms_wallets')->insert([
+                            'tenant_id'             => $tenantId,
+                            'balance'               => 20.00,
+                            'low_balance_threshold' => 50.00,
+                            'created_at'            => now(),
+                            'updated_at'            => now(),
+                        ]);
+                    } catch (\Throwable $e) {}
 
                     $user->tenant_id = $tenantId;
                     $user->save();

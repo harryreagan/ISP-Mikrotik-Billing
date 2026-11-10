@@ -16,6 +16,7 @@ class Router extends Model
 
     protected $casts = [
         'services'                   => 'array',
+        'port_roles'                 => 'array',
         'is_test'                    => 'boolean',
         'vpn_capable'                => 'boolean',
         'provision_token_expires_at' => 'datetime',

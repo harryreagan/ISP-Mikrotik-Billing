@@ -37,6 +37,35 @@ class PayHeroPaymentService
         }
     }
 
+    public static function forTenant(?int $tenantId = null): self
+    {
+        $service = new self();
+        if ($tenantId) {
+            $channel = \App\Models\PaymentChannel::where('tenant_id', $tenantId)
+                ->where('gateway', 'payhero')
+                ->where('is_active', true)
+                ->orderBy('is_default', 'desc')
+                ->first();
+
+            if ($channel) {
+                if ($channel->api_key_encrypted) {
+                    try {
+                        $service->apiKey = Crypt::decryptString($channel->api_key_encrypted);
+                    } catch (\Throwable $e) {}
+                }
+                if ($channel->api_secret_encrypted) {
+                    try {
+                        $service->apiSecret = Crypt::decryptString($channel->api_secret_encrypted);
+                    } catch (\Throwable $e) {}
+                }
+                if ($channel->payhero_channel_id) {
+                    $service->channelId = (string) $channel->payhero_channel_id;
+                }
+            }
+        }
+        return $service;
+    }
+
     public function isConfigured(): bool
     {
         return !empty($this->apiKey) && !empty($this->channelId);

@@ -46,27 +46,46 @@ class FortifyServiceProvider extends ServiceProvider
             return view('auth.register');
         });
 
-        // Enforce Email Verification on Login
+        Fortify::requestPasswordResetLinkView(function () {
+            return view('auth.forgot-password');
+        });
+
+        Fortify::resetPasswordView(function ($request) {
+            return view('auth.reset-password', ['request' => $request]);
+        });
+
+        // Support Phone OR Email login with Kenyan phone number normalization
         Fortify::authenticateUsing(function (Request $request) {
-            $loginInput = $request->input(Fortify::username());
-            $query = User::where('email', $loginInput);
-            if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'phone')) {
-                $query->orWhere('phone', $loginInput);
-            } elseif (\Illuminate\Support\Facades\Schema::hasColumn('users', 'mobile')) {
-                $query->orWhere('mobile', $loginInput);
-            }
-            $user = $query->first();
+            $loginInput = trim((string) $request->input(Fortify::username()));
+            $normalizedPhone = \App\Services\Auth\OtpVerificationService::normalizeKenyanPhone($loginInput);
+
+            $user = User::where('email', strtolower($loginInput))
+                ->orWhere(function ($q) use ($loginInput, $normalizedPhone) {
+                    if ($normalizedPhone) {
+                        $q->where('phone', $normalizedPhone)
+                          ->orWhere('mobile', $normalizedPhone)
+                          ->orWhere('phone', $loginInput)
+                          ->orWhere('mobile', $loginInput);
+                    } else {
+                        $q->where('phone', $loginInput)
+                          ->orWhere('mobile', $loginInput);
+                    }
+                })->first();
 
             if ($user && Hash::check($request->input('password'), $user->password)) {
-                // Unverified users cannot log in until verified
-                if (is_null($user->email_verified_at)) {
-                    session(['pending_verification_email' => $user->email]);
+                // Ensure either email or phone is verified
+                if (is_null($user->email_verified_at) && is_null($user->phone_verified_at)) {
+                    session(['pending_verification_email' => $user->email, 'pending_verification_phone' => $user->phone]);
                     try {
-                        app(EmailVerificationService::class)->generateAndSendCode($user->email, $request->ip());
+                        if ($user->email) {
+                            app(EmailVerificationService::class)->generateAndSendCode($user->email, $request->ip());
+                        } elseif ($user->phone) {
+                            \App\Services\Auth\OtpVerificationService::generateAndSendOtp($user->phone, 'auth', $user->tenant_id, $request->ip());
+                        }
                     } catch (\Throwable $e) {}
 
                     throw ValidationException::withMessages([
-                        Fortify::username() => ['Your email is not verified yet. A 6-digit verification code has been sent to your email. Please verify to continue.'],
+                        Fortify::username() => ['Account is not verified yet. A verification code has been dispatched. Please verify to continue.'],
                     ])->redirectTo(route('register', ['tab' => 'verify']));
                 }
 

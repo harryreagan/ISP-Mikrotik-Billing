@@ -55,11 +55,7 @@
         .hero-panel {
             flex: 1 1 48%;
             min-height: 100vh;
-            background-color: var(--navy);
-            background-image: url('{{ asset('images/gallery/fiber-light.jpg') }}');
-            background-position: center center;
-            background-size: cover;
-            background-repeat: no-repeat;
+            background: linear-gradient(165deg, #0F1424 0%, #161B2E 50%, #1A2035 100%);
             position: relative;
             display: flex;
             flex-direction: column;
@@ -71,7 +67,8 @@
         .hero-overlay {
             position: absolute;
             inset: 0;
-            background-color: rgba(22, 27, 46, 0.90);
+            background: radial-gradient(circle at 10% 20%, rgba(109, 63, 224, 0.12) 0%, transparent 60%),
+                        radial-gradient(circle at 90% 80%, rgba(244, 123, 6, 0.08) 0%, transparent 50%);
             z-index: 1;
         }
         .hero-content {

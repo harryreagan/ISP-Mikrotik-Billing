@@ -24,6 +24,115 @@ class CustomAuthController extends Controller
     }
 
     /**
+     * Handle forgot password submission for Email OR Phone Number.
+     */
+    public function handleForgotPassword(Request $request)
+    {
+        $input = trim((string) $request->input('identity', $request->input('email', '')));
+        if (empty($input)) {
+            return back()->withErrors(['identity' => 'Please enter your email address or phone number.'])->withInput();
+        }
+
+        $isEmail = str_contains($input, '@');
+        $normalizedPhone = \App\Services\Auth\OtpVerificationService::normalizeKenyanPhone($input);
+
+        // 1. Phone number entered: dispatch SMS OTP and redirect to OTP reset screen
+        if (!$isEmail && $normalizedPhone) {
+            $user = User::where('phone', $normalizedPhone)
+                ->orWhere('mobile', $normalizedPhone)
+                ->orWhere('phone', $input)
+                ->orWhere('mobile', $input)
+                ->first();
+
+            if (!$user) {
+                return back()->withErrors(['identity' => 'We cannot find an account associated with that mobile number.'])->withInput();
+            }
+
+            $res = \App\Services\Auth\OtpVerificationService::generateAndSendOtp($normalizedPhone, 'password_reset', $user->tenant_id, $request->ip());
+
+            if (in_array($res['status'], ['rate_limited', 'cooldown'])) {
+                return back()->withErrors(['identity' => $res['message']])->withInput();
+            }
+
+            session([
+                'password_reset_phone'     => $normalizedPhone,
+                'password_reset_challenge' => $res['challenge_id'] ?? null,
+            ]);
+
+            return redirect()->route('password.reset.otp')->with('status', $res['message']);
+        }
+
+        // 2. Email address entered: clean stale tokens and send reset link
+        $email = strtolower($input);
+        $user = User::where('email', $email)->first();
+        if (!$user) {
+            return back()->withErrors(['identity' => 'We cannot find an account with that email address.'])->withInput();
+        }
+
+        // Always delete any existing token to prevent SQL duplicate key 1062 errors
+        try {
+            \Illuminate\Support\Facades\DB::table('password_reset_tokens')->where('email', $email)->delete();
+        } catch (\Throwable $e) {}
+
+        try {
+            $status = \Illuminate\Support\Facades\Password::broker()->sendResetLink(['email' => $email]);
+            if ($status === \Illuminate\Support\Facades\Password::RESET_LINK_SENT) {
+                return back()->with('status', __($status));
+            }
+            return back()->withErrors(['identity' => __($status)])->withInput();
+        } catch (\Throwable $e) {
+            Log::error("[ForgotPassword] Error dispatching reset link: " . $e->getMessage());
+            return back()->withErrors(['identity' => 'Unable to send password reset email. Please try again.'])->withInput();
+        }
+    }
+
+    /**
+     * Show Phone SMS OTP Password Reset screen.
+     */
+    public function showPasswordResetOtpForm()
+    {
+        $phone = session('password_reset_phone');
+        if (empty($phone)) {
+            return redirect()->route('password.request');
+        }
+
+        return view('auth.reset-password-otp', compact('phone'));
+    }
+
+    /**
+     * Process Phone SMS OTP Password Reset.
+     */
+    public function handlePasswordResetOtp(Request $request)
+    {
+        $request->validate([
+            'phone'                 => 'required|string',
+            'code'                  => 'required|string|size:6',
+            'password'              => 'required|string|min:8|confirmed',
+        ]);
+
+        $phone = \App\Services\Auth\OtpVerificationService::normalizeKenyanPhone($request->phone);
+        $code = trim((string) $request->code);
+
+        $verify = \App\Services\Auth\OtpVerificationService::verifyOtp($phone, $code, 'password_reset');
+
+        if ($verify['status'] !== 'verified') {
+            return back()->withErrors(['code' => $verify['message']])->withInput();
+        }
+
+        $user = User::where('phone', $phone)->orWhere('mobile', $phone)->first();
+        if (!$user) {
+            return redirect()->route('password.request')->withErrors(['identity' => 'User account not found.']);
+        }
+
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        session()->forget(['password_reset_phone', 'password_reset_challenge']);
+
+        return redirect()->route('login')->with('status', 'Your password has been successfully reset! You can now sign in.');
+    }
+
+    /**
      * Show combined auth page.
      */
     public function show(Request $request)
@@ -144,6 +253,39 @@ class CustomAuthController extends Controller
         // Log the user in
         $user = $result['user'] ?? User::where('email', $email)->first();
         if ($user) {
+            // Ensure tenant exists and is awarded 20 free SMS credits
+            if (empty($user->tenant_id)) {
+                try {
+                    $baseSlug = \Illuminate\Support\Str::slug($user->name ?: 'isp');
+                    $subdomain = $baseSlug . '-' . $user->id;
+                    $billingCode = strtoupper(\Illuminate\Support\Str::random(6));
+
+                    $tenantId = \Illuminate\Support\Facades\DB::table('tenants')->insertGetId([
+                        'name'         => ($user->name ?: 'ISP') . ' Networks',
+                        'subdomain'    => $subdomain,
+                        'billing_code' => $billingCode,
+                        'country'      => 'Kenya',
+                        'county'       => 'Nairobi',
+                        'is_active'    => 1,
+                        'sms_balance'  => 20.00,
+                        'created_at'   => now(),
+                        'updated_at'   => now(),
+                    ]);
+
+                    \Illuminate\Support\Facades\DB::table('sms_wallets')->insert([
+                        'tenant_id'             => $tenantId,
+                        'balance'               => 20.00,
+                        'low_balance_threshold' => 50.00,
+                        'created_at'            => now(),
+                        'updated_at'            => now(),
+                    ]);
+
+                    $user->tenant_id = $tenantId;
+                    $user->save();
+                } catch (\Throwable $e) {
+                    Log::warning("Tenant setup failed for registered user {$user->id}: " . $e->getMessage());
+                }
+            }
             Auth::login($user, true);
         }
 
@@ -256,6 +398,40 @@ class CustomAuthController extends Controller
             'personal_team' => true,
         ]);
         $user->current_team_id = $team->id;
+
+        // Auto-provision Tenant with 20 SMS credits
+        if (empty($user->tenant_id)) {
+            try {
+                $baseSlug = \Illuminate\Support\Str::slug($user->name);
+                $subdomain = $baseSlug . '-' . $user->id;
+                $billingCode = strtoupper(\Illuminate\Support\Str::random(6));
+
+                $tenantId = \Illuminate\Support\Facades\DB::table('tenants')->insertGetId([
+                    'name'         => $user->name . ' Networks',
+                    'subdomain'    => $subdomain,
+                    'billing_code' => $billingCode,
+                    'country'      => 'Kenya',
+                    'county'       => 'Nairobi',
+                    'is_active'    => 1,
+                    'sms_balance'  => 20.00,
+                    'created_at'   => now(),
+                    'updated_at'   => now(),
+                ]);
+
+                \Illuminate\Support\Facades\DB::table('sms_wallets')->insert([
+                    'tenant_id'             => $tenantId,
+                    'balance'               => 20.00,
+                    'low_balance_threshold' => 50.00,
+                    'created_at'            => now(),
+                    'updated_at'            => now(),
+                ]);
+
+                $user->tenant_id = $tenantId;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Tenant setup failed for Google user: " . $e->getMessage());
+            }
+        }
+
         $user->save();
 
         // Assign default Admin role
@@ -266,6 +442,175 @@ class CustomAuthController extends Controller
         Auth::login($user, true);
 
         return redirect()->route('dashboard');
+    }
+
+    /**
+     * Request 6-digit OTP for passwordless login (phone or email).
+     */
+    public function requestLoginOtp(Request $request)
+    {
+        $input = trim((string) $request->input('destination'));
+        if (empty($input)) {
+            return response()->json(['status' => 'error', 'message' => 'Please enter your phone number or email address.'], 422);
+        }
+
+        $isEmail = str_contains($input, '@');
+        $normalizedPhone = \App\Services\Auth\OtpVerificationService::normalizeKenyanPhone($input);
+
+        $user = User::where(function ($q) use ($input, $isEmail, $normalizedPhone) {
+            if ($isEmail) {
+                $q->where('email', strtolower($input));
+            } else {
+                $q->where('phone', $normalizedPhone)
+                  ->orWhere('mobile', $normalizedPhone)
+                  ->orWhere('phone', $input)
+                  ->orWhere('mobile', $input);
+            }
+        })->first();
+
+        if (!$user) {
+            return response()->json(['status' => 'error', 'message' => 'No account was found for this phone or email.'], 404);
+        }
+
+        $dest = $isEmail ? $user->email : ($user->phone ?: $user->mobile);
+        $result = \App\Services\Auth\OtpVerificationService::generateAndSendOtp($dest, 'login', $user->tenant_id, $request->ip());
+
+        return response()->json($result);
+    }
+
+    /**
+     * Sign in using 6-digit OTP code.
+     */
+    public function loginWithOtp(Request $request)
+    {
+        $input = trim((string) $request->input('destination'));
+        $code = trim((string) $request->input('code'));
+
+        if (empty($input) || empty($code)) {
+            return response()->json(['status' => 'error', 'message' => 'Both destination and OTP code are required.'], 422);
+        }
+
+        $isEmail = str_contains($input, '@');
+        $normalizedPhone = \App\Services\Auth\OtpVerificationService::normalizeKenyanPhone($input);
+
+        $user = User::where(function ($q) use ($input, $isEmail, $normalizedPhone) {
+            if ($isEmail) {
+                $q->where('email', strtolower($input));
+            } else {
+                $q->where('phone', $normalizedPhone)
+                  ->orWhere('mobile', $normalizedPhone)
+                  ->orWhere('phone', $input)
+                  ->orWhere('mobile', $input);
+            }
+        })->first();
+
+        if (!$user) {
+            return response()->json(['status' => 'error', 'message' => 'Account not found.'], 404);
+        }
+
+        $dest = $isEmail ? $user->email : ($user->phone ?: $user->mobile);
+        $verify = \App\Services\Auth\OtpVerificationService::verifyOtp($dest, $code, 'login');
+
+        if ($verify['status'] !== 'verified') {
+            return response()->json($verify, 422);
+        }
+
+        // Auto-verify phone/email if not yet marked
+        if ($isEmail && is_null($user->email_verified_at)) {
+            $user->email_verified_at = now();
+            $user->save();
+        } elseif (!$isEmail && is_null($user->phone_verified_at)) {
+            $user->phone_verified_at = now();
+            $user->save();
+        }
+
+        Auth::login($user, true);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Login successful.',
+            'redirect' => route('dashboard'),
+        ]);
+    }
+
+    /**
+     * Request Password Reset via SMS OTP or Email.
+     */
+    public function requestForgotPasswordOtp(Request $request)
+    {
+        $input = trim((string) $request->input('destination'));
+        if (empty($input)) {
+            return response()->json(['status' => 'error', 'message' => 'Please enter your phone number or email.'], 422);
+        }
+
+        $isEmail = str_contains($input, '@');
+        $normalizedPhone = \App\Services\Auth\OtpVerificationService::normalizeKenyanPhone($input);
+
+        $user = User::where(function ($q) use ($input, $isEmail, $normalizedPhone) {
+            if ($isEmail) {
+                $q->where('email', strtolower($input));
+            } else {
+                $q->where('phone', $normalizedPhone)
+                  ->orWhere('mobile', $normalizedPhone);
+            }
+        })->first();
+
+        if (!$user) {
+            return response()->json(['status' => 'error', 'message' => 'No account associated with that number or email.'], 404);
+        }
+
+        $dest = $isEmail ? $user->email : ($user->phone ?: $user->mobile);
+        $result = \App\Services\Auth\OtpVerificationService::generateAndSendOtp($dest, 'password_reset', $user->tenant_id, $request->ip());
+
+        return response()->json($result);
+    }
+
+    /**
+     * Reset password using verified OTP code.
+     */
+    public function resetPasswordWithOtp(Request $request)
+    {
+        $request->validate([
+            'destination' => 'required|string',
+            'code'        => 'required|string|size:6',
+            'password'    => 'required|string|min:8|confirmed',
+        ]);
+
+        $input = trim((string) $request->input('destination'));
+        $code = trim((string) $request->input('code'));
+        $newPass = $request->input('password');
+
+        $isEmail = str_contains($input, '@');
+        $normalizedPhone = \App\Services\Auth\OtpVerificationService::normalizeKenyanPhone($input);
+
+        $user = User::where(function ($q) use ($input, $isEmail, $normalizedPhone) {
+            if ($isEmail) {
+                $q->where('email', strtolower($input));
+            } else {
+                $q->where('phone', $normalizedPhone)
+                  ->orWhere('mobile', $normalizedPhone);
+            }
+        })->first();
+
+        if (!$user) {
+            return response()->json(['status' => 'error', 'message' => 'Account not found.'], 404);
+        }
+
+        $dest = $isEmail ? $user->email : ($user->phone ?: $user->mobile);
+        $verify = \App\Services\Auth\OtpVerificationService::verifyOtp($dest, $code, 'password_reset');
+
+        if ($verify['status'] !== 'verified') {
+            return response()->json($verify, 422);
+        }
+
+        $user->password = Hash::make($newPass);
+        $user->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Password has been successfully reset. Please sign in with your new password.',
+            'redirect' => route('login'),
+        ]);
     }
 }
 

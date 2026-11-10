@@ -52,8 +52,8 @@ return [
 
     'wireguard' => [
         'interface_name' => env('WIREGUARD_INTERFACE', 'wg0'),
-        'server_public_key' => env('WIREGUARD_SERVER_PUBLIC_KEY', 'DuZQaTGDe95eAhT6+OFgFaI+rsP/n6iaIxjWSvtTRx4='),
-        'server_endpoint' => env('WIREGUARD_SERVER_ENDPOINT', '213.199.49.216:51820'),
+        'server_public_key' => env('WG_SERVER_PUBLIC_KEY', env('WIREGUARD_SERVER_PUBLIC_KEY', 'DuZQaTGDe95eAhT6+OFgFaI+rsP/n6iaIxjWSvtTRx4=')),
+        'server_endpoint' => env('WG_ENDPOINT', env('WIREGUARD_SERVER_ENDPOINT', '213.199.49.216:51820')),
         'gateway_ip' => env('WIREGUARD_GATEWAY_IP', '10.10.0.1'),
     ],
 

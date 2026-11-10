@@ -240,7 +240,14 @@ class MainSiteSetup extends Component implements HasActions, HasForms
                 ->grow(),
             Select::make('log_server_routers')
                 ->multiple()
-                ->options(RouterList::pluck('router_name', 'router_name'))
+                ->options(function () {
+                    return RouterList::whereNotNull('router_name')
+                        ->where('router_name', '!=', '')
+                        ->pluck('router_name', 'router_name')
+                        ->filter(fn ($v) => !empty($v))
+                        ->map(fn ($v) => (string) $v)
+                        ->toArray();
+                })
                 ->label('Capture logs for:')
                 ->searchable(),
         ])->statePath('data');
@@ -329,7 +336,9 @@ class MainSiteSetup extends Component implements HasActions, HasForms
                     Select::make('category')
                         ->label('Category')
                         ->options(fn () => collect(MainSiteData::getValue('gallery_categories', []))
-                            ->mapWithKeys(fn ($c) => [($c['key'] ?? $c['label'] ?? '') => $c['label'] ?? $c['key'] ?? ''])
+                            ->filter(fn ($c) => !empty($c['key']) || !empty($c['label']))
+                            ->mapWithKeys(fn ($c) => [(string) ($c['key'] ?? $c['label'] ?? '') => (string) ($c['label'] ?? $c['key'] ?? '')])
+                            ->filter(fn ($val, $key) => $val !== '' && $key !== '')
                             ->toArray())
                         ->default('category-1'),
                 ])

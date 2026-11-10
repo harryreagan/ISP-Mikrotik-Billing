@@ -38,5 +38,18 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->report(function (\Throwable $e) {
+            try {
+                if (app()->bound('auth') && app()->bound('hash')) {
+                    $user = auth()->user();
+                    \Illuminate\Support\Facades\Log::withContext([
+                        'tenant_id' => $user?->tenant_id ?? (session()->has('tenant_id') ? session('tenant_id') : 'platform'),
+                        'user_id'   => $user?->id ?? 'guest',
+                        'user_role' => $user?->role ?? ($user?->roles?->first()?->name ?? 'guest'),
+                        'url'       => request()->fullUrl(),
+                        'method'    => request()->method(),
+                    ]);
+                }
+            } catch (\Throwable $ignored) {}
+        });
     })->create();
