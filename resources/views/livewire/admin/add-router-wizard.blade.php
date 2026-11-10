@@ -136,23 +136,45 @@
                     </div>
                 </div>
 
-                {{-- Script Box with Copy Button --}}
+                {{-- One-Line Terminal Command (Industry Standard Bootstrap) --}}
                 <div class="position-relative mb-4">
                     <div class="d-flex align-items-center justify-content-between bg-dark text-white px-3 py-2 rounded-top">
-                        <span class="small font-monospace text-warning"><i class="bi bi-code-slash me-2"></i>MikroTik RouterOS Script</span>
+                        <span class="small font-monospace text-warning">
+                            <i class="bi bi-terminal me-2"></i>One-Line MikroTik Terminal Command
+                        </span>
                         <button type="button" 
-                                id="copyScriptBtn"
-                                class="btn btn-warning btn-sm fw-bold"
-                                onclick="copyScriptCode()">
-                            <i class="bi bi-clipboard me-1" id="copyIcon"></i>
-                            <span id="copyText">Copy Script</span>
+                                id="copyCmdBtn"
+                                class="btn btn-warning btn-sm fw-bold px-3 shadow-sm"
+                                onclick="copyBootstrapCommand()">
+                            <i class="bi bi-clipboard me-1" id="copyCmdIcon"></i>
+                            <span id="copyCmdText">Copy Command</span>
                         </button>
                     </div>
-                    <textarea id="routerScriptArea" 
+                    <textarea id="routerBootstrapArea" 
                               class="form-control font-monospace bg-dark text-white border-0 rounded-bottom p-3" 
-                              rows="10" 
+                              rows="3" 
                               readonly 
-                              style="font-size: 13px; resize: none; border-top-left-radius: 0 !important; border-top-right-radius: 0 !important;">{{ $script }}</textarea>
+                              style="font-size: 13px; line-height: 1.6; resize: none; border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; color: #38bdf8 !important;">{{ $one_line_command }}</textarea>
+                </div>
+
+                {{-- Collapsible Raw Script Details --}}
+                <div class="accordion mb-4" id="scriptAccordion">
+                    <div class="accordion-item border rounded-3 overflow-hidden">
+                        <h2 class="accordion-header" id="headingScript">
+                            <button class="accordion-button collapsed py-2 px-3 bg-light text-dark small" type="button" data-bs-toggle="collapse" data-bs-target="#collapseScript">
+                                <i class="bi bi-code-slash me-2 text-secondary"></i>Advanced: View Full RouterOS Configuration Script
+                            </button>
+                        </h2>
+                        <div id="collapseScript" class="accordion-collapse collapse" data-bs-parent="#scriptAccordion">
+                            <div class="accordion-body p-0">
+                                <textarea id="routerScriptArea" 
+                                          class="form-control font-monospace bg-dark text-light border-0 p-3" 
+                                          rows="8" 
+                                          readonly 
+                                          style="font-size: 12px; resize: none;">{{ $script }}</textarea>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {{-- Live Connection Polling Status --}}
@@ -406,6 +428,25 @@
 </div>
 
 <script>
+function copyBootstrapCommand() {
+    const copyText = document.getElementById("routerBootstrapArea");
+    if (!copyText) return;
+    copyText.select();
+    copyText.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(copyText.value).then(() => {
+        const btnText = document.getElementById("copyCmdText");
+        const icon = document.getElementById("copyCmdIcon");
+        if (btnText && icon) {
+            btnText.innerText = "Copied to Clipboard!";
+            icon.className = "bi bi-check-lg me-1";
+            setTimeout(() => {
+                btnText.innerText = "Copy Command";
+                icon.className = "bi bi-clipboard me-1";
+            }, 3000);
+        }
+    });
+}
+
 function copyScriptCode() {
     const copyText = document.getElementById("routerScriptArea");
     if (!copyText) return;

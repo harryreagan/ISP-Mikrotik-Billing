@@ -36,36 +36,43 @@ class ProvisioningTokenService
     }
 
     /**
-     * Validate an incoming provisioning token against the stored hash and expiry.
+     * Validate an incoming provisioning token against stored tokens, hashes, and expiry.
      */
     public static function validateToken(string $plainToken): ?Router
     {
-        if (empty($plainToken) || !str_contains($plainToken, '.')) {
+        if (empty($plainToken)) {
             return null;
         }
 
-        [$routerUuid] = explode('.', $plainToken, 2);
-        if (empty($routerUuid)) {
-            return null;
+        $clean = trim($plainToken);
+
+        // 1. Direct match on setup_token or provision_token (used by AddRouterWizard & MikrotikSync)
+        $router = Router::where('setup_token', $clean)
+            ->orWhere('provision_token', $clean)
+            ->first();
+
+        if ($router) {
+            return $router;
         }
 
-        $router = Router::where('router_uuid', $routerUuid)->first();
-        if (!$router) {
-            return null;
+        // 2. Token format with dot: <router_uuid>.<random_secret>
+        if (str_contains($clean, '.')) {
+            [$routerUuid] = explode('.', $clean, 2);
+            if (!empty($routerUuid)) {
+                $router = Router::where('router_uuid', $routerUuid)->first();
+                if ($router) {
+                    if ($router->provision_token_expires_at && now()->isAfter($router->provision_token_expires_at)) {
+                        return null;
+                    }
+                    $computedHash = hash('sha256', $clean);
+                    if (hash_equals((string) $router->provisioning_token_hash, $computedHash)) {
+                        return $router;
+                    }
+                }
+            }
         }
 
-        // Check expiration
-        if (!$router->provision_token_expires_at || now()->isAfter($router->provision_token_expires_at)) {
-            return null;
-        }
-
-        // Verify SHA-256 hash in constant time
-        $computedHash = hash('sha256', $plainToken);
-        if (!hash_equals((string) $router->provisioning_token_hash, $computedHash)) {
-            return null;
-        }
-
-        return $router;
+        return null;
     }
 
     /**

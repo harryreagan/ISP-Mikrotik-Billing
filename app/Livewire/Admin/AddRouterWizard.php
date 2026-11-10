@@ -29,6 +29,7 @@ class AddRouterWizard extends Component
     public string $api_password_plain = '';
     public string $tunnel_ip = '';
     public string $script = '';
+    public string $one_line_command = '';
     public bool $is_online = false;
     public ?string $peer_registration_status = null;
     public ?string $check_message = null;
@@ -79,8 +80,8 @@ class AddRouterWizard extends Component
                      ?: 1;
         }
 
-        // 1. Generate security credentials
-        $this->setup_token = bin2hex(random_bytes(16));
+        // 1. Generate security credentials (nbp_ prefix matching industry bootstrap standard)
+        $this->setup_token = 'nbp_' . Str::random(36);
         $this->api_user = 'hs_api_' . strtolower(Str::random(6));
         $this->api_password_plain = Str::random(16);
 
@@ -97,6 +98,7 @@ class AddRouterWizard extends Component
             'location'        => $this->location,
             'status'          => 'pending',
             'setup_token'     => $this->setup_token,
+            'provision_token' => $this->setup_token,
             'api_user'        => $this->api_user,
             'username'        => $this->api_user,
             'api_password'    => Crypt::encryptString($this->api_password_plain),
@@ -131,8 +133,11 @@ class AddRouterWizard extends Component
             }
         }
 
-        // 6. Build the RouterOS setup script
+        // 6. Build the RouterOS setup script and one-line fetch command
         $this->script = $this->buildRouterOsScript($privKeyPlain, $this->tunnel_ip);
+
+        $appUrl = rtrim(config('app.url', url('/')), '/');
+        $this->one_line_command = ":do { /tool fetch mode=https url=\"{$appUrl}/provision/{$this->setup_token}/bootstrap\" dst-path=\"hsmart-bootstrap.rsc\" } on-error={ :log error \"HSmart bootstrap download failed\"; :put \"HSmart bootstrap download failed\"; :error \"HSmart provisioning stopped\" }; /import file-name=\"hsmart-bootstrap.rsc\"; /file remove \"hsmart-bootstrap.rsc\"";
 
         // Advance to Step 2
         $this->step = 2;
