@@ -8,7 +8,7 @@ LOCAL_DIR = r"c:\xampp\htdocs\poss\isp-billing"
 ZIP_PATH = r"c:\xampp\htdocs\poss\isp-billing\deploy_update.zip"
 
 EXCLUDE_DIRS = {
-    '.git', 'node_modules', 'vendor', '.vscode', 'storage', 'backups'
+    '.git', 'node_modules', 'vendor', '.vscode', 'storage', 'backups', 'bootstrap/cache', 'cache'
 }
 EXCLUDE_FILES = {
     '.env', 'deploy_update.zip', 'deploy_clean.zip'
@@ -30,28 +30,43 @@ def make_zip():
     size_mb = os.path.getsize(ZIP_PATH) / (1024 * 1024)
     print(f"Archive created! Size: {size_mb:.2f} MB")
 
-def run_cmd(cmd_list):
+def run_cmd(cmd_list, timeout=60):
     print("RUNNING:", " ".join(cmd_list))
-    res = subprocess.run(cmd_list, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    if res.stdout:
-        print("STDOUT:\n", res.stdout)
-    if res.stderr:
-        print("STDERR:\n", res.stderr)
-    return res.returncode
+    try:
+        res = subprocess.run(
+            cmd_list,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdin=subprocess.DEVNULL,
+            timeout=timeout
+        )
+        if res.stdout:
+            print("STDOUT:\n", res.stdout)
+        if res.stderr:
+            print("STDERR:\n", res.stderr)
+        return res.returncode
+    except subprocess.TimeoutExpired:
+        print("ERROR: Command timed out after", timeout, "seconds!")
+        return 1
+    except Exception as e:
+        print("ERROR running command:", e)
+        return 1
 
 def deploy():
     make_zip()
     
     print("\n--- 1. Uploading archive to VPS ---")
-    scp_cmd = ["scp", "-o", "ConnectTimeout=15", ZIP_PATH, f"{VPS_HOST}:/tmp/deploy_update.zip"]
-    code = run_cmd(scp_cmd)
+    scp_cmd = ["scp", "-B", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=15", ZIP_PATH, f"{VPS_HOST}:/tmp/deploy_update.zip"]
+    code = run_cmd(scp_cmd, timeout=90)
     if code != 0:
         print("SCP failed!")
         return False
 
     print("\n--- 2. Unzipping on VPS ---")
     remote_unzip = "unzip -o /tmp/deploy_update.zip -d /var/www/poss/isp-billing && rm -f /tmp/deploy_update.zip"
-    code = run_cmd(["ssh", "-o", "ConnectTimeout=15", VPS_HOST, remote_unzip])
+    code = run_cmd(["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=15", VPS_HOST, remote_unzip], timeout=45)
     if code != 0:
         print("Unzip failed!")
         return False
@@ -64,7 +79,7 @@ php artisan migrate --force && \
 php artisan optimize:clear && \
 php artisan test:smoke-routes
 """
-    code = run_cmd(["ssh", "-o", "ConnectTimeout=20", VPS_HOST, remote_post])
+    code = run_cmd(["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=30", VPS_HOST, remote_post], timeout=90)
     return code == 0
 
 if __name__ == "__main__":
@@ -73,7 +88,7 @@ if __name__ == "__main__":
         sys.exit(0 if success else 1)
     elif len(sys.argv) > 1:
         cmd = " ".join(sys.argv[1:])
-        code = run_cmd(["ssh", "-o", "ConnectTimeout=15", VPS_HOST, cmd])
+        code = run_cmd(["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=20", VPS_HOST, cmd], timeout=60)
         sys.exit(code)
     else:
         print("Usage: python deploy_helper.py deploy | <cmd>")

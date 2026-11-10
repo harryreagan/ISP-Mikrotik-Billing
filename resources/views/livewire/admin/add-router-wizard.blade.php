@@ -3,7 +3,7 @@
     <div class="d-flex align-items-center justify-content-between mb-4">
         <div>
             <h3 class="fw-bold text-dark mb-1">Add Router</h3>
-            <p class="text-muted small mb-0">Connect and set up any MikroTik router in 4 simple steps.</p>
+            <p class="text-muted small mb-0">Connect and set up any MikroTik router in 4 verified steps.</p>
         </div>
         <a href="{{ route('mikrotik-sync') }}" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-x-lg me-1"></i>Cancel
@@ -44,16 +44,16 @@
                 {{-- Step 4 --}}
                 <div class="col-3">
                     <div class="d-flex flex-column align-items-center">
-                        <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold mb-1 {{ $step === 4 ? ($is_configured ? 'bg-success text-white' : 'bg-primary text-white') : 'bg-light text-muted border' }}" style="width: 38px; height: 38px;">
-                            @if($is_configured) <i class="bi bi-check-all fs-4"></i> @else 4 @endif
+                        <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold mb-1 {{ $step === 4 ? ($is_configured ? 'bg-success text-white' : ($apply_error ? 'bg-danger text-white' : 'bg-primary text-white')) : 'bg-light text-muted border' }}" style="width: 38px; height: 38px;">
+                            @if($is_configured) <i class="bi bi-check-all fs-4"></i> @elseif($apply_error) <i class="bi bi-exclamation-triangle fs-5"></i> @else 4 @endif
                         </div>
-                        <span class="small fw-semibold {{ $step === 4 ? ($is_configured ? 'text-success' : 'text-primary') : 'text-muted' }}">Done</span>
+                        <span class="small fw-semibold {{ $step === 4 ? ($is_configured ? 'text-success' : ($apply_error ? 'text-danger' : 'text-primary')) : 'text-muted' }}">Done</span>
                     </div>
                 </div>
             </div>
             {{-- Progress Line --}}
             <div class="progress mt-2" style="height: 4px;">
-                <div class="progress-bar bg-primary" role="progressbar" style="width: {{ ($step - 1) * 33.33 + ($is_configured ? 33.34 : 10) }}%"></div>
+                <div class="progress-bar {{ $apply_error ? 'bg-danger' : ($is_configured ? 'bg-success' : 'bg-primary') }}" role="progressbar" style="width: {{ ($step - 1) * 33.33 + ($is_configured ? 33.34 : 10) }}%"></div>
             </div>
         </div>
     </div>
@@ -108,7 +108,7 @@
                         <i class="bi bi-terminal fs-2"></i>
                     </div>
                     <h4 class="fw-bold text-dark">Connect Your Router</h4>
-                    <p class="text-muted small">Follow these 3 simple instructions to connect your router to the platform.</p>
+                    <p class="text-muted small">Follow these 3 simple instructions to connect your MikroTik router to HSmart Cloud.</p>
                 </div>
 
                 {{-- 3 Plain Instructions --}}
@@ -150,12 +150,12 @@
                     </div>
                     <textarea id="routerScriptArea" 
                               class="form-control font-monospace bg-dark text-white border-0 rounded-bottom p-3" 
-                              rows="9" 
+                              rows="10" 
                               readonly 
                               style="font-size: 13px; resize: none; border-top-left-radius: 0 !important; border-top-right-radius: 0 !important;">{{ $script }}</textarea>
                 </div>
 
-                {{-- Listening Spinner --}}
+                {{-- Live Connection Polling Status --}}
                 <div class="card border border-primary bg-primary bg-opacity-10 text-center p-4 mb-4">
                     <div class="d-flex align-items-center justify-content-center mb-2">
                         <div class="spinner-border text-primary me-3" role="status">
@@ -163,14 +163,25 @@
                         </div>
                         <h5 class="fw-bold text-primary mb-0">Waiting for your router to connect...</h5>
                     </div>
-                    <p class="text-muted small mb-0">
-                        Once you paste the script in Winbox and press Enter, your router will automatically appear here within seconds.
+                    <p class="text-muted small mb-3">
+                        As soon as your router executes the script and contacts our cloud gateway, this page will advance automatically.
                     </p>
+                    <div class="d-flex flex-wrap justify-content-center gap-3 small text-muted">
+                        <div><i class="bi bi-shield-lock me-1"></i>Setup Token: <span class="font-monospace text-dark fw-bold">{{ substr($setup_token, 0, 10) }}...</span></div>
+                        <div><i class="bi bi-diagram-3 me-1"></i>Cloud IP: <span class="font-monospace text-dark fw-bold">{{ $tunnel_ip }}</span></div>
+                    </div>
                 </div>
 
-                <div class="text-center">
-                    <button type="button" wire:click="advanceToStep3" class="btn btn-outline-secondary btn-sm">
-                        Router already pasted? Continue to Ports <i class="bi bi-arrow-right ms-1"></i>
+                @if($check_message)
+                    <div class="alert alert-warning text-start mb-4 d-flex align-items-start">
+                        <i class="bi bi-info-circle-fill fs-5 me-2 mt-1"></i>
+                        <div>{{ $check_message }}</div>
+                    </div>
+                @endif
+
+                <div class="d-flex justify-content-center gap-2">
+                    <button type="button" wire:click="manualCheckConnection" class="btn btn-primary px-4">
+                        <i class="bi bi-arrow-repeat me-1"></i>Check Connection Now
                     </button>
                 </div>
             </div>
@@ -192,16 +203,38 @@
                 </div>
 
                 @if($port_validation_error)
-                    <div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
-                        <i class="bi bi-exclamation-triangle-fill fs-5 me-2"></i>
-                        <div>{{ $port_validation_error }}</div>
+                    <div class="alert alert-danger mb-4 text-start" role="alert">
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-exclamation-triangle-fill fs-5 me-2 mt-1"></i>
+                            <div>
+                                <div class="fw-bold mb-1">Port Detection Notice</div>
+                                <div>{{ $port_validation_error }}</div>
+                            </div>
+                        </div>
                     </div>
                 @endif
 
                 @if($is_loading_interfaces)
                     <div class="text-center py-5">
                         <div class="spinner-border text-primary mb-2"></div>
-                        <p class="text-muted small">Reading ports from router...</p>
+                        <p class="text-muted small">Querying network interfaces directly from router...</p>
+                    </div>
+                @elseif(empty($interfaces))
+                    {{-- Honest error state: No fake ports! --}}
+                    <div class="card bg-light border-0 p-4 text-center mb-4">
+                        <i class="bi bi-hdd-network text-warning fs-1 mb-2"></i>
+                        <h5 class="fw-bold text-dark">No Hardware Interfaces Found</h5>
+                        <p class="text-muted small mb-4" style="max-width: 500px; margin: 0 auto;">
+                            We could not read ports from your router via RouterOS API. Please make sure the setup script ran completely in Winbox Terminal, the WireGuard tunnel is active, and the router has internet access.
+                        </p>
+                        <div class="d-flex justify-content-center gap-2">
+                            <button type="button" wire:click="fetchInterfaces" class="btn btn-primary">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Retry Reading Ports
+                            </button>
+                            <button type="button" wire:click="goBackToStep2" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Back to Script (Step 2)
+                            </button>
+                        </div>
                     </div>
                 @else
                     <div class="table-responsive mb-4">
@@ -255,18 +288,23 @@
                         <div class="d-flex align-items-center small text-muted">
                             <i class="bi bi-info-circle text-primary me-2 fs-5"></i>
                             <div>
-                                <strong>Tip:</strong> Plug your main internet cable from your provider (ISP) into <strong>{{ array_search('wan', $port_roles) ?: 'ether1' }}</strong>. Your customers or Access Points plug into the Hotspot/PPPoE ports.
+                                <strong>Tip:</strong> Plug your main internet cable from your provider into <strong>{{ array_search('wan', $port_roles) ?: 'ether1' }}</strong>. Your customers or Access Points plug into the Hotspot/PPPoE ports.
                             </div>
                         </div>
                     </div>
 
-                    <button type="button" 
-                            wire:click="applyConfiguration" 
-                            class="btn btn-primary btn-lg w-100 py-3 fw-bold"
-                            @if($port_validation_error) disabled @endif>
-                        <span>Apply &amp; Configure Router</span>
-                        <i class="bi bi-arrow-right ms-2"></i>
-                    </button>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <button type="button" wire:click="goBackToStep2" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left me-1"></i>Back to Script
+                        </button>
+                        <button type="button" 
+                                wire:click="applyConfiguration" 
+                                class="btn btn-primary btn-lg px-4 py-3 fw-bold"
+                                @if($port_validation_error || empty($interfaces)) disabled @endif>
+                            <span>Apply &amp; Configure Router</span>
+                            <i class="bi bi-arrow-right ms-2"></i>
+                        </button>
+                    </div>
                 @endif
             </div>
         </div>
@@ -280,9 +318,17 @@
             <div class="card-body p-4 p-md-5">
                 @if(!$is_configured)
                     <div class="text-center mb-4">
-                        <div class="spinner-border text-primary mb-3" style="width: 3.5rem; height: 3.5rem;" role="status"></div>
-                        <h4 class="fw-bold text-dark">Applying Configuration</h4>
-                        <p class="text-muted small">Please wait while we automatically set up your MikroTik router...</p>
+                        @if($apply_error)
+                            <div class="d-inline-flex align-items-center justify-content-center bg-danger text-white rounded-circle mb-3" style="width: 70px; height: 70px;">
+                                <i class="bi bi-x-lg fs-1"></i>
+                            </div>
+                            <h4 class="fw-bold text-danger">Configuration Incomplete</h4>
+                            <p class="text-muted small">We could not complete the setup on your router. See details below.</p>
+                        @else
+                            <div class="spinner-border text-primary mb-3" style="width: 3.5rem; height: 3.5rem;" role="status"></div>
+                            <h4 class="fw-bold text-dark">Applying Configuration</h4>
+                            <p class="text-muted small">Please wait while we automatically configure your MikroTik router...</p>
+                        @endif
                     </div>
 
                     {{-- Live Animated Checklist --}}
@@ -302,8 +348,24 @@
                             </div>
                         @endforeach
                     </div>
+
+                    @if($apply_error)
+                        <div class="alert alert-danger mb-4 text-start">
+                            <div class="fw-bold mb-1"><i class="bi bi-exclamation-triangle-fill me-1"></i>Error Details:</div>
+                            <div class="small font-monospace">{{ $apply_error }}</div>
+                        </div>
+
+                        <div class="d-flex justify-content-center gap-2">
+                            <button type="button" wire:click="applyConfiguration" class="btn btn-primary">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Retry Configuration
+                            </button>
+                            <button type="button" wire:click="goBackToStep3" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Back to Port Selection
+                            </button>
+                        </div>
+                    @endif
                 @else
-                    {{-- Big Green Finished Screen --}}
+                    {{-- Big Green Finished Screen (Shown ONLY after all checks succeed) --}}
                     <div class="text-center py-4">
                         <div class="d-inline-flex align-items-center justify-content-center bg-success text-white rounded-circle shadow-lg mb-4" style="width: 90px; height: 90px;">
                             <i class="bi bi-check-lg" style="font-size: 50px;"></i>
@@ -338,17 +400,6 @@
                         </div>
                     </div>
                 @endif
-
-                @if($apply_error)
-                    <div class="alert alert-danger mt-4 text-start">
-                        <strong>Configuration notice:</strong> {{ $apply_error }}
-                        <div class="mt-2">
-                            <button type="button" wire:click="goBackToStep3" class="btn btn-danger btn-sm">
-                                <i class="bi bi-arrow-left me-1"></i>Go back to Step 3
-                            </button>
-                        </div>
-                    </div>
-                @endif
             </div>
         </div>
     @endif
@@ -357,17 +408,20 @@
 <script>
 function copyScriptCode() {
     const copyText = document.getElementById("routerScriptArea");
+    if (!copyText) return;
     copyText.select();
     copyText.setSelectionRange(0, 99999);
     navigator.clipboard.writeText(copyText.value).then(() => {
         const btnText = document.getElementById("copyText");
         const icon = document.getElementById("copyIcon");
-        btnText.innerText = "Copied to Clipboard!";
-        icon.className = "bi bi-check-lg me-1";
-        setTimeout(() => {
-            btnText.innerText = "Copy Script";
-            icon.className = "bi bi-clipboard me-1";
-        }, 3000);
+        if (btnText && icon) {
+            btnText.innerText = "Copied to Clipboard!";
+            icon.className = "bi bi-check-lg me-1";
+            setTimeout(() => {
+                btnText.innerText = "Copy Script";
+                icon.className = "bi bi-clipboard me-1";
+            }, 3000);
+        }
     });
 }
 </script>

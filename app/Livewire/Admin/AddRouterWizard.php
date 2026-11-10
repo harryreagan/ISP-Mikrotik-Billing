@@ -31,10 +31,11 @@ class AddRouterWizard extends Component
     public string $script = '';
     public bool $is_online = false;
     public ?string $peer_registration_status = null;
+    public ?string $check_message = null;
 
     // STEP 3 - Ports
     public array $interfaces = [];
-    public array $port_roles = []; // e.g. ['ether1' => 'wan', 'ether2' => 'hotspot', 'ether3' => 'pppoe', 'ether4' => 'none']
+    public array $port_roles = []; // e.g. ['ether1' => 'wan', 'ether2' => 'hotspot', 'ether3' => 'none']
     public ?string $port_validation_error = null;
     public bool $is_loading_interfaces = false;
 
@@ -42,10 +43,10 @@ class AddRouterWizard extends Component
     public bool $is_applying = false;
     public bool $is_configured = false;
     public array $checklist = [
-        'wan'        => ['status' => 'pending', 'label' => 'Internet (WAN) port set & NAT configured'],
+        'connection' => ['status' => 'pending', 'label' => 'Router WireGuard tunnel & RouterOS API reachability'],
+        'wan'        => ['status' => 'pending', 'label' => 'Internet (WAN) port & NAT masquerade configured'],
         'hotspot'    => ['status' => 'pending', 'label' => 'Hotspot server, bridge & IP pool created'],
-        'pppoe'      => ['status' => 'pending', 'label' => 'PPPoE server & credentials profile ready'],
-        'connection' => ['status' => 'pending', 'label' => 'Router connection & telemetry verified'],
+        'pppoe'      => ['status' => 'pending', 'label' => 'PPPoE server & billing profile ready'],
     ];
     public ?string $apply_error = null;
 
@@ -72,9 +73,9 @@ class AddRouterWizard extends Component
         $user = auth()->user();
         $tenantId = $user?->tenant_id ?: (session('tenant_id') ?: session('impersonated_tenant_id'));
 
-        if (!$tenantId || !\Illuminate\Support\Facades\DB::table('tenants')->where('id', $tenantId)->exists()) {
-            $tenantId = \Illuminate\Support\Facades\DB::table('tenants')->where('is_active', 1)->value('id')
-                     ?: \Illuminate\Support\Facades\DB::table('tenants')->value('id')
+        if (!$tenantId || !DB::table('tenants')->where('id', $tenantId)->exists()) {
+            $tenantId = DB::table('tenants')->where('is_active', 1)->value('id')
+                     ?: DB::table('tenants')->value('id')
                      ?: 1;
         }
 
@@ -116,13 +117,18 @@ class AddRouterWizard extends Component
             'ip'         => $this->tunnel_ip,
         ]);
 
-        // 5. Dispatch async job to register peer on WireGuard server
+        // 5. Register peer on WireGuard server
         try {
-            RegisterWireguardPeerJob::dispatch($router->id, $pubKey, $this->tunnel_ip);
-            $this->peer_registration_status = 'Peer registered in WireGuard queue.';
+            RegisterWireguardPeerJob::dispatchSync($router->id, $pubKey, $this->tunnel_ip);
+            $this->peer_registration_status = 'Peer registered on WireGuard server.';
         } catch (\Throwable $e) {
-            Log::warning("[AddRouterWizard] Could not dispatch RegisterWireguardPeerJob: " . $e->getMessage());
-            $this->peer_registration_status = 'Local dev mode (peer simulated).';
+            Log::warning("[AddRouterWizard] Sync WireGuard peer registration: " . $e->getMessage());
+            try {
+                RegisterWireguardPeerJob::dispatch($router->id, $pubKey, $this->tunnel_ip);
+                $this->peer_registration_status = 'Peer registered in WireGuard queue.';
+            } catch (\Throwable $ex) {
+                $this->peer_registration_status = 'Local dev mode.';
+            }
         }
 
         // 6. Build the RouterOS setup script
@@ -130,6 +136,7 @@ class AddRouterWizard extends Component
 
         // Advance to Step 2
         $this->step = 2;
+        $this->check_message = null;
     }
 
     /**
@@ -153,22 +160,43 @@ class AddRouterWizard extends Component
 # ==============================================================
 
 # 1. Create HSmart Management Group & Dedicated API User
-/user group add name=hsmart_api policy=api,read,write,test,policy,password comment="HSmart Managed Group"
-/user add name="{$this->api_user}" group=hsmart_api password="{$this->api_password_plain}" comment="HSmart Automated API"
+:if ([:len [/user group find name=hsmart_api]] = 0) do={
+    /user group add name=hsmart_api policy=api,read,write,test,policy,password comment="HSmart Managed Group"
+}
+:if ([:len [/user find name="{$this->api_user}"]] = 0) do={
+    /user add name="{$this->api_user}" group=hsmart_api password="{$this->api_password_plain}" comment="HSmart Automated API"
+} else={
+    /user set [find name="{$this->api_user}"] password="{$this->api_password_plain}"
+}
 
 # 2. Enable API Service on Standard Port 8728
 /ip service enable api
 /ip service set api port=8728
 
 # 3. Configure WireGuard Tunnel
-/interface wireguard add name=wg-hsmart listen-port=13231 private-key="{$plainPrivateKey}" comment="HSmart VPN Tunnel"
-/ip address add address={$vpnIp}/16 interface=wg-hsmart network=10.10.0.0 comment="HSmart Cloud IP"
+:if ([:len [/interface wireguard find name=wg-hsmart]] = 0) do={
+    /interface wireguard add name=wg-hsmart listen-port=13231 private-key="{$plainPrivateKey}" comment="HSmart VPN Tunnel"
+} else={
+    /interface wireguard set [find name=wg-hsmart] private-key="{$plainPrivateKey}"
+}
+
+:if ([:len [/ip address find interface=wg-hsmart]] = 0) do={
+    /ip address add address={$vpnIp}/16 interface=wg-hsmart comment="HSmart Cloud IP"
+} else={
+    /ip address set [find interface=wg-hsmart] address={$vpnIp}/16
+}
 
 # 4. Attach WireGuard Peer to HSmart Cloud Gateway
-/interface wireguard peers add interface=wg-hsmart public-key="{$serverPubKey}" endpoint-address="{$serverHost}" endpoint-port={$serverPort} allowed-address=10.10.0.0/16 persistent-keepalive=25 comment="HSmart Cloud Gateway"
+:if ([:len [/interface wireguard peers find interface=wg-hsmart]] = 0) do={
+    /interface wireguard peers add interface=wg-hsmart public-key="{$serverPubKey}" endpoint-address="{$serverHost}" endpoint-port={$serverPort} allowed-address=10.10.0.0/16 persistent-keepalive=25 comment="HSmart Cloud Gateway"
+} else={
+    /interface wireguard peers set [find interface=wg-hsmart] public-key="{$serverPubKey}" endpoint-address="{$serverHost}" endpoint-port={$serverPort} allowed-address=10.10.0.0/16 persistent-keepalive=25
+}
 
 # 5. Allow Inbound Management Traffic over Secure Tunnel
-/ip firewall filter add chain=input interface=wg-hsmart action=accept place-before=1 comment="HSmart Inbound Management"
+:if ([:len [/ip firewall filter find comment="HSmart Inbound Management"]] = 0) do={
+    /ip firewall filter add chain=input interface=wg-hsmart action=accept place-before=0 comment="HSmart Inbound Management"
+}
 
 # 6. Periodic Heartbeat Telemetry (Signals Online Status to Portal)
 /system scheduler remove [find name=hsmart_hello]
@@ -179,6 +207,7 @@ ROUTERSCRIPT;
 
     /**
      * Poll router online status every 3 seconds while on Step 2.
+     * Transitions to Step 3 ONLY when a verified heartbeat is received from the router.
      */
     public function checkRouterOnline()
     {
@@ -191,32 +220,55 @@ ROUTERSCRIPT;
             return;
         }
 
-        if ($router->status === 'online' || ($router->last_seen_at && $router->last_seen_at->gt(now()->subSeconds(45)))) {
+        // Router is online ONLY if status is 'online' AND last_seen_at was updated within the last 120 seconds
+        $recentlySeen = $router->last_seen_at && $router->last_seen_at->gt(now()->subSeconds(120));
+
+        if ($router->status === 'online' && $recentlySeen) {
             $this->is_online = true;
             $this->step = 3;
+            $this->check_message = null;
             $this->fetchInterfaces();
         }
     }
 
     /**
-     * Manual override to advance to Step 3 if user knows router is connected.
+     * Manual user trigger to check connection status immediately.
      */
-    public function advanceToStep3()
+    public function manualCheckConnection()
     {
-        $this->step = 3;
-        $this->fetchInterfaces();
+        $this->checkRouterOnline();
+
+        if (!$this->is_online) {
+            $router = Router::find($this->created_router_id);
+            $lastSeen = $router?->last_seen_at ? $router->last_seen_at->diffForHumans() : 'Never';
+            $this->check_message = "No heartbeat received yet (Last seen: {$lastSeen}). Please paste the script into Winbox -> New Terminal and ensure the router has internet access.";
+        }
+    }
+
+    /**
+     * Go back to Step 2 from Step 3 if user needs to re-run or inspect the script.
+     */
+    public function goBackToStep2()
+    {
+        $this->step = 2;
+        $this->port_validation_error = null;
+        $this->check_message = null;
     }
 
     /**
      * STEP 3: Fetch interfaces from Router via RouterOS API.
+     * STRICT: No mock or fake interfaces! If router is unreachable, reports exact error.
      */
     public function fetchInterfaces()
     {
         $this->is_loading_interfaces = true;
         $this->port_validation_error = null;
+        $this->interfaces = [];
+        $this->port_roles = [];
 
         $router = Router::find($this->created_router_id);
         if (!$router) {
+            $this->port_validation_error = 'Router record not found in system.';
             $this->is_loading_interfaces = false;
             return;
         }
@@ -233,18 +285,27 @@ ROUTERSCRIPT;
         }
 
         $detectedInterfaces = [];
+        $connectionError = null;
 
         try {
             $api = new MikrotikApiService($apiHost, $apiPort, $apiUser, $apiPass, 5);
             $rawInterfaces = $api->executeCommand('/interface/print');
 
+            if (is_string($rawInterfaces) && str_starts_with($rawInterfaces, 'Error:')) {
+                throw new Exception($rawInterfaces);
+            }
+
             if (is_array($rawInterfaces) && !empty($rawInterfaces)) {
                 foreach ($rawInterfaces as $item) {
-                    $name = $item['name'] ?? 'ether';
-                    $type = $item['type'] ?? 'ether';
+                    if (isset($item['!trap'])) {
+                        continue;
+                    }
 
-                    // Only display physical/tunable interface types (ether, sfp, wlan, wifi)
-                    if (str_contains($type, 'ether') || str_contains($type, 'sfp') || str_contains($type, 'wlan') || str_contains($type, 'wifi') || str_starts_with($name, 'ether')) {
+                    $name = $item['name'] ?? '';
+                    $type = $item['type'] ?? '';
+
+                    // Only physical and tunable interfaces (ether, sfp, wlan, wifi)
+                    if (str_contains($type, 'ether') || str_contains($type, 'sfp') || str_contains($type, 'wlan') || str_contains($type, 'wifi') || str_starts_with($name, 'ether') || str_starts_with($name, 'wlan') || str_starts_with($name, 'sfp')) {
                         $running = ($item['running'] ?? 'false') === 'true';
                         $mac = $item['mac-address'] ?? ($item['mac'] ?? '—');
 
@@ -258,23 +319,24 @@ ROUTERSCRIPT;
                 }
             }
         } catch (\Throwable $e) {
-            Log::info("[AddRouterWizard] API query exception: " . $e->getMessage() . ". Using hardware standard list.");
+            $connectionError = $e->getMessage();
+            Log::warning("[AddRouterWizard] API interface query failed for router #{$router->id} at {$apiHost}:{$apiPort}: " . $connectionError);
         }
 
-        // Fallback to standard 5-port Gigabit layout if router is not directly reachable on API yet
+        // STRICT: If no interfaces were read from the real router, halt and show honest error
         if (empty($detectedInterfaces)) {
-            $detectedInterfaces = [
-                ['name' => 'ether1', 'type' => 'ether', 'running' => true,  'mac' => '48:8F:5A:11:01:A1'],
-                ['name' => 'ether2', 'type' => 'ether', 'running' => false, 'mac' => '48:8F:5A:11:01:A2'],
-                ['name' => 'ether3', 'type' => 'ether', 'running' => false, 'mac' => '48:8F:5A:11:01:A3'],
-                ['name' => 'ether4', 'type' => 'ether', 'running' => false, 'mac' => '48:8F:5A:11:01:A4'],
-                ['name' => 'ether5', 'type' => 'ether', 'running' => false, 'mac' => '48:8F:5A:11:01:A5'],
-            ];
+            $this->interfaces = [];
+            $this->port_roles = [];
+            $this->port_validation_error = "Unable to connect to router RouterOS API ({$apiHost}:{$apiPort}). " . 
+                ($connectionError ? "Detail: {$connectionError}. " : "") .
+                "Please verify that the router executed the setup script, WireGuard tunnel is up, and API service is running.";
+            $this->is_loading_interfaces = false;
+            return;
         }
 
         $this->interfaces = $detectedInterfaces;
 
-        // Initialize port roles: ether1 as WAN, ether2 as Hotspot, others none
+        // Initialize port roles: ether1 as WAN, second port as Hotspot, remainder none
         $roles = [];
         foreach ($this->interfaces as $index => $iface) {
             $name = $iface['name'];
@@ -294,11 +356,17 @@ ROUTERSCRIPT;
 
     /**
      * Validate interface assignments:
+     * - Must have real interfaces loaded.
      * - Exactly ONE Internet (WAN) port.
      * - At least ONE Hotspot or PPPoE port.
      */
     public function validatePortRoles(): bool
     {
+        if (empty($this->interfaces)) {
+            $this->port_validation_error = 'No interfaces detected from router. Please reconnect or retry.';
+            return false;
+        }
+
         $wanCount = 0;
         $hotspotCount = 0;
         $pppoeCount = 0;
@@ -334,7 +402,8 @@ ROUTERSCRIPT;
     }
 
     /**
-     * STEP 3 -> STEP 4: Apply configuration to Router and display checklist.
+     * STEP 3 -> STEP 4: Apply configuration to Router.
+     * STRICT: Verifies API connectivity and halts with detailed error if any command fails.
      */
     public function applyConfiguration()
     {
@@ -342,9 +411,22 @@ ROUTERSCRIPT;
             return;
         }
 
+        if (empty($this->interfaces)) {
+            $this->port_validation_error = 'Cannot configure router without verified network interfaces.';
+            return;
+        }
+
         $this->step = 4;
         $this->is_applying = true;
         $this->apply_error = null;
+        $this->is_configured = false;
+
+        $this->checklist = [
+            'connection' => ['status' => 'pending', 'label' => 'Router WireGuard tunnel & RouterOS API reachability'],
+            'wan'        => ['status' => 'pending', 'label' => 'Internet (WAN) port & NAT masquerade configured'],
+            'hotspot'    => ['status' => 'pending', 'label' => 'Hotspot server, bridge & IP pool created'],
+            'pppoe'      => ['status' => 'pending', 'label' => 'PPPoE server & billing profile ready'],
+        ];
 
         $router = Router::find($this->created_router_id);
         if (!$router) {
@@ -375,41 +457,63 @@ ROUTERSCRIPT;
             if ($role === 'pppoe')   $pppoePorts[] = $port;
         }
 
+        // 1. VERIFY API REACHABILITY
         $api = null;
         try {
-            $api = new MikrotikApiService($apiHost, $apiPort, $apiUser, $apiPass, 5);
+            $api = new MikrotikApiService($apiHost, $apiPort, $apiUser, $apiPass, 6);
+            $testResp = $api->executeCommand('/system/identity/print');
+            if (is_string($testResp) && str_starts_with($testResp, 'Error:')) {
+                throw new Exception($testResp);
+            }
+            $this->checklist['connection']['status'] = 'done';
         } catch (\Throwable $e) {
-            Log::info("[AddRouterWizard] API direct connection deferred: " . $e->getMessage());
+            $this->checklist['connection']['status'] = 'failed';
+            $this->apply_error = "Could not connect to router API at {$apiHost}:{$apiPort}. Error: " . $e->getMessage() . ". Ensure the setup script executed completely in Winbox and WireGuard tunnel is up.";
+            $this->is_applying = false;
+            $this->is_configured = false;
+            $router->update(['status' => 'config_failed']);
+            return;
         }
 
-        // 1. WAN Configuration: DHCP Client & Masquerade NAT
+        // 2. WAN Configuration: DHCP Client & Masquerade NAT
         try {
-            if ($api && $wanPort) {
+            if ($wanPort) {
                 // Check if DHCP client already exists on WAN port
                 $existingDhcp = $api->executeCommand('/ip/dhcp-client/print', [], ['interface' => $wanPort]);
                 if (empty($existingDhcp) || !is_array($existingDhcp)) {
-                    $api->executeCommand('/ip/dhcp-client/add', ['interface' => $wanPort, 'disabled' => 'no', 'comment' => 'HSmart WAN']);
+                    $res = $api->executeCommand('/ip/dhcp-client/add', ['interface' => $wanPort, 'disabled' => 'no', 'comment' => 'HSmart WAN']);
+                    if (is_string($res) && str_starts_with($res, 'Error:')) {
+                        throw new Exception($res);
+                    }
                 }
 
                 // Check masquerade rule
                 $existingNat = $api->executeCommand('/ip/firewall/nat/print', [], ['chain' => 'srcnat', 'action' => 'masquerade', 'out-interface' => $wanPort]);
                 if (empty($existingNat) || !is_array($existingNat)) {
-                    $api->executeCommand('/ip/firewall/nat/add', [
+                    $res = $api->executeCommand('/ip/firewall/nat/add', [
                         'chain'         => 'srcnat',
                         'out-interface' => $wanPort,
                         'action'        => 'masquerade',
                         'comment'       => 'HSmart Masquerade',
                     ]);
+                    if (is_string($res) && str_starts_with($res, 'Error:')) {
+                        throw new Exception($res);
+                    }
                 }
             }
             $this->checklist['wan']['status'] = 'done';
         } catch (\Throwable $e) {
-            $this->checklist['wan']['status'] = 'done'; // Safe tolerance
+            $this->checklist['wan']['status'] = 'failed';
+            $this->apply_error = "WAN Configuration failed: " . $e->getMessage();
+            $this->is_applying = false;
+            $this->is_configured = false;
+            $router->update(['status' => 'config_failed']);
+            return;
         }
 
-        // 2. Hotspot Configuration (if hotspot ports assigned)
+        // 3. Hotspot Configuration (if hotspot ports assigned)
         try {
-            if ($api && !empty($hotspotPorts)) {
+            if (!empty($hotspotPorts)) {
                 // Create Bridge if not present
                 $existingBridge = $api->executeCommand('/interface/bridge/print', [], ['name' => 'hs-bridge']);
                 if (empty($existingBridge) || !is_array($existingBridge)) {
@@ -457,15 +561,24 @@ ROUTERSCRIPT;
                 if (empty($existingHsSrv) || !is_array($existingHsSrv)) {
                     $api->executeCommand('/ip/hotspot/add', ['name' => 'hs-server', 'interface' => 'hs-bridge', 'profile' => 'hsmart-profile', 'address-pool' => 'hs-pool', 'disabled' => 'no']);
                 }
+
+                $this->checklist['hotspot']['status'] = 'done';
+            } else {
+                $this->checklist['hotspot']['status'] = 'done';
+                $this->checklist['hotspot']['label'] = 'Hotspot server skipped (no ports assigned)';
             }
-            $this->checklist['hotspot']['status'] = 'done';
         } catch (\Throwable $e) {
-            $this->checklist['hotspot']['status'] = 'done';
+            $this->checklist['hotspot']['status'] = 'failed';
+            $this->apply_error = "Hotspot Configuration failed: " . $e->getMessage();
+            $this->is_applying = false;
+            $this->is_configured = false;
+            $router->update(['status' => 'config_failed']);
+            return;
         }
 
-        // 3. PPPoE Configuration (if PPPoE ports assigned)
+        // 4. PPPoE Configuration (if PPPoE ports assigned)
         try {
-            if ($api && !empty($pppoePorts)) {
+            if (!empty($pppoePorts)) {
                 // IP Pool for PPPoE
                 $existingPppPool = $api->executeCommand('/ip/pool/print', [], ['name' => 'pppoe-pool']);
                 if (empty($existingPppPool) || !is_array($existingPppPool)) {
@@ -492,20 +605,26 @@ ROUTERSCRIPT;
                         ]);
                     }
                 }
+
+                $this->checklist['pppoe']['status'] = 'done';
+            } else {
+                $this->checklist['pppoe']['status'] = 'done';
+                $this->checklist['pppoe']['label'] = 'PPPoE server skipped (no ports assigned)';
             }
-            $this->checklist['pppoe']['status'] = 'done';
         } catch (\Throwable $e) {
-            $this->checklist['pppoe']['status'] = 'done';
+            $this->checklist['pppoe']['status'] = 'failed';
+            $this->apply_error = "PPPoE Configuration failed: " . $e->getMessage();
+            $this->is_applying = false;
+            $this->is_configured = false;
+            $router->update(['status' => 'config_failed']);
+            return;
         }
 
-        // 4. Verify Telemetry & Save state
-        $this->checklist['connection']['status'] = 'done';
-
-        // Update Router status to ready and save port roles
+        // All steps successfully verified and executed on live router!
         $router->update([
             'status'         => 'ready',
             'wan_interface'  => $wanPort ?: 'ether1',
-            'lan_interface'  => !empty($hotspotPorts) ? 'hs-bridge' : 'ether2',
+            'lan_interface'  => !empty($hotspotPorts) ? 'hs-bridge' : ($pppoePorts[0] ?? 'ether2'),
             'port_roles'     => $this->port_roles,
             'hotspot_status' => !empty($hotspotPorts) ? 'configured' : 'not_configured',
             'pppoe_status'   => !empty($pppoePorts) ? 'configured' : 'not_configured',
@@ -530,4 +649,3 @@ ROUTERSCRIPT;
         return view('livewire.admin.add-router-wizard')->layout('layouts.app');
     }
 }
-
