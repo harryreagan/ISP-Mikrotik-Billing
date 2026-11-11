@@ -2,15 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class PackageList extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToTenant;
 
     protected $fillable = [
-        'tenant_id',
         'package', 'type', 'price', 'description', 'merchant_company',
         'plan_label', 'speed', 'speed_download', 'speed_download_unit', 'speed_upload', 'speed_upload_unit',
         'burst_speed', 'features', 'is_featured', 'show_on_site', 'is_active', 'show_public', 'sort_order',

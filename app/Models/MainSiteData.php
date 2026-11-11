@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use App\Services\Tenant\TenantContext;
+use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 
 class MainSiteData extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToTenant;
 
     protected $fillable = [
         'type',
@@ -64,7 +66,8 @@ class MainSiteData extends Model
      */
     public static function getActive()
     {
-        return Cache::rememberForever('main_site_data_active', function () {
+        $cacheKey = TenantContext::cacheKey('main_site_data_active');
+        return Cache::rememberForever($cacheKey, function () {
             $data = new \stdClass;
             $records = self::all();
 
@@ -139,8 +142,13 @@ class MainSiteData extends Model
 
     protected static function booted(): void
     {
-        static::saved(fn () => Cache::flush());
-        static::updated(fn () => Cache::flush());
-        static::deleted(fn () => Cache::flush());
+        $clearTenantCache = function ($model) {
+            $tid = $model->tenant_id ?? TenantContext::getTenantId();
+            Cache::forget(TenantContext::cacheKey('main_site_data_active', $tid));
+        };
+
+        static::saved($clearTenantCache);
+        static::updated($clearTenantCache);
+        static::deleted($clearTenantCache);
     }
 }

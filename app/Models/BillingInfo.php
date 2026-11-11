@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\Activitylog\LogOptions;
@@ -11,6 +12,7 @@ class BillingInfo extends Model
 {
     use HasFactory;
     use LogsActivity;
+    use BelongsToTenant;
 
     protected $fillable = [
         'customer_bill_unique_id',

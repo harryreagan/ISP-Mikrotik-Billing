@@ -30,6 +30,18 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // ── Register Multi-Tenant Isolation Policies ──────────────────────────
+        Gate::policy(\App\Models\Router::class, \App\Policies\RouterPolicy::class);
+        Gate::policy(\App\Models\PackageList::class, \App\Policies\PackagePolicy::class);
+        Gate::policy(\App\Models\CustomersInfo::class, \App\Policies\CustomerPolicy::class);
+        Gate::policy(\App\Models\PPPSecrets::class, \App\Policies\PppSecretPolicy::class);
+        Gate::policy(\App\Models\HotspotVoucher::class, \App\Policies\VoucherPolicy::class);
+        Gate::policy(\App\Models\Voucher::class, \App\Policies\VoucherPolicy::class);
+        Gate::policy(\App\Models\PaymentChannel::class, \App\Policies\PaymentChannelPolicy::class);
+        Gate::policy(\App\Models\IspExpense::class, \App\Policies\ExpensePolicy::class);
+        Gate::policy(\App\Models\SupportTicket::class, \App\Policies\TicketPolicy::class);
+        Gate::policy(\App\Models\Reseller::class, \App\Policies\ResellerPolicy::class);
+
         // ── Force HTTPS in production or behind HTTPS reverse proxy ──────────
         if (app()->environment('production') || config('app.env') === 'production' || str_starts_with((string)config('app.url'), 'https://') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')) {
             \Illuminate\Support\Facades\URL::forceScheme('https');

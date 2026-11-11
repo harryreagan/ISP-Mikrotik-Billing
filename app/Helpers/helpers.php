@@ -29,11 +29,14 @@ if (! function_exists('siteUrlSettings')) {
                 return null;
             }
 
-            if (array_key_exists($key, $runtimeCache)) {
-                return $runtimeCache[$key];
+            $tenantId = \App\Services\Tenant\TenantContext::getTenantId() ?? 0;
+            $cacheKey = $tenantId . ':' . $key;
+
+            if (array_key_exists($cacheKey, $runtimeCache)) {
+                return $runtimeCache[$cacheKey];
             }
 
-            return $runtimeCache[$key] = MainSiteData::getValue($key);
+            return $runtimeCache[$cacheKey] = \App\Models\MainSiteData::getValue($key);
         } catch (\Throwable $e) {
             return null;
         }

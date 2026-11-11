@@ -23,6 +23,7 @@ class RadiusService
         DB::table('nas')->updateOrInsert(
             ['nasname' => $vpnIp],
             [
+                'tenant_id'   => $router->tenant_id ?? 1,
                 'shortname'   => substr(preg_replace('/[^a-zA-Z0-9_-]/', '', $router->name ?: 'router'), 0, 32),
                 'type'        => 'mikrotik',
                 'ports'       => 1812,
@@ -65,17 +66,19 @@ class RadiusService
             return;
         }
 
-        DB::transaction(function () use ($username, $password, $rateLimit, $expiresAt, $simultaneousUse) {
+        $tenantId = \App\Services\Tenant\TenantContext::getTenantId() ?? 1;
+
+        DB::transaction(function () use ($username, $password, $rateLimit, $expiresAt, $simultaneousUse, $tenantId) {
             // 1. radcheck: Password & Simultaneous-Use
             DB::table('radcheck')->updateOrInsert(
                 ['username' => $username, 'attribute' => 'Cleartext-Password'],
-                ['op' => ':=', 'value' => $password]
+                ['op' => ':=', 'value' => $password, 'tenant_id' => $tenantId]
             );
 
             if ($simultaneousUse > 0) {
                 DB::table('radcheck')->updateOrInsert(
                     ['username' => $username, 'attribute' => 'Simultaneous-Use'],
-                    ['op' => ':=', 'value' => (string) $simultaneousUse]
+                    ['op' => ':=', 'value' => (string) $simultaneousUse, 'tenant_id' => $tenantId]
                 );
             }
 
@@ -86,7 +89,7 @@ class RadiusService
 
                 DB::table('radcheck')->updateOrInsert(
                     ['username' => $username, 'attribute' => 'Expiration'],
-                    ['op' => ':=', 'value' => $radExpFormat]
+                    ['op' => ':=', 'value' => $radExpFormat, 'tenant_id' => $tenantId]
                 );
             }
 
@@ -97,7 +100,7 @@ class RadiusService
 
                 DB::table('radreply')->updateOrInsert(
                     ['username' => $username, 'attribute' => 'Mikrotik-Rate-Limit'],
-                    ['op' => '=', 'value' => $formattedRate]
+                    ['op' => '=', 'value' => $formattedRate, 'tenant_id' => $tenantId]
                 );
             }
         });

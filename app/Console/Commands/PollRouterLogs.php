@@ -33,52 +33,43 @@ class PollRouterLogs extends Command
      */
     public function handle()
     {
-        $enabled = (bool) MainSiteData::getValue('log_server_enabled', false);
-        if (! $enabled) {
-            $this->info('Log server is disabled in settings.');
-
-            return;
+        $tenants = \App\Models\Tenant::where('is_active', 1)->pluck('id');
+        if ($tenants->isEmpty()) {
+            $tenants = collect([1]);
         }
 
-        $enabledRouters = MainSiteData::getValue('log_server_routers', []);
-        if (empty($enabledRouters)) {
-            $this->warn('No routers selected for logging.');
-
-            return;
-        }
-
-        $routers = RouterList::where('action', 'connected')
-            ->whereIn('router_name', $enabledRouters)
-            ->get();
-
-        if ($routers->isEmpty()) {
-            $this->warn('No connected routers found among the selected ones.');
-
-            return;
-        }
-
-        $this->info('Polling logs for '.$routers->count().' routers...');
-
-        $ctrl = app(MikrotikController::class);
-        $totalInserted = 0;
-
-        foreach ($routers as $router) {
-            try {
-                $this->comment("Fetching logs from: {$router->router_name}");
-                $logs = $ctrl->getRouterLogs($router->router_name, 150);
-
-                if (! empty($logs)) {
-                    $inserted = $ctrl->storeRouterLogs($router->router_name, $logs);
-                    $totalInserted += $inserted;
-                    $this->info("  - Inserted {$inserted} new logs.");
-                } else {
-                    $this->warn('  - No logs retrieved.');
+        foreach ($tenants as $tenantId) {
+            \App\Services\Tenant\TenantContext::runWithTenant((int) $tenantId, function () {
+                $enabled = (bool) MainSiteData::getValue('log_server_enabled', false);
+                if (! $enabled) {
+                    return;
                 }
-            } catch (\Exception $e) {
-                $this->error('  - Failed: '.$e->getMessage());
-            }
-        }
 
-        $this->info("Log polling complete. Total new logs inserted: {$totalInserted}");
+                $enabledRouters = MainSiteData::getValue('log_server_routers', []);
+                if (empty($enabledRouters)) {
+                    return;
+                }
+
+                $routers = RouterList::where(function ($q) {
+                    $q->where('action', 'connected')->orWhere('status', 'online');
+                })->whereIn('router_name', $enabledRouters)->get();
+
+                if ($routers->isEmpty()) {
+                    return;
+                }
+
+                $ctrl = app(MikrotikController::class);
+                foreach ($routers as $router) {
+                    try {
+                        $logs = $ctrl->getRouterLogs($router->router_name ?: $router->name, 150);
+                        if (! empty($logs)) {
+                            $ctrl->storeRouterLogs($router->router_name ?: $router->name, $logs);
+                        }
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error("Failed to poll logs for router {$router->name}: ".$e->getMessage());
+                    }
+                }
+            });
+        }
     }
 }

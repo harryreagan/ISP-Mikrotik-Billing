@@ -342,6 +342,14 @@ class CustomersManager extends Component
             }
         }
 
+        // 5. Send confirmation SMS with login credentials
+        try {
+            $welcomeMsg = "Dear {$this->new_name}, welcome to HSmart WiFi! Your " . strtoupper($this->new_type) . " account is ready. Username: {$secret->username}, Password: {$secret->password}. Package: " . ($package?->name ?? 'Standard') . ". Enjoy high-speed internet!";
+            IspSmsDispatcher::sendDirectSms($customer->mobile, $welcomeMsg, null);
+        } catch (\Throwable $se) {
+            Log::warning("[CustomersManager] Welcome SMS notification error: " . $se->getMessage());
+        }
+
         session()->flash('success', "Customer {$this->new_name} ({$uniqueId}) created successfully.");
         $this->closeCreateModal();
     }

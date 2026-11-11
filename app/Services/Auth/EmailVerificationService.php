@@ -18,7 +18,7 @@ class EmailVerificationService
      * Generate a cryptographically secure 6-digit code, store hashed, and send via email.
      * Never logs the code.
      */
-    public function generateAndSendCode(string $email, string $ip): array
+    public function generateAndSendCode(string $email, string $ip, ?string $phone = null): array
     {
         $normalizedEmail = strtolower(trim($email));
 
@@ -92,21 +92,33 @@ class EmailVerificationService
             Cache::increment($hourlyIpKey);
         }
 
-        // 7. Dispatch branded queued email (Never logs the code)
+        // 7. Dispatch branded email immediately (synchronous delivery)
         try {
-            Mail::to($normalizedEmail)->queue(new VerificationCodeMail($code));
+            Mail::to($normalizedEmail)->send(new VerificationCodeMail($code));
         } catch (\Throwable $e) {
-            // Fallback to synchronous delivery if queue worker isn't running
+            \Illuminate\Support\Facades\Log::error("[EmailVerification] Failed to send verification email to {$normalizedEmail}: " . $e->getMessage());
+        }
+
+        // 8. Dispatch real SMS OTP immediately if mobile phone provided
+        $smsSent = false;
+        if (!empty($phone)) {
             try {
-                Mail::to($normalizedEmail)->send(new VerificationCodeMail($code));
-            } catch (\Throwable $mailError) {
-                // Return generic response without leaking errors
+                $cleanPhone = \App\Services\Auth\OtpVerificationService::normalizeKenyanPhone($phone);
+                if ($cleanPhone) {
+                    $siteName = siteUrlSettings('site_name') ?? 'HSmart WiFi';
+                    $smsMsg = "Your {$siteName} verification code is: {$code}. Valid for 10 minutes. Welcome to HSmart!";
+                    $smsSent = \App\Services\Sms\IspSmsDispatcher::sendDirectSms($cleanPhone, $smsMsg, null);
+                }
+            } catch (\Throwable $se) {
+                \Illuminate\Support\Facades\Log::warning("[EmailVerification] Failed to send verification SMS to {$phone}: " . $se->getMessage());
             }
         }
 
+        $destText = $smsSent ? 'email and SMS' : 'email address';
+
         return [
             'status' => 'sent',
-            'message' => 'A 6-digit verification code has been sent to your email address.',
+            'message' => "A 6-digit verification code has been sent to your {$destText}.",
         ];
     }
 

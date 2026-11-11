@@ -28,53 +28,56 @@ class ProvisionMikrotikUserJob implements ShouldQueue
 
     public function handle(): void
     {
-        $customer = CustomersInfo::with('pppUser')->find($this->customerId);
+        $customer = CustomersInfo::withoutGlobalScopes()->with(['pppUser' => fn($q) => $q->withoutGlobalScopes()])->find($this->customerId);
 
         if (! $customer || ! $customer->pppUser) {
             Log::info("ProvisionMikrotikUserJob: Customer #{$this->customerId} or PPPoE user not found. Skipping.");
             return;
         }
 
-        $pppUser = $customer->pppUser;
-        $routerName = $pppUser->router_name;
-        $username = $pppUser->username;
-        $profile = $pppUser->profile;
+        $tenantId = $customer->tenant_id ?? 1;
+        \App\Services\Tenant\TenantContext::runWithTenant((int) $tenantId, function () use ($customer) {
+            $pppUser = $customer->pppUser;
+            $routerName = $pppUser->router_name;
+            $username = $pppUser->username;
+            $profile = $pppUser->profile;
 
-        if (empty($routerName) || empty($username)) {
-            Log::warning("ProvisionMikrotikUserJob: Incomplete router or username for customer #{$this->customerId}");
-            return;
-        }
-
-        try {
-            $mikrotik = app(MikrotikController::class);
-
-            // 1. Enable secret on RouterOS
-            $mikrotik->enablePPPSecret($customer->customer_unique_id, $routerName, $username);
-
-            // 2. Restore subscribed profile
-            if (! empty($profile)) {
-                $mikrotik->updatePPPSecret($routerName, $username, 'profile', $profile);
+            if (empty($routerName) || empty($username)) {
+                Log::warning("ProvisionMikrotikUserJob: Incomplete router or username for customer #{$customer->id}");
+                return;
             }
 
-            // 3. Kick active connection so router applies renewed profile
             try {
-                $mikrotik->singleWrite(
-                    $routerName,
-                    '/ppp active remove [find name="'.$username.'"]'
-                );
+                $mikrotik = app(MikrotikController::class);
+
+                // 1. Enable secret on RouterOS
+                $mikrotik->enablePPPSecret($customer->customer_unique_id, $routerName, $username);
+
+                // 2. Restore subscribed profile
+                if (! empty($profile)) {
+                    $mikrotik->updatePPPSecret($routerName, $username, 'profile', $profile);
+                }
+
+                // 3. Kick active connection so router applies renewed profile
+                try {
+                    $mikrotik->singleWrite(
+                        $routerName,
+                        '/ppp active remove [find name="'.$username.'"]'
+                    );
+                } catch (\Throwable $e) {
+                    Log::debug("ProvisionMikrotikUserJob: Active session kick skipped: {$e->getMessage()}");
+                }
+
+                // 4. Update local DB secret status
+                PPPSecrets::where('id', $pppUser->id)->update(['status' => 'active']);
+
+                Log::info("ProvisionMikrotikUserJob: Successfully provisioned customer {$customer->customer_unique_id} on router {$routerName}");
+
             } catch (\Throwable $e) {
-                Log::debug("ProvisionMikrotikUserJob: Active session kick skipped: {$e->getMessage()}");
+                Log::error("ProvisionMikrotikUserJob failed for customer {$customer->customer_unique_id}: {$e->getMessage()}");
+                throw $e;
             }
-
-            // 4. Update local DB secret status
-            PPPSecrets::where('id', $pppUser->id)->update(['status' => 'active']);
-
-            Log::info("ProvisionMikrotikUserJob: Successfully provisioned customer {$customer->customer_unique_id} on router {$routerName}");
-
-        } catch (\Throwable $e) {
-            Log::error("ProvisionMikrotikUserJob failed for customer {$customer->customer_unique_id}: {$e->getMessage()}");
-            throw $e;
-        }
+        });
     }
 }
 

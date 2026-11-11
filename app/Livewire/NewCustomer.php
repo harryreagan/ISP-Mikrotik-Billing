@@ -552,8 +552,10 @@ class NewCustomer extends Component
             $customer->email = $this->email;
             $customer->identification_no = $this->identification_no;
             $customer->photo_url = $this->photo_url ? $path : null;
-            $customer->mobile = '88'.$this->mobile;
-            $customer->alternative_mobile = '88'.$this->alternative_mobile;
+            $cleanMobile = \App\Services\Auth\OtpVerificationService::normalizeKenyanPhone($this->mobile) ?: $this->mobile;
+            $cleanAltMobile = \App\Services\Auth\OtpVerificationService::normalizeKenyanPhone($this->alternative_mobile) ?: $this->alternative_mobile;
+            $customer->mobile = $cleanMobile;
+            $customer->alternative_mobile = $cleanAltMobile;
             $customer->profession = $this->profession;
             $customer->ppp_user_id = $pppUser?->id;
             $customer->connection_date = $this->connection_date;
@@ -626,6 +628,18 @@ class NewCustomer extends Component
 
             // Commit transaction if all goes well
             DB::commit();
+
+            // Send confirmation SMS with login credentials
+            try {
+                if (!empty($customer->mobile)) {
+                    $uName = $pppUser?->username ?: ($customer->customer_unique_id);
+                    $uPass = $pppUser?->password ?: 'Check your portal';
+                    $welcomeMsg = "Dear {$customer->customer_name}, welcome to HSmart WiFi! Your account {$customer->customer_unique_id} has been registered. Username: {$uName}, Password: {$uPass}. Enjoy seamless internet!";
+                    \App\Services\Sms\IspSmsDispatcher::sendDirectSms($customer->mobile, $welcomeMsg, null);
+                }
+            } catch (\Throwable $se) {
+                \Illuminate\Support\Facades\Log::warning("[NewCustomer] Confirmation SMS error: " . $se->getMessage());
+            }
 
             flash()->success('Customer created successfully!');
 

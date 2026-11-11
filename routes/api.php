@@ -21,11 +21,19 @@ Route::prefix('payment/daraja')->group(function () {
     Route::post('/stk-callback', [DarajaPaymentController::class, 'handleStkCallback'])->middleware(['throttle:60,1', 'webhook.log']);
     Route::post('/validation', [DarajaPaymentController::class, 'handleC2bValidation'])->middleware(['throttle:60,1', 'webhook.log']);
     Route::post('/confirmation', [DarajaPaymentController::class, 'handleC2bConfirmation'])->middleware(['throttle:60,1', 'webhook.log']);
-    Route::post('/stk-push', [DarajaPaymentController::class, 'initiateStkPush'])->middleware('throttle:30,1');
-    Route::get('/status', [DarajaPaymentController::class, 'checkPaymentStatus'])->middleware('throttle:120,1');
+    Route::post('/stk-push', [PayHeroPaymentController::class, 'initiatePortalPayment'])->middleware('throttle:30,1');
+    Route::get('/status', [PayHeroPaymentController::class, 'checkPortalStatus'])->middleware('throttle:120,1');
 });
 
-// 3. PayHero Webhook
+// Unified Hotspot & Portal Payment Endpoints
+Route::post('/payment/stk-push', [PayHeroPaymentController::class, 'initiatePortalPayment'])->middleware('throttle:30,1');
+Route::get('/payment/status', [PayHeroPaymentController::class, 'checkPortalStatus'])->middleware('throttle:120,1');
+
+// 3. PayHero (Webhook, STK Push & Polling)
+Route::prefix('payment/payhero')->group(function () {
+    Route::post('/stk-push', [PayHeroPaymentController::class, 'initiatePortalPayment'])->middleware('throttle:30,1');
+    Route::get('/status', [PayHeroPaymentController::class, 'checkPortalStatus'])->middleware('throttle:120,1');
+});
 Route::middleware(['throttle:60,1', 'webhook.log'])->post('/payment/payhero/webhook', [PayHeroPaymentController::class, 'handleWebhook']);
 
 // 4. KopoKopo Webhook

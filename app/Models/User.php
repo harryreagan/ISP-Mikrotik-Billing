@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Http\Controllers\AvatarController;
+use App\Traits\BelongsToTenant;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasAvatar;
 use Filament\Panel;
@@ -24,6 +25,7 @@ class User extends Authenticatable implements HasAvatar, FilamentUser
     use HasTeams;
     use Notifiable;
     use TwoFactorAuthenticatable;
+    use BelongsToTenant;
 
     protected $guard_name = 'web';
 
@@ -41,8 +43,6 @@ class User extends Authenticatable implements HasAvatar, FilamentUser
         'password',
         'role',
         'status',
-        'tenant_id',
-        'is_super_admin',
         'otp_code',
         'otp_expires_at',
         'phone_verified_at',

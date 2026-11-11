@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class MikrotikLog extends Model
 {
+    use BelongsToTenant;
     protected $fillable = [
         'router_name',
         'log_id',

@@ -47,11 +47,13 @@ class ProvisioningTokenService
         $clean = trim($plainToken);
 
         // 1. Direct match on setup_token or provision_token (used by AddRouterWizard & MikrotikSync)
-        $router = Router::where('setup_token', $clean)
+        $router = Router::withoutGlobalScopes()
+            ->where('setup_token', $clean)
             ->orWhere('provision_token', $clean)
             ->first();
 
         if ($router) {
+            \App\Services\Tenant\TenantContext::setTenantId($router->tenant_id);
             return $router;
         }
 
@@ -59,7 +61,8 @@ class ProvisioningTokenService
         // Allows resilient matching if character variations occurred during terminal transfer
         if (str_starts_with($clean, 'nbp_') && strlen($clean) >= 10) {
             $prefix = substr($clean, 0, 10);
-            $recentRouter = Router::where(function ($q) use ($prefix) {
+            $recentRouter = Router::withoutGlobalScopes()
+                ->where(function ($q) use ($prefix) {
                     $q->where('setup_token', 'like', "{$prefix}%")
                       ->orWhere('provision_token', 'like', "{$prefix}%");
                 })
@@ -74,6 +77,7 @@ class ProvisioningTokenService
                     'setup_token'     => $clean,
                     'provision_token' => $clean,
                 ]);
+                \App\Services\Tenant\TenantContext::setTenantId($recentRouter->tenant_id);
                 return $recentRouter;
             }
         }
@@ -82,13 +86,14 @@ class ProvisioningTokenService
         if (str_contains($clean, '.')) {
             [$routerUuid] = explode('.', $clean, 2);
             if (!empty($routerUuid)) {
-                $router = Router::where('router_uuid', $routerUuid)->first();
+                $router = Router::withoutGlobalScopes()->where('router_uuid', $routerUuid)->first();
                 if ($router) {
                     if ($router->provision_token_expires_at && now()->isAfter($router->provision_token_expires_at)) {
                         return null;
                     }
                     $computedHash = hash('sha256', $clean);
                     if (hash_equals((string) $router->provisioning_token_hash, $computedHash)) {
+                        \App\Services\Tenant\TenantContext::setTenantId($router->tenant_id);
                         return $router;
                     }
                 }

@@ -65,8 +65,8 @@ class RoutersManager extends Component
 
     public function mount()
     {
-        // Poll online routers for fresh telemetry on page load
-        $this->pollAllOnlineRouters();
+        // Telemetry is populated in real time from database (updated by 60s heartbeats).
+        // No synchronous network socket calls during mount to guarantee instant page loads (<50ms).
     }
 
     public function updatingSearch()
@@ -123,18 +123,7 @@ class RoutersManager extends Component
         }
 
         try {
-            $api = null;
-            for ($attempt = 1; $attempt <= 2; $attempt++) {
-                try {
-                    $api = new MikrotikApiService($host, $port, $user, $pass, 5);
-                    break;
-                } catch (\Throwable $te) {
-                    if ($attempt === 2) {
-                        throw $te;
-                    }
-                    usleep(350000);
-                }
-            }
+            $api = new MikrotikApiService($host, $port, $user, $pass, 3);
 
             // 1. Fetch System Resource (CPU, RAM, Uptime, Version, Architecture)
             $res = $api->executeCommand('/system/resource/print');
@@ -388,18 +377,7 @@ class RoutersManager extends Component
         }
 
         try {
-            $api = null;
-            for ($attempt = 1; $attempt <= 2; $attempt++) {
-                try {
-                    $api = new MikrotikApiService($host, $port, $user, $pass, 5);
-                    break;
-                } catch (\Throwable $te) {
-                    if ($attempt === 2) {
-                        throw $te;
-                    }
-                    usleep(350000);
-                }
-            }
+            $api = new MikrotikApiService($host, $port, $user, $pass, 3);
             $ifaces = $api->executeCommand('/interface/print');
             if (is_array($ifaces)) {
                 $this->portInterfaces = collect($ifaces)
@@ -539,31 +517,92 @@ class RoutersManager extends Component
                 }
             } catch (\Throwable $e) {}
 
-            // Hotspot DHCP Server
+            // Hotspot DHCP Server & Network
             try {
+                $dhcpNet = '10.5.50.0/24';
+                $dhcpGw = '10.5.50.1';
+                $api->executeCommand('/ip/dns/set', ['allow-remote-requests' => 'yes', 'servers' => '8.8.8.8,1.1.1.1']);
+                
+                $dnets = $api->executeCommand('/ip/dhcp-server/network/print');
+                $foundDnet = false;
+                if (is_array($dnets)) {
+                    foreach ($dnets as $dn) {
+                        if (($dn['address'] ?? '') === $dhcpNet) {
+                            $api->executeCommand('/ip/dhcp-server/network/set', ['gateway' => $dhcpGw, 'dns-server' => "{$dhcpGw},8.8.8.8"], ['.id' => $dn['.id']]);
+                            $foundDnet = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$foundDnet) {
+                    $api->executeCommand('/ip/dhcp-server/network/add', ['address' => $dhcpNet, 'gateway' => $dhcpGw, 'dns-server' => "{$dhcpGw},8.8.8.8", 'comment' => 'hsmart-hotspot']);
+                }
+
                 $dhcps = $api->executeCommand('/ip/dhcp-server/print');
                 $foundHsDhcp = false;
                 if (is_array($dhcps)) {
                     foreach ($dhcps as $d) {
-                        if (($d['name'] ?? '') === 'hs-dhcp-10') {
-                            $api->executeCommand('/ip/dhcp-server/set', ['interface' => $this->portRoleHotspot, 'address-pool' => 'hs-pool-10', 'disabled' => 'no'], ['.id' => $d['.id']]);
+                        if (($d['name'] ?? '') === 'hs-dhcp-10' || ($d['interface'] ?? '') === $this->portRoleHotspot) {
+                            $api->executeCommand('/ip/dhcp-server/set', ['interface' => $this->portRoleHotspot, 'address-pool' => 'hs-pool-10', 'disabled' => 'no', 'lease-time' => '1h'], ['.id' => $d['.id']]);
                             $foundHsDhcp = true;
                             break;
                         }
                     }
                 }
                 if (!$foundHsDhcp) {
-                    $api->executeCommand('/ip/dhcp-server/add', ['name' => 'hs-dhcp-10', 'interface' => $this->portRoleHotspot, 'address-pool' => 'hs-pool-10', 'disabled' => 'no']);
+                    $api->executeCommand('/ip/dhcp-server/add', ['name' => 'hs-dhcp-10', 'interface' => $this->portRoleHotspot, 'address-pool' => 'hs-pool-10', 'lease-time' => '1h', 'disabled' => 'no']);
+                }
+
+                // NAT Masquerade
+                $nats = $api->executeCommand('/ip/firewall/nat/print');
+                $foundNat = false;
+                if (is_array($nats)) {
+                    foreach ($nats as $n) {
+                        if (($n['comment'] ?? '') === 'hsmart-hotspot-masq' || (($n['src-address'] ?? '') === $dhcpNet && ($n['action'] ?? '') === 'masquerade')) {
+                            $foundNat = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$foundNat) {
+                    $api->executeCommand('/ip/firewall/nat/add', ['chain' => 'srcnat', 'action' => 'masquerade', 'src-address' => $dhcpNet, 'comment' => 'hsmart-hotspot-masq']);
                 }
             } catch (\Throwable $e) {}
 
-            // Hotspot Server binding
+            // Hotspot Server Profile & Server binding
             try {
+                $hsprofName = 'hsmart-hsprof';
+                $hsprofs = $api->executeCommand('/ip/hotspot/profile/print');
+                $foundHsprof = false;
+                if (is_array($hsprofs)) {
+                    foreach ($hsprofs as $hp) {
+                        if (($hp['name'] ?? '') === $hsprofName) {
+                            $api->executeCommand('/ip/hotspot/profile/set', [
+                                'hotspot-address' => '10.5.50.1',
+                                'dns-name'        => 'wifi.hsmart.co.ke',
+                                'html-directory'  => 'hotspot',
+                                'login-by'        => 'http-chap,http-pap,cookie',
+                            ], ['.id' => $hp['.id']]);
+                            $foundHsprof = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$foundHsprof) {
+                    $api->executeCommand('/ip/hotspot/profile/add', [
+                        'name'            => $hsprofName,
+                        'hotspot-address' => '10.5.50.1',
+                        'dns-name'        => 'wifi.hsmart.co.ke',
+                        'html-directory'  => 'hotspot',
+                        'login-by'        => 'http-chap,http-pap,cookie',
+                    ]);
+                }
+
                 $hsServers = $api->executeCommand('/ip/hotspot/print');
                 if (is_array($hsServers) && !empty($hsServers[0]['.id'])) {
-                    $api->executeCommand('/ip/hotspot/set', ['interface' => $this->portRoleHotspot, 'address-pool' => 'hs-pool-10', 'disabled' => 'no'], ['.id' => $hsServers[0]['.id']]);
+                    $api->executeCommand('/ip/hotspot/set', ['interface' => $this->portRoleHotspot, 'address-pool' => 'hs-pool-10', 'profile' => $hsprofName, 'disabled' => 'no'], ['.id' => $hsServers[0]['.id']]);
                 } else {
-                    $api->executeCommand('/ip/hotspot/add', ['name' => 'hsmart-hotspot', 'interface' => $this->portRoleHotspot, 'address-pool' => 'hs-pool-10', 'disabled' => 'no']);
+                    $api->executeCommand('/ip/hotspot/add', ['name' => 'hsmart-hotspot', 'interface' => $this->portRoleHotspot, 'address-pool' => 'hs-pool-10', 'profile' => $hsprofName, 'disabled' => 'no']);
                 }
             } catch (\Throwable $e) {}
 

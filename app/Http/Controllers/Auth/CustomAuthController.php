@@ -187,15 +187,23 @@ class CustomAuthController extends Controller
         );
 
         // Ensure personal team exists
-        if (!$user->personalTeam()) {
-            $teamName = $request->business_name ?: explode(' ', $user->name, 2)[0] . "'s Team";
-            $team = Team::forceCreate([
-                'user_id' => $user->id,
-                'name' => $teamName,
-                'personal_team' => true,
-            ]);
-            $user->current_team_id = $team->id;
-            $user->save();
+        if (class_exists(Team::class) && \Illuminate\Support\Facades\Schema::hasTable('teams')) {
+            try {
+                if (method_exists($user, 'personalTeam') && !$user->personalTeam()) {
+                    $teamName = $request->business_name ?: explode(' ', $user->name, 2)[0] . "'s Team";
+                    $team = Team::forceCreate([
+                        'user_id' => $user->id,
+                        'name' => $teamName,
+                        'personal_team' => true,
+                    ]);
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'current_team_id')) {
+                        $user->current_team_id = $team->id;
+                        $user->save();
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Personal team creation skipped: " . $e->getMessage());
+            }
         }
 
         // Assign default Admin role if Spatie roles exist
@@ -203,8 +211,8 @@ class CustomAuthController extends Controller
             $user->assignRole('Admin');
         }
 
-        // Generate and send 6-digit code
-        $result = $this->verificationService->generateAndSendCode($email, $request->ip());
+        // Generate and send 6-digit code via Email and real SMS
+        $result = $this->verificationService->generateAndSendCode($email, $request->ip(), $user->mobile);
 
         session([
             'pending_verification_email' => $email,
@@ -256,12 +264,13 @@ class CustomAuthController extends Controller
             // Ensure tenant exists and is awarded 20 free SMS credits
             if (empty($user->tenant_id)) {
                 try {
-                    $baseSlug = \Illuminate\Support\Str::slug($user->name ?: 'isp');
+                    $bizName = session('signup_business_name') ?: (($user->name ?: 'ISP') . ' Networks');
+                    $baseSlug = \Illuminate\Support\Str::slug($bizName);
                     $subdomain = $baseSlug . '-' . $user->id;
                     $billingCode = strtoupper(\Illuminate\Support\Str::random(6));
 
                     $tenantId = \Illuminate\Support\Facades\DB::table('tenants')->insertGetId([
-                        'name'         => ($user->name ?: 'ISP') . ' Networks',
+                        'name'         => $bizName,
                         'subdomain'    => $subdomain,
                         'billing_code' => $billingCode,
                         'country'      => 'Kenya',
@@ -308,7 +317,8 @@ class CustomAuthController extends Controller
                 ->with('active_tab', 'verify');
         }
 
-        $result = $this->verificationService->generateAndSendCode($email, $request->ip());
+        $user = User::where('email', $email)->first();
+        $result = $this->verificationService->generateAndSendCode($email, $request->ip(), $user?->mobile);
 
         if (in_array($result['status'], ['cooldown', 'rate_limited'])) {
             return back()

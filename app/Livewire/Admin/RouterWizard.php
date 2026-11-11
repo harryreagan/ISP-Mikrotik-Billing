@@ -192,8 +192,10 @@ class RouterWizard extends Component
 
     public function finalizeRouter()
     {
-        $user = auth()->user();
-        $tenantId = $user ? ($user->tenant_id ?: 1) : 1;
+        $tenantId = \App\Services\Tenant\TenantContext::getTenantId();
+        if (!$tenantId) {
+            abort(403, 'No tenant context found. Please ensure you are logged into a valid ISP account.');
+        }
 
         $services = [];
         if (in_array($this->service_mode, ['hotspot', 'both'])) {

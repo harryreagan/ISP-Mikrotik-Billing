@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToTenant;
 use Carbon\Carbon;
 use Carbon\CarbonInterval;
 use Illuminate\Database\Eloquent\Model;
@@ -9,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HotspotVoucher extends Model
 {
+    use BelongsToTenant;
     protected $fillable = [
         'router_name', 'code', 'profile', 'username', 'password',
         'price', 'batch_name', 'status', 'used_by', 'mac_address',
@@ -33,9 +35,36 @@ class HotspotVoucher extends Model
         return $query->where('status', 'unused');
     }
 
-    public function scopeForRouter($query, string $router)
+    public function scopeForRouter($query, $router)
     {
-        return $query->where('router_name', $router);
+        if (empty($router)) {
+            return $query;
+        }
+
+        if (is_numeric($router)) {
+            $routerId = (int) $router;
+            $routerName = Router::where('id', $routerId)->value('name');
+
+            return $query->where(function ($q) use ($routerId, $routerName) {
+                $q->where('router_id', $routerId);
+                if ($routerName && \Illuminate\Support\Facades\Schema::hasColumn('hotspot_vouchers', 'router_name')) {
+                    $q->orWhere('router_name', $routerName);
+                }
+            });
+        }
+
+        $routerId = Router::where('name', $router)
+            ->orWhere('router_name', $router)
+            ->value('id');
+
+        return $query->where(function ($q) use ($router, $routerId) {
+            if ($routerId) {
+                $q->where('router_id', $routerId);
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('hotspot_vouchers', 'router_name')) {
+                $q->orWhere('router_name', $router);
+            }
+        });
     }
 
     /**

@@ -71,13 +71,27 @@ class AddRouterWizard extends Component
     {
         $this->validate();
 
-        $user = auth()->user();
-        $tenantId = $user?->tenant_id ?: (session('tenant_id') ?: session('impersonated_tenant_id'));
+        $tenantId = \App\Services\Tenant\TenantContext::getTenantId();
 
-        if (!$tenantId || !DB::table('tenants')->where('id', $tenantId)->exists()) {
-            $tenantId = DB::table('tenants')->where('is_active', 1)->value('id')
-                     ?: DB::table('tenants')->value('id')
-                     ?: 1;
+        if (!$tenantId) {
+            $user = auth()->user();
+            if ($user && empty($user->tenant_id)) {
+                $tenantId = \Illuminate\Support\Facades\DB::table('tenants')->insertGetId([
+                    'name'         => ($user->name ?: 'ISP') . ' Networks',
+                    'subdomain'    => \Illuminate\Support\Str::slug($user->name ?: 'isp') . '-' . $user->id,
+                    'billing_code' => strtoupper(\Illuminate\Support\Str::random(6)),
+                    'country'      => 'Kenya',
+                    'county'       => 'Nairobi',
+                    'is_active'    => 1,
+                    'sms_balance'  => 20.00,
+                    'created_at'   => now(),
+                    'updated_at'   => now(),
+                ]);
+                $user->tenant_id = $tenantId;
+                $user->save();
+            } else {
+                abort(403, 'No tenant context found. Please ensure your ISP account is properly configured.');
+            }
         }
 
         // 1. Generate security credentials (nbp_ prefix matching industry bootstrap standard)

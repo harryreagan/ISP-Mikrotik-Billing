@@ -18,26 +18,60 @@ class ExpireRealtimeHotspotUsers extends Command
     {
         $ctrl = app(MikrotikController::class);
 
-        // 1. Sync voucher usage for all active routers first (collects first login time)
-        $routers = RouterList::where('action', 'connected')->get();
-        foreach ($routers as $router) {
-            $this->syncRouterVouchers($router->router_name, $ctrl);
+        $tenants = \App\Models\Tenant::where('is_active', 1)->pluck('id');
+        if ($tenants->isEmpty()) {
+            $tenants = collect([1]);
         }
 
-        // 2. Get all realtime vouchers that have expired in DB
-        $vouchers = HotspotVoucher::realtimeExpired()->get();
+        foreach ($tenants as $tenantId) {
+            \App\Services\Tenant\TenantContext::runWithTenant((int) $tenantId, function () use ($ctrl) {
+                // 1. Sync voucher usage for active routers of this tenant
+                $routers = RouterList::where('action', 'connected')->orWhere('status', 'online')->get();
+                foreach ($routers as $router) {
+                    $this->syncRouterVouchers($router->router_name ?: $router->name, $ctrl);
+                }
 
-        if ($vouchers->isEmpty()) {
-            return;
+                // 2. Get all realtime vouchers that have expired in DB for this tenant
+                $vouchers = HotspotVoucher::realtimeExpired()->get();
+                if ($vouchers->isEmpty()) {
+                    return;
+                }
+
+                $expiredCount = 0;
+                $grouped = $vouchers->groupBy('router_name');
+
+                foreach ($grouped as $routerName => $routerVouchers) {
+                    $router = RouterList::where(function ($q) use ($routerName) {
+                        $q->where('router_name', $routerName)->orWhere('name', $routerName);
+                    })->where(function ($q) {
+                        $q->where('action', 'connected')->orWhere('status', 'online');
+                    })->first();
+
+                    if (! $router) {
+                        continue;
+                    }
+
+                    foreach ($routerVouchers as $v) {
+                        if (! $v->isRealtimeExpired()) {
+                            continue;
+                        }
+
+                        try {
+                            $ctrl->disableHotspotUser($routerName, $v->username);
+                            try {
+                                $ctrl->disconnectHotspotUser($routerName, $v->username);
+                            } catch (\Exception $e) {}
+                            $ctrl->removeHotspotExpiryScheduler($routerName, $v->username);
+                            $v->update(['status' => 'expired']);
+                            $expiredCount++;
+                        } catch (\Throwable $e) {
+                            Log::warning("[ExpireRealtimeHotspotUsers] Failed to expire voucher {$v->username}: " . $e->getMessage());
+                        }
+                    }
+                }
+            });
         }
-
-        $expiredCount = 0;
-        $grouped = $vouchers->groupBy('router_name');
-
-        foreach ($grouped as $routerName => $routerVouchers) {
-            $router = RouterList::where('router_name', $routerName)
-                ->where('action', 'connected')
-                ->first();
+    }
 
             if (! $router) {
                 continue;

@@ -43,61 +43,64 @@ class SendBulkSmsJob implements ShouldQueue
      */
     public function handle(): void
     {
-        $admin = User::find($this->adminUserId);
+        $admin = User::withoutGlobalScopes()->find($this->adminUserId);
         $adminEmail = $admin ? $admin->email : 'System/Admin';
+        $tenantId = $admin?->tenant_id ?? 1;
 
-        $successfulIDs = [];
-        $errorIDs = [];
+        \App\Services\Tenant\TenantContext::runWithTenant((int) $tenantId, function () use ($adminEmail) {
+            $successfulIDs = [];
+            $errorIDs = [];
 
-        // Chunk process target customers to prevent memory exhaustion
-        CustomersInfo::whereIn('id', $this->customerIds)
-            ->with(['pppUser', 'billing'])
-            ->chunk(50, function ($customers) use (&$successfulIDs, &$errorIDs) {
-                foreach ($customers as $customer) {
-                    if (empty($customer->mobile)) {
-                        $errorIDs[] = $customer->customer_unique_id . ' (No mobile number)';
-                        continue;
-                    }
-
-                    // Dynamically compile placeholders for the customer
-                    $message = $this->compileMessage($customer, $this->messageTemplate);
-
-                    try {
-                        $response = SmsBridge::to($customer->mobile)
-                            ->message($message)
-                            ->send();
-
-                        if ($response && $response->isSuccessful()) {
-                            $successfulIDs[] = $customer->customer_unique_id . ' (' . ($customer->pppUser->username ?? 'No PPPoE') . ')';
-                        } else {
-                            $errorMsg = $response ? $response->getMessage() : 'Unknown error';
-                            $errorIDs[] = $customer->customer_unique_id . ' (' . ($customer->pppUser->username ?? 'No PPPoE') . ') - Error: ' . $errorMsg;
+            // Chunk process target customers to prevent memory exhaustion
+            CustomersInfo::whereIn('id', $this->customerIds)
+                ->with(['pppUser', 'billing'])
+                ->chunk(50, function ($customers) use (&$successfulIDs, &$errorIDs) {
+                    foreach ($customers as $customer) {
+                        if (empty($customer->mobile)) {
+                            $errorIDs[] = $customer->customer_unique_id . ' (No mobile number)';
+                            continue;
                         }
-                    } catch (\Exception $e) {
-                        Log::error("Bulk SMS gateway exception for: " . $customer->customer_unique_id . " - " . $e->getMessage());
-                        $errorIDs[] = $customer->customer_unique_id . ' - Exception: ' . $e->getMessage();
+
+                        // Dynamically compile placeholders for the customer
+                        $message = $this->compileMessage($customer, $this->messageTemplate);
+
+                        try {
+                            $response = SmsBridge::to($customer->mobile)
+                                ->message($message)
+                                ->send();
+
+                            if ($response && $response->isSuccessful()) {
+                                $successfulIDs[] = $customer->customer_unique_id . ' (' . ($customer->pppUser->username ?? 'No PPPoE') . ')';
+                            } else {
+                                $errorMsg = $response ? $response->getMessage() : 'Unknown error';
+                                $errorIDs[] = $customer->customer_unique_id . ' (' . ($customer->pppUser->username ?? 'No PPPoE') . ') - Error: ' . $errorMsg;
+                            }
+                        } catch (\Exception $e) {
+                            Log::error("Bulk SMS gateway exception for: " . $customer->customer_unique_id . " - " . $e->getMessage());
+                            $errorIDs[] = $customer->customer_unique_id . ' - Exception: ' . $e->getMessage();
+                        }
                     }
-                }
-            });
+                });
 
-        // Store notification logs for tracking the bulk campaign results
-        if (!empty($successfulIDs)) {
-            NotificationLogs::create([
-                'title' => 'Bulk SMS Campaign Success (' . count($successfulIDs) . ' Sent)',
-                'message' => 'Sent by: ' . $adminEmail . PHP_EOL . 'Recipients: ' . implode(', ', $successfulIDs),
-                'status' => 'Delivered successfully',
-                'type' => 'Bulk SMS',
-            ]);
-        }
+            // Store notification logs for tracking the bulk campaign results
+            if (!empty($successfulIDs)) {
+                NotificationLogs::create([
+                    'title' => 'Bulk SMS Campaign Success (' . count($successfulIDs) . ' Sent)',
+                    'message' => 'Sent by: ' . $adminEmail . PHP_EOL . 'Recipients: ' . implode(', ', $successfulIDs),
+                    'status' => 'Delivered successfully',
+                    'type' => 'Bulk SMS',
+                ]);
+            }
 
-        if (!empty($errorIDs)) {
-            NotificationLogs::create([
-                'title' => 'Bulk SMS Campaign Errors (' . count($errorIDs) . ' Failed)',
-                'message' => 'Sent by: ' . $adminEmail . PHP_EOL . 'Failures: ' . implode(', ', $errorIDs),
-                'status' => 'Delivered with errors',
-                'type' => 'Bulk SMS',
-            ]);
-        }
+            if (!empty($errorIDs)) {
+                NotificationLogs::create([
+                    'title' => 'Bulk SMS Campaign Errors (' . count($errorIDs) . ' Failed)',
+                    'message' => 'Sent by: ' . $adminEmail . PHP_EOL . 'Failures: ' . implode(', ', $errorIDs),
+                    'status' => 'Delivered with errors',
+                    'type' => 'Bulk SMS',
+                ]);
+            }
+        });
     }
 
     /**

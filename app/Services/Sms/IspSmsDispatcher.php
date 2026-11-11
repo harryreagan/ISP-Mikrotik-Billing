@@ -188,8 +188,15 @@ class IspSmsDispatcher
     {
         $providerName = 'HSmart System Gateway (TextSMS)';
 
-        // 1. Verify tenant has SMS credit balance if tenantId is provided
-        if ($tenantId) {
+        // 1. Verify tenant has SMS credit balance if tenantId is provided (skip for platform auth/verification/welcome)
+        $isAuthOrConfirmation = str_contains(strtolower($message), 'verification') 
+            || str_contains(strtolower($message), 'code')
+            || str_contains(strtolower($message), 'otp')
+            || str_contains(strtolower($message), 'welcome')
+            || str_contains(strtolower($message), 'confirm')
+            || $tenantId === -1;
+
+        if ($tenantId && !$isAuthOrConfirmation) {
             $creditBalance = self::getTenantCreditBalance($tenantId);
             if ($creditBalance <= 0) {
                 $providerResponse = [

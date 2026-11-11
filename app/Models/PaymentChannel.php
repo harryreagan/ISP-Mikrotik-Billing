@@ -2,18 +2,18 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Crypt;
 
 class PaymentChannel extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToTenant;
 
     protected $table = 'isp_payment_channels';
 
     protected $fillable = [
-        'tenant_id',
         'user_id',
         'gateway',
         'channel_type',
@@ -53,6 +53,49 @@ class PaymentChannel extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Virtual Accessor: till_number
+     */
+    public function getTillNumberAttribute(): ?string
+    {
+        return in_array($this->channel_type, ['till', 'buy_goods']) ? $this->short_code : null;
+    }
+
+    public function setTillNumberAttribute(?string $value): void
+    {
+        if (!empty($value)) {
+            $this->attributes['short_code'] = trim($value);
+        }
+    }
+
+    /**
+     * Virtual Accessor: paybill_number
+     */
+    public function getPaybillNumberAttribute(): ?string
+    {
+        return in_array($this->channel_type, ['paybill', 'bank']) ? $this->short_code : null;
+    }
+
+    public function setPaybillNumberAttribute(?string $value): void
+    {
+        if (!empty($value)) {
+            $this->attributes['short_code'] = trim($value);
+        }
+    }
+
+    /**
+     * Human-readable Type format matching POS
+     */
+    public function getFormattedTypeAttribute(): string
+    {
+        return match ($this->channel_type) {
+            'buy_goods', 'till' => 'TILL NUMBER',
+            'paybill'           => 'PAYBILL',
+            'bank'              => 'BANK ACCOUNT',
+            default             => strtoupper(str_replace('_', ' ', $this->channel_type ?? 'CHANNEL')),
+        };
     }
 
     /**
@@ -124,4 +167,3 @@ class PaymentChannel extends Model
         return substr($key, 0, 4) . '••••••••' . substr($key, -4);
     }
 }
-

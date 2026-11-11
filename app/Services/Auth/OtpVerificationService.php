@@ -109,7 +109,8 @@ class OtpVerificationService
                 Log::error("[OtpService] Email delivery failed: " . $e->getMessage());
             }
         } else {
-            $dispatched = IspSmsDispatcher::sendDirectSms($normalized, $message, $tenantId);
+            // Platform-level verification: never blocked by tenant balance
+            $dispatched = IspSmsDispatcher::sendDirectSms($normalized, $message, null);
         }
 
         // 6. Record rate limiting caches

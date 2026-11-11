@@ -99,7 +99,9 @@ class RouterScriptGeneratorService
         $lines[] = "# --- 4. Restricted Management API User ---";
         $lines[] = ":do {";
         $lines[] = "    :if ([:len [/user group find name=hsmart_api]] = 0) do={";
-        $lines[] = "        /user group add name=hsmart_api policy=api,read,write,test,policy,password comment=\"HSmart Managed Group\"";
+        $lines[] = "        /user group add name=hsmart_api policy=api,read,write,test,policy,password,ftp,reboot comment=\"HSmart Managed Group\"";
+        $lines[] = "    } else={";
+        $lines[] = "        /user group set [find name=hsmart_api] policy=api,read,write,test,policy,password,ftp,reboot";
         $lines[] = "    }";
         $lines[] = "} on-error={};";
         $lines[] = "";

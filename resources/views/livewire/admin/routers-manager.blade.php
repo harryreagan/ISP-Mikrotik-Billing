@@ -1,4 +1,4 @@
-<div class="container-fluid py-4" wire:poll.30s="pollAllOnlineRouters">
+<div class="container-fluid py-4" wire:poll.15s="$refresh">
     {{-- Header --}}
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
         <div>

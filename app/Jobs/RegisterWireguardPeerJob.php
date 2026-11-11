@@ -36,35 +36,38 @@ class RegisterWireguardPeerJob implements ShouldQueue
      */
     public function handle(): void
     {
-        $router = Router::find($this->routerId);
+        $router = Router::withoutGlobalScopes()->find($this->routerId);
         if (!$router) {
             Log::warning("[RegisterWireguardPeerJob] Router #{$this->routerId} not found.");
             return;
         }
 
-        try {
-            $success = WireGuardService::addPeer($this->publicKey, $this->vpnIp);
+        $tenantId = $router->tenant_id ?? 1;
+        \App\Services\Tenant\TenantContext::runWithTenant((int) $tenantId, function () use ($router) {
+            try {
+                $success = WireGuardService::addPeer($this->publicKey, $this->vpnIp);
 
-            if ($success) {
-                $router->update([
-                    'vpn_status' => 'peer_registered',
-                    'notes'      => ($router->notes ? $router->notes . " | " : "") . "WireGuard peer registered successfully at " . now()->toDateTimeString(),
-                ]);
-                Log::info("[RegisterWireguardPeerJob] Successfully registered peer {$this->publicKey} ({$this->vpnIp}) for router #{$this->routerId}");
-            } else {
+                if ($success) {
+                    $router->update([
+                        'vpn_status' => 'peer_registered',
+                        'notes'      => ($router->notes ? $router->notes . " | " : "") . "WireGuard peer registered successfully at " . now()->toDateTimeString(),
+                    ]);
+                    Log::info("[RegisterWireguardPeerJob] Successfully registered peer {$this->publicKey} ({$this->vpnIp}) for router #{$this->routerId}");
+                } else {
+                    $router->update([
+                        'vpn_status' => 'peer_failed',
+                        'notes'      => ($router->notes ? $router->notes . " | " : "") . "WireGuard peer registration warning at " . now()->toDateTimeString(),
+                    ]);
+                    Log::warning("[RegisterWireguardPeerJob] WireGuard peer registration reported non-fatal status for router #{$this->routerId}");
+                }
+            } catch (\Throwable $e) {
                 $router->update([
                     'vpn_status' => 'peer_failed',
-                    'notes'      => ($router->notes ? $router->notes . " | " : "") . "WireGuard peer registration warning at " . now()->toDateTimeString(),
+                    'notes'      => ($router->notes ? $router->notes . " | " : "") . "WireGuard error: " . $e->getMessage(),
                 ]);
-                Log::warning("[RegisterWireguardPeerJob] WireGuard peer registration reported non-fatal status for router #{$this->routerId}");
+                Log::error("[RegisterWireguardPeerJob] Exception registering peer for router #{$this->routerId}: " . $e->getMessage());
             }
-        } catch (\Throwable $e) {
-            $router->update([
-                'vpn_status' => 'peer_failed',
-                'notes'      => ($router->notes ? $router->notes . " | " : "") . "WireGuard error: " . $e->getMessage(),
-            ]);
-            Log::error("[RegisterWireguardPeerJob] Exception registering peer for router #{$this->routerId}: " . $e->getMessage());
-        }
+        });
     }
 }
 

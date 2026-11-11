@@ -212,6 +212,16 @@ class HotspotManager extends Component
             return;
         }
 
+        // Verify router belongs to current tenant
+        $routerExists = \App\Models\Router::where(function ($q) {
+            $q->where('name', $this->selectedRouter)->orWhere('router_name', $this->selectedRouter);
+        })->exists();
+
+        if (! $routerExists) {
+            $this->selectedRouter = '';
+            return;
+        }
+
         try {
             $this->servers = $this->ctrl()->getHotspotServers($this->selectedRouter);
             $this->userProfiles = $this->ctrl()->getHotspotUserProfiles($this->selectedRouter);

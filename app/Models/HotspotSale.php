@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HotspotSale extends Model
 {
+    use BelongsToTenant;
     protected $fillable = [
         'router_name', 'voucher_code', 'profile', 'username',
         'amount', 'payment_method', 'note', 'sale_date', 'sold_by',

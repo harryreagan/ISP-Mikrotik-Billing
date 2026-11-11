@@ -956,7 +956,7 @@
             </p>
             <div class="countdown-badge" id="countdown-timer">Waiting for PIN (60s)</div>
 
-            <button type="button" class="btn-primary-orange" style="margin-top:1rem;" onclick="simulateVerificationSuccess()">
+            <button type="button" class="btn-primary-orange" style="margin-top:1rem;" onclick="checkPaymentStatusNow()">
                 I Have Entered My PIN
             </button>
             <button type="button" style="background:transparent; border:none; color:var(--ink-secondary); font-size:0.8rem; margin-top:0.75rem; cursor:pointer;" onclick="cancelMpesaPayment()">
@@ -1123,7 +1123,8 @@
 
             // Trigger STK Push
             const fullPhone = '254' + phone;
-            fetch('/api/payment/daraja/stk-push', {
+            window.lastPhone = fullPhone;
+            fetch('/api/payment/stk-push', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1133,14 +1134,24 @@
                     phone: fullPhone,
                     amount: currentPackage.price,
                     account_reference: 'HS-' + phone,
-                    package_id: currentPackage.id
+                    package_id: currentPackage.id,
+                    router_id: '{{ $router->id ?? "" }}',
+                    mac: '{{ $mac ?? "" }}',
+                    ip: '{{ $ip ?? "" }}'
                 })
             }).then(r => r.json()).then(res => {
-                if (res.success && res.checkout_request_id) {
-                    startPaymentPolling(res.checkout_request_id, fullPhone);
+                if (res.success && (res.checkout_request_id || res.reference)) {
+                    const cid = res.checkout_request_id || res.reference;
+                    window.lastCheckoutId = cid;
+                    startPaymentPolling(cid, fullPhone);
+                } else {
+                    clearInterval(countdownInterval);
+                    clearInterval(pollInterval);
+                    alert(res.message || 'Payment initiation failed. Please verify your phone number and try again.');
+                    cancelMpesaPayment();
                 }
             }).catch(err => {
-                console.warn('STK push error, waiting for manual confirmation...', err);
+                console.warn('STK push network issue, waiting for confirmation...', err);
             });
 
             countdownInterval = setInterval(() => {
@@ -1157,7 +1168,7 @@
         let pollInterval = null;
         function startPaymentPolling(checkoutId, fullPhone) {
             pollInterval = setInterval(() => {
-                fetch(`/api/payment/daraja/status?checkout_id=${checkoutId}&phone=${fullPhone}`)
+                fetch(`/api/payment/status?checkout_id=${checkoutId}&phone=${fullPhone}`)
                     .then(r => r.json())
                     .then(data => {
                         if (data.status === 'completed' || data.status === 'paid' || data.voucher_code) {
@@ -1167,6 +1178,25 @@
                         }
                     }).catch(() => {});
             }, 2500);
+        }
+
+        function checkPaymentStatusNow() {
+            const cid = window.lastCheckoutId || '';
+            const phone = window.lastPhone || document.getElementById('display-phone').innerText || '';
+            
+            fetch(`/api/payment/status?checkout_id=${cid}&phone=${phone}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'completed' || data.status === 'paid' || data.voucher_code) {
+                        clearInterval(countdownInterval);
+                        clearInterval(pollInterval);
+                        handleSuccessfulPayment(data.voucher_code || phone, data.password || phone);
+                    } else {
+                        alert('Waiting for M-Pesa PIN entry. Please check your phone prompt.');
+                    }
+                }).catch(() => {
+                    alert('Checking status... please enter your M-Pesa PIN.');
+                });
         }
 
         function handleSuccessfulPayment(username, password) {

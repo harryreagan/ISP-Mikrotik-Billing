@@ -22,10 +22,19 @@ class PollRouterTelemetryJob implements ShouldQueue
 
     public function handle(): void
     {
-        $routers = Router::where('deleted_at', null)->get();
+        $tenants = \App\Models\Tenant::where('is_active', 1)->pluck('id');
 
-        foreach ($routers as $router) {
-            $this->pollRouter($router);
+        if ($tenants->isEmpty()) {
+            $tenants = collect([1]);
+        }
+
+        foreach ($tenants as $tenantId) {
+            \App\Services\Tenant\TenantContext::runWithTenant((int) $tenantId, function () {
+                $routers = Router::where('deleted_at', null)->get();
+                foreach ($routers as $router) {
+                    $this->pollRouter($router);
+                }
+            });
         }
     }
 
