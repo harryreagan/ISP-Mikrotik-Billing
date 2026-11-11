@@ -122,7 +122,7 @@
         <select class="form-select form-select-sm w-auto" wire:model.live="selectedRouter" id="hs-router-select">
             <option value="">{{ __('-- Select Router --') }}</option>
             @foreach($routers as $r)
-                <option value="{{ $r->router_name }}">{{ $r->router_name }} ({{ $r->ip_address }})</option>
+                <option value="{{ $r->router_name ?: $r->name }}">{{ $r->router_name ?: $r->name }} ({{ $r->vpn_ip ?: ($r->ip_address ?: $r->ip) }})</option>
             @endforeach
         </select>
         @if($selectedRouter)

@@ -36,6 +36,19 @@ class RoutersManager extends Component
     public ?string $modalScript = null;
     public ?string $modalRouterName = null;
 
+    // Ports Configuration Modal State
+    public bool $showPortsModal = false;
+    public ?int $selectedPortsRouterId = null;
+    public string $portsRouterName = '';
+    public string $portsRouterModel = '';
+    public string $portsRouterIp = '';
+    public array $portInterfaces = [];
+    public string $portRoleWan = 'ether1';
+    public string $portRoleHotspot = 'ether2';
+    public string $portRolePppoe = 'ether3';
+    public string $portHotspotSubnet = '10.5.50.0/24';
+    public string $portPppoePool = '10.0.0.0/24';
+
     protected $paginationTheme = 'bootstrap';
 
     protected function rules(): array
@@ -48,6 +61,12 @@ class RoutersManager extends Component
             'edit_username' => 'required|string|max:100',
             'edit_password' => 'nullable|string|max:255',
         ];
+    }
+
+    public function mount()
+    {
+        // Poll online routers for fresh telemetry on page load
+        $this->pollAllOnlineRouters();
     }
 
     public function updatingSearch()
@@ -67,13 +86,29 @@ class RoutersManager extends Component
     }
 
     /**
-     * Poll a specific router for live hardware telemetry (CPU, RAM, Uptime).
+     * Poll all online routers for the current tenant.
      */
-    public function pollRouterTelemetry(int $routerId)
+    public function pollAllOnlineRouters(): void
+    {
+        $tenantId = $this->getTenantId();
+        $onlineRouters = Router::where('tenant_id', $tenantId)
+            ->where('status', 'online')
+            ->whereNotNull('vpn_ip')
+            ->get();
+
+        foreach ($onlineRouters as $r) {
+            $this->pollRouterTelemetry($r->id, true);
+        }
+    }
+
+    /**
+     * Poll a specific router for live hardware telemetry (CPU, RAM, Serial, Model, Uptime, Version).
+     */
+    public function pollRouterTelemetry(int $routerId, bool $quiet = false): bool
     {
         $router = Router::where('id', $routerId)->first();
         if (!$router) {
-            return;
+            return false;
         }
 
         $host = $router->vpn_ip ?: $router->ip;
@@ -88,35 +123,113 @@ class RoutersManager extends Component
         }
 
         try {
-            $api = new MikrotikApiService($host, $port, $user, $pass, 4);
-            $res = $api->executeCommand('/system/resource/print');
-
-            if (is_array($res) && !empty($res)) {
-                $data = $res[0];
-                $cpuLoad = (int) ($data['cpu-load'] ?? 0);
-                $freeMem = (int) ($data['free-memory'] ?? 0);
-                $totalMem = (int) ($data['total-memory'] ?? 0);
-                $memPercent = $totalMem > 0 ? (int) round((($totalMem - $freeMem) / $totalMem) * 100) : 0;
-                $uptime = (string) ($data['uptime'] ?? 'unknown');
-                $version = (string) ($data['version'] ?? $router->version);
-                $board = (string) ($data['board-name'] ?? $router->model);
-
-                $router->updateQuietly([
-                    'status'       => 'online',
-                    'cpu_load'     => $cpuLoad,
-                    'memory_load'  => $memPercent,
-                    'uptime'       => $uptime,
-                    'version'      => $version,
-                    'model'        => $board,
-                    'last_seen_at' => now(),
-                ]);
-
-                session()->flash('success', "Telemetry refreshed for {$router->name}: CPU {$cpuLoad}%, RAM {$memPercent}%, Uptime {$uptime}.");
-            } else {
-                session()->flash('warning', "Router {$router->name} did not return telemetry data.");
+            $api = null;
+            for ($attempt = 1; $attempt <= 2; $attempt++) {
+                try {
+                    $api = new MikrotikApiService($host, $port, $user, $pass, 5);
+                    break;
+                } catch (\Throwable $te) {
+                    if ($attempt === 2) {
+                        throw $te;
+                    }
+                    usleep(350000);
+                }
             }
+
+            // 1. Fetch System Resource (CPU, RAM, Uptime, Version, Architecture)
+            $res = $api->executeCommand('/system/resource/print');
+            if (!is_array($res) || empty($res)) {
+                if (!$quiet) {
+                    session()->flash('warning', "Router {$router->name} did not return telemetry data.");
+                }
+                return false;
+            }
+
+            $data = $res[0];
+            $cpuLoad    = (int) ($data['cpu-load'] ?? 0);
+            $freeMem    = (int) ($data['free-memory'] ?? 0);
+            $totalMem   = (int) ($data['total-memory'] ?? 0);
+            $memPercent = $totalMem > 0 ? (int) round((($totalMem - $freeMem) / $totalMem) * 100) : 0;
+            $uptime     = (string) ($data['uptime'] ?? 'unknown');
+            $version    = (string) ($data['version'] ?? $router->version);
+            $board      = (string) ($data['board-name'] ?? ($router->board ?: 'MikroTik'));
+            $arch       = (string) ($data['architecture-name'] ?? ($router->architecture ?: 'smips'));
+
+            // 2. Fetch Routerboard Hardware Info (Model, Serial Number, Firmware)
+            $serialNumber = $router->serial_number;
+            $model        = $router->model ?: $board;
+            try {
+                $rbRes = $api->executeCommand('/system/routerboard/print');
+                if (is_array($rbRes) && !empty($rbRes[0])) {
+                    $rb = $rbRes[0];
+                    if (!empty($rb['serial-number'])) {
+                        $serialNumber = (string) $rb['serial-number'];
+                    }
+                    if (!empty($rb['board-name'])) {
+                        $board = (string) $rb['board-name'];
+                    }
+                    if (!empty($rb['model'])) {
+                        $model = (string) $rb['model'];
+                    }
+                }
+            } catch (\Throwable $rbe) {
+                Log::debug("Routerboard print warning for [{$router->name}]: " . $rbe->getMessage());
+            }
+
+            // 3. Count Active Connected Users (Hotspot & PPPoE)
+            $hsCount = 0;
+            try {
+                $hsActive = $api->executeCommand('/ip/hotspot/active/print');
+                if (is_array($hsActive)) {
+                    $hsCount = count($hsActive);
+                }
+            } catch (\Throwable $e) {}
+
+            $pppCount = 0;
+            try {
+                $pppActive = $api->executeCommand('/ppp/active/print');
+                if (is_array($pppActive)) {
+                    $pppCount = count($pppActive);
+                }
+            } catch (\Throwable $e) {}
+
+            $activeUsers = $hsCount + $pppCount;
+
+            $portRoles = is_array($router->port_roles) ? $router->port_roles : [];
+            $portRoles['active_hs'] = $hsCount;
+            $portRoles['active_ppp'] = $pppCount;
+            $portRoles['active_total'] = $activeUsers;
+
+            $updatePayload = [
+                'status'         => 'online',
+                'cpu_load'       => $cpuLoad,
+                'memory_load'    => $memPercent,
+                'total_memory'   => $totalMem,
+                'free_memory'    => $freeMem,
+                'uptime'         => $uptime,
+                'version'        => $version,
+                'board'          => $board,
+                'architecture'   => $arch,
+                'model'          => $model,
+                'serial_number'  => $serialNumber,
+                'port_roles'     => $portRoles,
+                'last_seen_at'   => now(),
+                'last_polled_at' => now(),
+            ];
+
+            $router->updateQuietly($updatePayload);
+
+            if (!$quiet) {
+                session()->flash('success', "Telemetry refreshed for {$router->name}: Model '{$model}', S/N '{$serialNumber}', CPU {$cpuLoad}%, RAM {$memPercent}%, Uptime {$uptime}.");
+            }
+            return true;
+
         } catch (\Throwable $e) {
-            session()->flash('error', "Could not reach router {$router->name} at {$host}:{$port} ({$e->getMessage()}).");
+            Log::warning("Could not reach router {$router->name} at {$host}:{$port} ({$e->getMessage()})");
+            if (!$quiet) {
+                session()->flash('error', "Could not reach router {$router->name} at {$host}:{$port} ({$e->getMessage()}).");
+            }
+            return false;
         }
     }
 
@@ -150,85 +263,85 @@ class RoutersManager extends Component
                 'status' => 'rebooting',
             ]);
 
-            session()->flash('success', "Reboot signal sent to {$router->name}. The router will restart and reconnect within 60 seconds.");
+            session()->flash('success', "Reboot signal sent to router {$router->name}. It will come back online shortly.");
         } catch (\Throwable $e) {
-            session()->flash('error', "Failed to reboot {$router->name}: " . $e->getMessage());
+            session()->flash('error', "Reboot failed for router {$router->name}: " . $e->getMessage());
         }
     }
 
     /**
-     * Open Edit Modal
+     * Open the Edit Router modal.
      */
     public function editRouter(int $routerId)
     {
-        $router = Router::where('id', $routerId)->first();
-        if (!$router) {
-            return;
-        }
+        $router = Router::where('id', $routerId)->firstOrFail();
 
         $this->editingRouterId = $router->id;
-        $this->edit_name = $router->name ?: ($router->router_name ?: '');
+        $this->edit_name = $router->name ?: $router->router_name;
         $this->edit_location = $router->location ?: '';
         $this->edit_ip = $router->ip ?: ($router->ip_address ?: '');
         $this->edit_api_port = (int) ($router->api_port ?: 8728);
-        $this->edit_username = $router->api_user ?: ($router->username ?: 'admin');
-        $this->edit_password = '';
+        $this->edit_username = $router->api_user ?: ($router->username ?: '');
+        $this->edit_password = ''; // Keep blank unless changing
+
         $this->showEditModal = true;
     }
 
-    public function closeEditModal()
-    {
-        $this->showEditModal = false;
-        $this->editingRouterId = null;
-        $this->resetValidation();
-    }
-
     /**
-     * Save Router Edits
+     * Save edited router settings.
      */
-    public function updateRouter()
+    public function saveRouter()
     {
         $this->validate();
 
-        $router = Router::where('id', $this->editingRouterId)->first();
-        if (!$router) {
-            session()->flash('error', 'Router not found.');
-            $this->closeEditModal();
-            return;
-        }
+        $router = Router::where('id', $this->editingRouterId)->firstOrFail();
 
         $data = [
             'name'        => $this->edit_name,
             'router_name' => $this->edit_name,
             'location'    => $this->edit_location,
-            'ip'          => $this->edit_ip,
-            'ip_address'  => $this->edit_ip,
+            'ip'          => $this->edit_ip ?: null,
+            'ip_address'  => $this->edit_ip ?: null,
             'api_port'    => $this->edit_api_port,
-            'username'    => $this->edit_username,
             'api_user'    => $this->edit_username,
+            'username'    => $this->edit_username,
         ];
 
         if (!empty($this->edit_password)) {
-            $data['password'] = Crypt::encryptString($this->edit_password);
             $data['api_password'] = Crypt::encryptString($this->edit_password);
+            $data['password']     = Crypt::encryptString($this->edit_password);
         }
 
         $router->update($data);
 
-        session()->flash('success', "Router {$this->edit_name} updated successfully.");
-        $this->closeEditModal();
+        $this->showEditModal = false;
+        session()->flash('success', "Router {$router->name} details updated.");
     }
 
     /**
-     * Delete Router safely and free allocated VPN IP.
+     * View Bootstrap Script for a router.
+     */
+    public function viewScript(int $routerId)
+    {
+        $router = Router::where('id', $routerId)->firstOrFail();
+
+        $token = $router->setup_token ?: ('nbp_' . bin2hex(random_bytes(16)));
+        if (empty($router->setup_token)) {
+            $router->updateQuietly(['setup_token' => $token]);
+        }
+
+        $baseUrl = config('app.url', url('/'));
+        $this->modalScript = \App\Services\RouterScriptGeneratorService::generateScript($router, $token, $baseUrl);
+        $this->modalRouterName = $router->name;
+        $this->showScriptModal = true;
+    }
+
+    /**
+     * Delete router and release VPN IP/peers.
      */
     public function deleteRouter(int $routerId)
     {
-        $router = Router::where('id', $routerId)->first();
-        if (!$router) {
-            return;
-        }
-
+        $router = Router::where('id', $routerId)->firstOrFail();
         $name = $router->name;
 
         // Release WireGuard IP
@@ -242,6 +355,273 @@ class RoutersManager extends Component
         $router->delete();
 
         session()->flash('success', "Router {$name} deleted successfully.");
+    }
+
+    /**
+     * Open the Port Configuration Modal and query live physical interfaces.
+     */
+    public function openPortsModal(int $routerId): void
+    {
+        $router = Router::where('id', $routerId)->firstOrFail();
+        $this->selectedPortsRouterId = $router->id;
+        $this->portsRouterName = $router->name ?: $router->router_name;
+        $this->portsRouterModel = $router->board ?: ($router->model ?: 'MikroTik RouterOS');
+        $this->portsRouterIp = $router->vpn_ip ?: ($router->ip ?: '10.10.0.x');
+
+        $portRoles = is_array($router->port_roles) ? $router->port_roles : [];
+        $this->portRoleWan = $router->wan_interface ?: ($portRoles['wan'] ?? 'ether1');
+        $this->portRoleHotspot = $router->lan_interface ?: ($portRoles['hotspot'] ?? 'ether2');
+        $this->portRolePppoe = $portRoles['pppoe'] ?? 'ether3';
+        $this->portHotspotSubnet = $router->hotspot_subnet ?: '10.5.50.0/24';
+        $this->portPppoePool = $router->pppoe_pool ?: '10.0.0.0/24';
+        $this->portInterfaces = [];
+
+        // Fetch live interfaces from router
+        $host = $router->vpn_ip ?: $router->ip;
+        $port = (int) ($router->api_port ?: 8728);
+        $user = $router->api_user ?: ($router->username ?: 'admin');
+        $pass = '';
+        try {
+            $pass = Crypt::decryptString($router->api_password ?: $router->password);
+        } catch (\Throwable $e) {
+            $pass = $router->api_password ?: $router->password;
+        }
+
+        try {
+            $api = null;
+            for ($attempt = 1; $attempt <= 2; $attempt++) {
+                try {
+                    $api = new MikrotikApiService($host, $port, $user, $pass, 5);
+                    break;
+                } catch (\Throwable $te) {
+                    if ($attempt === 2) {
+                        throw $te;
+                    }
+                    usleep(350000);
+                }
+            }
+            $ifaces = $api->executeCommand('/interface/print');
+            if (is_array($ifaces)) {
+                $this->portInterfaces = collect($ifaces)
+                    ->filter(function ($i) {
+                        return in_array($i['type'] ?? '', ['ether', 'wlan', 'bridge']) || str_starts_with($i['name'] ?? '', 'ether');
+                    })
+                    ->map(function ($i) {
+                        return [
+                            'name'     => $i['name'] ?? '',
+                            'type'     => $i['type'] ?? 'ether',
+                            'running'  => ($i['running'] ?? 'false') === 'true',
+                            'disabled' => ($i['disabled'] ?? 'false') === 'true',
+                            'mac'      => $i['mac-address'] ?? '',
+                            'comment'  => $i['comment'] ?? '',
+                        ];
+                    })
+                    ->values()
+                    ->toArray();
+
+                // Auto-detect currently bound Hotspot server interface
+                try {
+                    $hs = $api->executeCommand('/ip/hotspot/print');
+                    if (is_array($hs) && !empty($hs[0]['interface'])) {
+                        $this->portRoleHotspot = $hs[0]['interface'];
+                    }
+                } catch (\Throwable $e) {}
+
+                // Auto-detect currently bound PPPoE server interface
+                try {
+                    $ppp = $api->executeCommand('/interface/pppoe-server/server/print');
+                    if (is_array($ppp) && !empty($ppp[0]['interface'])) {
+                        $this->portRolePppoe = $ppp[0]['interface'];
+                    }
+                } catch (\Throwable $e) {}
+            }
+        } catch (\Throwable $e) {
+            Log::warning("[RoutersManager] Could not query live interfaces for {$router->name}: " . $e->getMessage());
+        }
+
+        // Fallback default ports if offline
+        if (empty($this->portInterfaces)) {
+            $this->portInterfaces = [
+                ['name' => 'ether1', 'type' => 'ether', 'running' => true,  'disabled' => false, 'mac' => '', 'comment' => 'WAN Uplink'],
+                ['name' => 'ether2', 'type' => 'ether', 'running' => false, 'disabled' => false, 'mac' => '', 'comment' => 'Hotspot Default'],
+                ['name' => 'ether3', 'type' => 'ether', 'running' => false, 'disabled' => false, 'mac' => '', 'comment' => 'PPPoE Default'],
+                ['name' => 'ether4', 'type' => 'ether', 'running' => false, 'disabled' => false, 'mac' => '', 'comment' => 'LAN Bridge'],
+                ['name' => 'wlan1',  'type' => 'wlan',  'running' => false, 'disabled' => true,  'mac' => '', 'comment' => 'Wireless'],
+            ];
+        }
+
+        $this->showPortsModal = true;
+    }
+
+    public function closePortsModal(): void
+    {
+        $this->showPortsModal = false;
+        $this->selectedPortsRouterId = null;
+        $this->portInterfaces = [];
+    }
+
+    /**
+     * Apply and reconfigure physical port roles live on the MikroTik router.
+     */
+    public function applyPortConfiguration(): void
+    {
+        if (!$this->selectedPortsRouterId) {
+            return;
+        }
+
+        $router = Router::where('id', $this->selectedPortsRouterId)->firstOrFail();
+
+        $this->validate([
+            'portRoleWan'       => 'required|string|max:32',
+            'portRoleHotspot'   => 'required|string|max:32',
+            'portRolePppoe'     => 'required|string|max:32',
+            'portHotspotSubnet' => 'required|string|max:32',
+            'portPppoePool'     => 'required|string|max:32',
+        ]);
+
+        $host = $router->vpn_ip ?: $router->ip;
+        $port = (int) ($router->api_port ?: 8728);
+        $user = $router->api_user ?: ($router->username ?: 'admin');
+        $pass = '';
+        try {
+            $pass = Crypt::decryptString($router->api_password ?: $router->password);
+        } catch (\Throwable $e) {
+            $pass = $router->api_password ?: $router->password;
+        }
+
+        $appliedOnRouter = false;
+        try {
+            $api = new MikrotikApiService($host, $port, $user, $pass, 6);
+
+            // 1. Hotspot IP Address
+            $hsIp = '10.5.50.1/24';
+            if (str_contains($this->portHotspotSubnet, '/')) {
+                $base = explode('/', $this->portHotspotSubnet)[0];
+                $parts = explode('.', $base);
+                if (count($parts) === 4) {
+                    $parts[3] = '1';
+                    $hsIp = implode('.', $parts) . '/24';
+                }
+            }
+
+            try {
+                $addrs = $api->executeCommand('/ip/address/print');
+                $foundHsIp = false;
+                if (is_array($addrs)) {
+                    foreach ($addrs as $addr) {
+                        if (str_contains($addr['address'] ?? '', '10.5.50.') || ($addr['comment'] ?? '') === 'hsmart-hotspot') {
+                            $api->executeCommand('/ip/address/set', ['interface' => $this->portRoleHotspot, 'address' => $hsIp], ['.id' => $addr['.id']]);
+                            $foundHsIp = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$foundHsIp) {
+                    $api->executeCommand('/ip/address/add', ['address' => $hsIp, 'interface' => $this->portRoleHotspot, 'comment' => 'hsmart-hotspot']);
+                }
+            } catch (\Throwable $e) {}
+
+            // Hotspot IP Pool
+            try {
+                $pools = $api->executeCommand('/ip/pool/print');
+                $foundHsPool = false;
+                if (is_array($pools)) {
+                    foreach ($pools as $pl) {
+                        if (($pl['name'] ?? '') === 'hs-pool-10') {
+                            $api->executeCommand('/ip/pool/set', ['ranges' => '10.5.50.10-10.5.50.254'], ['.id' => $pl['.id']]);
+                            $foundHsPool = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$foundHsPool) {
+                    $api->executeCommand('/ip/pool/add', ['name' => 'hs-pool-10', 'ranges' => '10.5.50.10-10.5.50.254']);
+                }
+            } catch (\Throwable $e) {}
+
+            // Hotspot DHCP Server
+            try {
+                $dhcps = $api->executeCommand('/ip/dhcp-server/print');
+                $foundHsDhcp = false;
+                if (is_array($dhcps)) {
+                    foreach ($dhcps as $d) {
+                        if (($d['name'] ?? '') === 'hs-dhcp-10') {
+                            $api->executeCommand('/ip/dhcp-server/set', ['interface' => $this->portRoleHotspot, 'address-pool' => 'hs-pool-10', 'disabled' => 'no'], ['.id' => $d['.id']]);
+                            $foundHsDhcp = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$foundHsDhcp) {
+                    $api->executeCommand('/ip/dhcp-server/add', ['name' => 'hs-dhcp-10', 'interface' => $this->portRoleHotspot, 'address-pool' => 'hs-pool-10', 'disabled' => 'no']);
+                }
+            } catch (\Throwable $e) {}
+
+            // Hotspot Server binding
+            try {
+                $hsServers = $api->executeCommand('/ip/hotspot/print');
+                if (is_array($hsServers) && !empty($hsServers[0]['.id'])) {
+                    $api->executeCommand('/ip/hotspot/set', ['interface' => $this->portRoleHotspot, 'address-pool' => 'hs-pool-10', 'disabled' => 'no'], ['.id' => $hsServers[0]['.id']]);
+                } else {
+                    $api->executeCommand('/ip/hotspot/add', ['name' => 'hsmart-hotspot', 'interface' => $this->portRoleHotspot, 'address-pool' => 'hs-pool-10', 'disabled' => 'no']);
+                }
+            } catch (\Throwable $e) {}
+
+            // 2. PPPoE Server binding
+            try {
+                $pppServers = $api->executeCommand('/interface/pppoe-server/server/print');
+                if (is_array($pppServers) && !empty($pppServers[0]['.id'])) {
+                    $api->executeCommand('/interface/pppoe-server/server/set', ['interface' => $this->portRolePppoe, 'disabled' => 'no'], ['.id' => $pppServers[0]['.id']]);
+                } else {
+                    $api->executeCommand('/interface/pppoe-server/server/add', ['service-name' => 'hsmart-pppoe', 'interface' => $this->portRolePppoe, 'disabled' => 'no', 'one-session-per-host' => 'yes']);
+                }
+            } catch (\Throwable $e) {}
+
+            // 3. WAN DHCP Client binding
+            try {
+                $dhcpClients = $api->executeCommand('/ip/dhcp-client/print');
+                $foundWan = false;
+                if (is_array($dhcpClients)) {
+                    foreach ($dhcpClients as $dc) {
+                        if (($dc['interface'] ?? '') === $this->portRoleWan) {
+                            $api->executeCommand('/ip/dhcp-client/set', ['disabled' => 'no', 'add-default-route' => 'yes'], ['.id' => $dc['.id']]);
+                            $foundWan = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$foundWan) {
+                    $api->executeCommand('/ip/dhcp-client/add', ['interface' => $this->portRoleWan, 'disabled' => 'no', 'add-default-route' => 'yes']);
+                }
+            } catch (\Throwable $e) {}
+
+            $appliedOnRouter = true;
+        } catch (\Throwable $e) {
+            Log::warning("[RoutersManager] Reconfiguring ports API error for {$router->name}: " . $e->getMessage());
+        }
+
+        // Save to Database
+        $updatedRoles = array_merge(is_array($router->port_roles) ? $router->port_roles : [], [
+            'wan'     => $this->portRoleWan,
+            'hotspot' => $this->portRoleHotspot,
+            'pppoe'   => $this->portRolePppoe,
+        ]);
+
+        $router->updateQuietly([
+            'wan_interface'  => $this->portRoleWan,
+            'lan_interface'  => $this->portRoleHotspot,
+            'hotspot_subnet' => $this->portHotspotSubnet,
+            'pppoe_pool'     => $this->portPppoePool,
+            'port_roles'     => $updatedRoles,
+        ]);
+
+        $this->showPortsModal = false;
+
+        if ($appliedOnRouter) {
+            session()->flash('success', "Ports successfully reconfigured on {$router->name}! WAN: '{$this->portRoleWan}', Hotspot: '{$this->portRoleHotspot}', PPPoE: '{$this->portRolePppoe}'.");
+        } else {
+            session()->flash('warning', "Port roles saved in system. Router will sync upon next online contact.");
+        }
     }
 
     public function render()
@@ -258,7 +638,9 @@ class RoutersManager extends Component
                   ->orWhere('router_name', 'like', $term)
                   ->orWhere('location', 'like', $term)
                   ->orWhere('ip', 'like', $term)
-                  ->orWhere('vpn_ip', 'like', $term);
+                  ->orWhere('vpn_ip', 'like', $term)
+                  ->orWhere('model', 'like', $term)
+                  ->orWhere('serial_number', 'like', $term);
             });
         }
 
@@ -302,4 +684,3 @@ class RoutersManager extends Component
         ])->layout('layouts.app');
     }
 }
-

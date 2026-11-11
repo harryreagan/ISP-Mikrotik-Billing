@@ -56,6 +56,13 @@ class ProvisioningController extends Controller
         // Burn the single-use token and mark router online
         ProvisioningTokenService::burnToken($router);
 
+        // Immediate background telemetry sync so hardware details are captured immediately
+        try {
+            (new \App\Livewire\Admin\RoutersManager())->pollRouterTelemetry($router->id, true);
+        } catch (\Throwable $te) {
+            Log::debug("Provisioning immediate telemetry poll failed: " . $te->getMessage());
+        }
+
         Log::info("[Provisioning] Router ID {$router->id} ('{$router->name}') marked ONLINE via bootstrap callback.");
 
         return response("OK - Router {$router->name} provisioned successfully and is now ONLINE.\r\n", 200, [

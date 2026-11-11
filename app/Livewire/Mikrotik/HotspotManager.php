@@ -170,9 +170,12 @@ class HotspotManager extends Component
         $this->report_to = now()->toDateString();
         $this->s_date = now()->toDateString();
 
-        $first = RouterList::where('action', 'connected')->first();
+        $first = RouterList::where(function ($q) {
+            $q->where('action', 'connected')->orWhere('status', 'online');
+        })->first();
+
         if ($first) {
-            $this->selectedRouter = $first->router_name;
+            $this->selectedRouter = $first->router_name ?: $first->name;
             $this->loadData();
         }
     }
@@ -1253,7 +1256,14 @@ class HotspotManager extends Component
 
     public function render()
     {
-        $routers = RouterList::where('action', 'connected')->orderBy('router_name')->get();
+        $routers = RouterList::where(function ($q) {
+            $q->where('action', 'connected')->orWhere('status', 'online');
+        })->orderBy('name')->get();
+
+        if (empty($this->selectedRouter) && $routers->isNotEmpty()) {
+            $this->selectedRouter = $routers->first()->name ?: $routers->first()->router_name;
+            $this->loadData();
+        }
         $reportData = $this->activeTab === 'report' ? $this->getReportData() : [];
         $vouchers = $this->activeTab === 'vouchers' ? $this->vouchers : collect();
         $voucherBatches = $this->activeTab === 'vouchers' ? $this->voucherBatches : collect();

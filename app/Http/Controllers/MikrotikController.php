@@ -254,10 +254,12 @@ class MikrotikController extends Controller
         }
 
         $fetchData = function () use ($router, $routerName, $apiCmd, $sshCmd, $apiParams, $showErrorFlash) {
-            // Priority 1: High-Speed API (3s timeout — fail fast so SSH fallback is immediate)
-            if ($router->api_port) {
+            [$rIp, $rApiPort, $rSshPort, $rUser, $rPass] = $this->getConnectionParams($router);
+
+            // Priority 1: High-Speed API (4s timeout — fail fast so SSH fallback is immediate)
+            if ($rApiPort) {
                 try {
-                    $service = $this->getPooledApiService($router->ip_address, $router->api_port, $router->username, $router->password, 3);
+                    $service = $this->getPooledApiService($rIp, $rApiPort, $rUser, $rPass, 4);
                     $isPrint = str_contains($apiCmd, 'print');
                     $res = $service->executeCommand(
                         $apiCmd,
@@ -274,16 +276,16 @@ class MikrotikController extends Controller
                     }
                 } catch (\Exception $e) {
                     \Log::debug("Mikrotik [{$routerName}] API Read Fail (falling back to SSH): ".$e->getMessage());
-                    if (! $router->ssh_port) {
+                    if (! $rSshPort) {
                         throw $e;
                     }
                 }
             }
 
             // Priority 2: Authoritative SSH Fallback (5s timeout)
-            if ($router->ssh_port) {
+            if ($rSshPort) {
                 try {
-                    $ssh = $this->getPooledSshService($router->ip_address, $router->ssh_port, $router->username, $router->password, 5);
+                    $ssh = $this->getPooledSshService($rIp, $rSshPort, $rUser, $rPass, 5);
 
                     try {
                         return $ssh->executeCommandParsable($sshCmd);
@@ -326,8 +328,10 @@ class MikrotikController extends Controller
             throw new \Exception("Router '{$routerName}' not connected.");
         }
 
+        [$rIp, $rApiPort, $rSshPort, $rUser, $rPass] = $this->getConnectionParams($router);
+
         // Priority 1: Authoritative SSH for write commands (5s timeout)
-        if ($router->ssh_port) {
+        if ($rSshPort) {
             try {
                 // Construct the full SSH command by appending params
                 $sshCmd = $command;
@@ -340,7 +344,7 @@ class MikrotikController extends Controller
                     }
                 }
 
-                $ssh = $this->getPooledSshService($router->ip_address, $router->ssh_port, $router->username, $router->password, 5);
+                $ssh = $this->getPooledSshService($rIp, $rSshPort, $rUser, $rPass, 5);
                 $res = (string) $ssh->executeCommand($sshCmd);
 
                 // Basic error detection for SSH
@@ -364,17 +368,17 @@ class MikrotikController extends Controller
 
                 return $res ?: 'OK';
             } catch (\Exception $e) {
-                if (! $router->api_port) {
+                if (! $rApiPort) {
                     throw $e;
                 }
                 \Log::debug("Mikrotik [{$routerName}] SSH Write failed. Falling back to API. ".$e->getMessage());
             }
         }
 
-        // Priority 2: API fallback for write commands (3s timeout)
-        if ($router->api_port) {
+        // Priority 2: API fallback for write commands (4s timeout)
+        if ($rApiPort) {
             try {
-                $api = $this->getPooledApiService($router->ip_address, $router->api_port, $router->username, $router->password, 3);
+                $api = $this->getPooledApiService($rIp, $rApiPort, $rUser, $rPass, 4);
                 $lcmd = ltrim($command, '/');
 
                 // Atomic [find ...] mapping: resolve name-based selector to internal .id for API
@@ -1768,12 +1772,35 @@ class MikrotikController extends Controller
     // =========================================================================
 
     /**
+     * Resolve effective connection credentials (VPN IP, decrypted password).
+     */
+    public function getConnectionParams($router): array
+    {
+        $ip = $router->vpn_ip ?: ($router->ip_address ?: $router->ip);
+        $apiPort = (int) ($router->api_port ?: 8728);
+        $sshPort = (int) ($router->ssh_port ?: 22);
+        $user = $router->api_user ?: ($router->username ?: 'admin');
+        $pass = $router->api_password ?: $router->password;
+        try {
+            $pass = \Illuminate\Support\Facades\Crypt::decryptString($pass);
+        } catch (\Throwable $e) {}
+
+        return [$ip, $apiPort, $sshPort, $user, $pass];
+    }
+
+    /**
      * Fetch a single connected router model, or null if not found.
      */
     protected function findConnectedRouter(string $routerName): ?RouterList
     {
-        return RouterList::where('router_name', $routerName)
-            ->where('action', 'connected')
+        return RouterList::where(function ($q) use ($routerName) {
+                $q->where('router_name', $routerName)
+                  ->orWhere('name', $routerName);
+            })
+            ->where(function ($q) {
+                $q->where('action', 'connected')
+                  ->orWhere('status', 'online');
+            })
             ->first();
     }
 
