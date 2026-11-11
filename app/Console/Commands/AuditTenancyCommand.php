@@ -50,3 +50,4 @@ class AuditTenancyCommand extends Command
         return 0;
     }
 }
+

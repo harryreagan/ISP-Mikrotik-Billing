@@ -60,3 +60,4 @@ class Tenant extends Model
         return $this->hasMany(PaymentChannel::class, 'tenant_id');
     }
 }
+

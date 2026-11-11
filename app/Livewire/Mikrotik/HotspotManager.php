@@ -172,7 +172,7 @@ class HotspotManager extends Component
 
         $first = RouterList::where(function ($q) {
             $q->where('action', 'connected')->orWhere('status', 'online');
-        })->first();
+        })->first() ?? RouterList::first();
 
         if ($first) {
             $this->selectedRouter = $first->router_name ?: $first->name;
@@ -1266,9 +1266,7 @@ class HotspotManager extends Component
 
     public function render()
     {
-        $routers = RouterList::where(function ($q) {
-            $q->where('action', 'connected')->orWhere('status', 'online');
-        })->orderBy('name')->get();
+        $routers = RouterList::orderBy('name')->get();
 
         if (empty($this->selectedRouter) && $routers->isNotEmpty()) {
             $this->selectedRouter = $routers->first()->name ?: $routers->first()->router_name;

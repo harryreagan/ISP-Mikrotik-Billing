@@ -8,7 +8,7 @@ LOCAL_DIR = r"c:\xampp\htdocs\poss\isp-billing"
 ZIP_PATH = r"c:\xampp\htdocs\poss\isp-billing\deploy_update.zip"
 
 EXCLUDE_DIRS = {
-    '.git', 'node_modules', 'vendor', '.vscode', 'storage', 'backups', 'bootstrap/cache', 'cache', 'public/images'
+    '.git', 'node_modules', 'vendor', '.vscode', 'storage', 'backups', 'bootstrap/cache', 'cache'
 }
 EXCLUDE_FILES = {
     '.env', 'deploy_update.zip', 'deploy_clean.zip'
@@ -65,14 +65,10 @@ def deploy():
         return False
 
     print("\n--- 2. Unzipping on VPS ---")
-    remote_unzip = """
-unzip -q -o /tmp/deploy_update.zip -d /var/www/poss/isp-billing && \
-rsync -a --exclude='.env' --exclude='storage' --exclude='bootstrap/cache' /var/www/poss/isp-billing/ /var/www/wifi/backend/ && \
-rm -f /tmp/deploy_update.zip
-"""
-    code = run_cmd(["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=15", VPS_HOST, remote_unzip], timeout=60)
+    remote_unzip = "unzip -q -o /tmp/deploy_update.zip -d /var/www/poss/isp-billing && rm -f /tmp/deploy_update.zip"
+    code = run_cmd(["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=15", VPS_HOST, remote_unzip], timeout=45)
     if code != 0:
-        print("Unzip/Sync failed!")
+        print("Unzip failed!")
         return False
 
     print("\n--- 3. Running DB Seed/Tenant-1 Check, Migrations & Clear Cache ---")
@@ -81,7 +77,7 @@ cd /var/www/poss/isp-billing && \
 php artisan tinker --execute="DB::table('tenants')->updateOrInsert(['id' => 1], ['name' => 'HSmart Master Network', 'subdomain' => 'hsmart-master', 'billing_code' => 'HSMST1', 'country' => 'Kenya', 'county' => 'Nairobi', 'is_active' => 1, 'sms_balance' => 100.00, 'created_at' => now(), 'updated_at' => now()]);" && \
 php artisan migrate --force && \
 php artisan optimize:clear && \
-systemctl restart php8.3-fpm
+php artisan test:smoke-routes
 """
     code = run_cmd(["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=30", VPS_HOST, remote_post], timeout=180)
     return code == 0

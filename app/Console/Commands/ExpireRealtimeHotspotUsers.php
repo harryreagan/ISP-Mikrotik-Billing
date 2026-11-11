@@ -73,63 +73,6 @@ class ExpireRealtimeHotspotUsers extends Command
         }
     }
 
-            if (! $router) {
-                continue;
-            }
-
-            foreach ($routerVouchers as $v) {
-                if (! $v->isRealtimeExpired()) {
-                    continue;
-                }
-
-                try {
-                    // OLD CODE (Disable & Expired Status):
-                    // // Disable user on router
-                    // $ctrl->disableHotspotUser($routerName, $v->username);
-                    // // Disconnect active session if any
-                    // try {
-                    //     $ctrl->disconnectHotspotUser($routerName, $v->username);
-                    // } catch (\Exception $e) {}
-                    // // Clean up the scheduler on router (if any exist)
-                    // $ctrl->removeHotspotExpiryScheduler($routerName, $v->username);
-                    // // Mark as expired in DB
-                    // $v->update(['status' => 'expired']);
-
-                    // NEW CODE (Remove & Delete):
-                    // Remove user from router API
-                    $ctrl->removeHotspotUser($routerName, $v->username);
-
-                    // Disconnect active session via RFC 3576 RADIUS Disconnect (UDP 3799) & Router API
-                    try {
-                        \App\Services\RadiusCoaService::disconnectUser($v->username);
-                        $ctrl->disconnectHotspotUser($routerName, $v->username);
-                    } catch (\Exception $e) {
-                        // Session might not exist, that's fine
-                    }
-
-                    // Remove from FreeRADIUS tables
-                    \App\Services\RadiusService::deleteUser($v->username);
-
-                    // Clean up the scheduler on router (if any exist)
-                    $ctrl->removeHotspotExpiryScheduler($routerName, $v->username);
-
-                    // Delete from DB
-                    $v->delete();
-
-                    $expiredCount++;
-                    Log::info("Realtime expired and deleted: {$v->username} on {$routerName}");
-                } catch (\Exception $e) {
-                    Log::warning("Failed to expire/delete {$v->username} on {$routerName}: " . $e->getMessage());
-                }
-            }
-        }
-
-        if ($expiredCount > 0) {
-            $this->info("Expired {$expiredCount} realtime hotspot user(s).");
-            Log::info("ExpireRealtimeHotspotUsers: Expired {$expiredCount} user(s).");
-        }
-    }
-
     private function syncRouterVouchers(string $routerName, MikrotikController $ctrl): void
     {
         try {

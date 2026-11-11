@@ -177,3 +177,4 @@ class TenantContext
         return "tenants/{$tid}/" . ltrim($path, '/');
     }
 }
+

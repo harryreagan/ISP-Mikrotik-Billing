@@ -250,20 +250,23 @@
                                 <span>Uptime:</span>
                                 <span class="text-dark font-monospace fw-semibold">{{ $router->uptime ?: '—' }}</span>
                             </div>
-                            <div class="d-flex justify-content-between align-items-center py-1 border-bottom border-light">
-                                <span>Connected:</span>
+                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
+                                <span class="text-muted small fw-medium">Active Online:</span>
                                 <div>
-                                    <span class="badge {{ ($router->port_roles['active_total'] ?? 0) > 0 ? 'bg-success text-white' : 'bg-light text-dark border' }} font-monospace px-2 py-1">
-                                        <i class="bi bi-broadcast me-1 {{ ($router->port_roles['active_total'] ?? 0) > 0 ? 'text-white' : 'text-success' }}"></i><strong>{{ $router->port_roles['active_total'] ?? 0 }}</strong> Active
+                                    @php $activeCount = $router->live_active ?? ($router->port_roles['active_total'] ?? ($router->subscribers ?? 0)); @endphp
+                                    <span class="badge {{ $activeCount > 0 ? 'bg-success text-white shadow-sm' : 'bg-secondary bg-opacity-75 text-white' }} px-2 py-1 font-monospace" style="font-size: 0.82rem; font-weight: 600;">
+                                        <i class="bi bi-broadcast me-1"></i><strong>{{ $activeCount }}</strong> Online
                                     </span>
-                                    <span class="text-muted small ms-1" style="font-size: 11px;">
-                                        ({{ $router->port_roles['active_hs'] ?? 0 }} HS, {{ $router->port_roles['active_ppp'] ?? 0 }} PPPoE)
-                                    </span>
+                                    @if(($router->live_hs ?? 0) > 0 || ($router->live_ppp ?? 0) > 0)
+                                        <span class="text-muted small ms-1" style="font-size: 11px;">
+                                            ({{ $router->live_hs ?? 0 }} HS, {{ $router->live_ppp ?? 0 }} PPPoE)
+                                        </span>
+                                    @endif
                                 </div>
                             </div>
-                            <div class="d-flex justify-content-between align-items-center py-1 border-bottom border-light">
-                                <span>Subscribers:</span>
-                                <a href="{{ route('admin.customers') }}" class="badge bg-primary bg-opacity-10 text-primary text-decoration-none">
+                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
+                                <span class="text-muted small fw-medium">Subscribers:</span>
+                                <a href="{{ route('admin.customers') }}" class="badge text-decoration-none px-2 py-1 shadow-sm" style="background-color: #e0e7ff !important; color: #3730a3 !important; font-size: 0.82rem; font-weight: 600; border: 1px solid #c7d2fe;">
                                     <i class="bi bi-people me-1"></i>{{ $router->subscribers_count ?? 0 }} Registered
                                 </a>
                             </div>

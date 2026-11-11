@@ -5,3 +5,4 @@ namespace App\Policies;
 class CustomerPolicy extends TenantModelPolicy
 {
 }
+

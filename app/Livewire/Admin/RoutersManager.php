@@ -693,9 +693,21 @@ class RoutersManager extends Component
 
         // Attach active subscribers counts
         $routers->getCollection()->transform(function ($r) {
-            $r->subscribers_count = PPPSecrets::where('router_name', $r->name ?: $r->router_name)
+            $rName = $r->name ?: $r->router_name;
+            $pppCount = PPPSecrets::where('router_name', $rName)
                 ->where('status', '!=', 'removed')
                 ->count();
+            $custCount = CustomersInfo::where('router_id', $r->id)
+                ->orWhere('router_name', $rName)
+                ->count();
+            $r->subscribers_count = max($pppCount, $custCount);
+            
+            // Connected live count
+            $roles = is_array($r->port_roles) ? $r->port_roles : [];
+            $r->live_active = (int) ($roles['active_total'] ?? ($r->subscribers ?? 0));
+            $r->live_hs = (int) ($roles['active_hs'] ?? 0);
+            $r->live_ppp = (int) ($roles['active_ppp'] ?? 0);
+            
             return $r;
         });
 

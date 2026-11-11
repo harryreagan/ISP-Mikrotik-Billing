@@ -119,10 +119,11 @@
     {{-- ── Router Selector ── --}}
     <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
         <i class="bi bi-wifi text-primary fs-5"></i>
-        <select class="form-select form-select-sm w-auto" wire:model.live="selectedRouter" id="hs-router-select">
+        <select class="form-select form-select-sm w-auto fw-medium shadow-sm" wire:model.live="selectedRouter" id="hs-router-select">
             <option value="">{{ __('-- Select Router --') }}</option>
             @foreach($routers as $r)
-                <option value="{{ $r->router_name ?: $r->name }}">{{ $r->router_name ?: $r->name }} ({{ $r->vpn_ip ?: ($r->ip_address ?: $r->ip) }})</option>
+                @php $rName = $r->router_name ?: $r->name; @endphp
+                <option value="{{ $rName }}">{{ $rName }} ({{ $r->vpn_ip ?: ($r->ip_address ?: $r->ip) }}){{ $r->status === 'online' ? ' • Online' : '' }}</option>
             @endforeach
         </select>
         @if($selectedRouter)

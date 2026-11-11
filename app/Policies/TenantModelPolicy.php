@@ -43,3 +43,4 @@ abstract class TenantModelPolicy
         return !empty($user->tenant_id) && (int) $user->tenant_id === (int) $model->tenant_id;
     }
 }
+
