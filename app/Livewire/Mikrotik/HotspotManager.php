@@ -213,12 +213,40 @@ class HotspotManager extends Component
         }
 
         // Verify router belongs to current tenant
-        $routerExists = \App\Models\Router::where(function ($q) {
+        $router = \App\Models\Router::where(function ($q) {
             $q->where('name', $this->selectedRouter)->orWhere('router_name', $this->selectedRouter);
-        })->exists();
+        })->first();
 
-        if (! $routerExists) {
+        if (! $router) {
             $this->selectedRouter = '';
+            return;
+        }
+
+        // Always load database-backed voucher stats immediately
+        $this->loadStats();
+
+        // Fast pre-flight socket probe (1.5s max) before attempting 6 heavy MikroTik socket commands
+        $host = $router->vpn_ip ?: ($router->ip_address ?: $router->ip);
+        $port = (int) ($router->api_port ?: 8728);
+        $isOnline = false;
+
+        if ($host) {
+            $socket = @fsockopen($host, $port, $errno, $errstr, 1.5);
+            if ($socket) {
+                fclose($socket);
+                $isOnline = true;
+            } elseif ($router->ssh_port) {
+                $sshSocket = @fsockopen($host, (int) $router->ssh_port, $errno, $errstr, 1.5);
+                if ($sshSocket) {
+                    fclose($sshSocket);
+                    $isOnline = true;
+                }
+            }
+        }
+
+        if (! $isOnline) {
+            flash()->warning("Router '{$this->selectedRouter}' is currently offline or unreachable at {$host}. Displaying local vouchers & sales records.");
+            $this->dispatch('reinit-datatables');
             return;
         }
 
@@ -236,7 +264,7 @@ class HotspotManager extends Component
             $this->loadStats();
             $this->dispatch('reinit-datatables');
         } catch (\Exception $e) {
-            flash()->error('Load error: '.$e->getMessage());
+            flash()->warning('Router sync notice: '.$e->getMessage());
         }
     }
 
@@ -1270,7 +1298,6 @@ class HotspotManager extends Component
 
         if (empty($this->selectedRouter) && $routers->isNotEmpty()) {
             $this->selectedRouter = $routers->first()->name ?: $routers->first()->router_name;
-            $this->loadData();
         }
         $reportData = $this->activeTab === 'report' ? $this->getReportData() : [];
         $vouchers = $this->activeTab === 'vouchers' ? $this->vouchers : collect();

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\CustomersInfo;
 use App\Models\PPPSecrets;
 use App\Models\Router;
 use App\Services\MikrotikApiService;
