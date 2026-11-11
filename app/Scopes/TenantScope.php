@@ -9,30 +9,42 @@ use Illuminate\Database\Eloquent\Scope;
 
 class TenantScope implements Scope
 {
+    protected static bool $resolving = false;
+
     /**
      * Apply the scope to a given Eloquent query builder.
      */
     public function apply(Builder $builder, Model $model)
     {
-        // 1. If user is Super Admin and no specific tenant explicitly configured, bypass scope
-        if (TenantContext::isSuperAdmin() && !TenantContext::isTenantExplicitlySet()) {
+        // 1. Prevent recursion during auth resolution or nested tenant checks
+        if (self::$resolving) {
             return;
         }
 
-        // 2. Allow unauthenticated login/authentication lookups on User model
-        if ($model instanceof \App\Models\User && !\Illuminate\Support\Facades\Auth::check() && !TenantContext::isTenantExplicitlySet()) {
+        // 2. Never scope User queries during Auth lookups unless tenant explicitly configured
+        if ($model instanceof \App\Models\User && !TenantContext::isTenantExplicitlySet()) {
             return;
         }
 
-        $tenantId = TenantContext::getTenantId();
+        self::$resolving = true;
+        try {
+            // 3. If user is Super Admin and no specific tenant explicitly configured, bypass scope
+            if (TenantContext::isSuperAdmin() && !TenantContext::isTenantExplicitlySet()) {
+                return;
+            }
 
-        // 3. FAIL CLOSED: If no tenant context exists, return NO rows (1 = 0)
-        if ($tenantId === null) {
-            $builder->whereRaw('1 = 0');
-            return;
+            $tenantId = TenantContext::getTenantId();
+
+            // 4. FAIL CLOSED: If no tenant context exists, return NO rows (1 = 0)
+            if ($tenantId === null) {
+                $builder->whereRaw('1 = 0');
+                return;
+            }
+
+            // 5. Normal tenant scoping
+            $builder->where($model->qualifyColumn('tenant_id'), $tenantId);
+        } finally {
+            self::$resolving = false;
         }
-
-        // 3. Normal tenant scoping
-        $builder->where($model->qualifyColumn('tenant_id'), $tenantId);
     }
 }

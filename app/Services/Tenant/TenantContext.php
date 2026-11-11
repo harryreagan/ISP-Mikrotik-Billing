@@ -11,6 +11,7 @@ class TenantContext
 {
     protected static ?int $currentTenantId = null;
     protected static bool $explicitlySet = false;
+    protected static bool $resolvingAuth = false;
 
     /**
      * Get the active tenant ID for the current execution context.
@@ -22,28 +23,37 @@ class TenantContext
             return self::$currentTenantId;
         }
 
-        // 2. Check authenticated user
-        if (Auth::check()) {
-            $user = Auth::user();
-
-            // If super admin and no specific tenant selected, return null (global scope bypassed)
-            if (self::isSuperAdmin($user)) {
-                $sessionTenant = session('impersonated_tenant_id') ?: session('tenant_id');
-                return $sessionTenant ? (int) $sessionTenant : null;
-            }
-
-            if (!empty($user->tenant_id)) {
-                return (int) $user->tenant_id;
-            }
+        if (self::$resolvingAuth) {
+            return null;
         }
 
-        // 3. Check session fallback
-        $sessionTenant = session('tenant_id') ?: session('impersonated_tenant_id');
-        if (!empty($sessionTenant)) {
-            return (int) $sessionTenant;
-        }
+        self::$resolvingAuth = true;
+        try {
+            // 2. Check authenticated user
+            if (Auth::check()) {
+                $user = Auth::user();
 
-        return null;
+                // If super admin and no specific tenant selected, return null (global scope bypassed)
+                if (self::isSuperAdmin($user)) {
+                    $sessionTenant = session('impersonated_tenant_id') ?: session('tenant_id');
+                    return $sessionTenant ? (int) $sessionTenant : null;
+                }
+
+                if (!empty($user->tenant_id)) {
+                    return (int) $user->tenant_id;
+                }
+            }
+
+            // 3. Check session fallback
+            $sessionTenant = session('tenant_id') ?: session('impersonated_tenant_id');
+            if (!empty($sessionTenant)) {
+                return (int) $sessionTenant;
+            }
+
+            return null;
+        } finally {
+            self::$resolvingAuth = false;
+        }
     }
 
     /**
@@ -77,24 +87,35 @@ class TenantContext
      */
     public static function isSuperAdmin(?User $user = null): bool
     {
-        $target = $user ?? Auth::user();
-        if (!$target) {
+        if ($user !== null) {
+            if (!empty($user->is_super_admin)) return true;
+            if (strtolower($user->role ?? '') === 'superadmin' || strtolower($user->role ?? '') === 'super_admin') return true;
+            if (method_exists($user, 'hasRole') && $user->hasRole('Super Admin')) return true;
             return false;
         }
 
-        if (!empty($target->is_super_admin)) {
-            return true;
+        if (self::$resolvingAuth) {
+            return false;
         }
 
-        if (strtolower($target->role ?? '') === 'superadmin' || strtolower($target->role ?? '') === 'super_admin') {
-            return true;
-        }
+        self::$resolvingAuth = true;
+        try {
+            if (!Auth::check()) {
+                return false;
+            }
+            $target = Auth::user();
+            if (!$target) {
+                return false;
+            }
 
-        if (method_exists($target, 'hasRole') && $target->hasRole('Super Admin')) {
-            return true;
-        }
+            if (!empty($target->is_super_admin)) return true;
+            if (strtolower($target->role ?? '') === 'superadmin' || strtolower($target->role ?? '') === 'super_admin') return true;
+            if (method_exists($target, 'hasRole') && $target->hasRole('Super Admin')) return true;
 
-        return false;
+            return false;
+        } finally {
+            self::$resolvingAuth = false;
+        }
     }
 
     /**
