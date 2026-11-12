@@ -26,6 +26,81 @@
     $termsUrl = Route::has('terms.show') ? route('terms.show') : '#terms';
     $whatsAppUrl = 'https://wa.me/' . preg_replace('/\D/', '', $whatsappNumber) . '?text=' . urlencode("Hello {$brandName}, I would like to learn more.");
 
+    // Query pricing plans and faqs dynamically from main_site_data (Super Admin ISP Hub updates)
+    $pricingPlans = null;
+    $landingFaqs = null;
+    try {
+        if (\Illuminate\Support\Facades\Schema::hasTable('main_site_data')) {
+            $rawPlans = \Illuminate\Support\Facades\DB::table('main_site_data')->where('type', 'pricing_plans')->value('value');
+            if ($rawPlans) {
+                $decodedPlans = json_decode($rawPlans, true);
+                if (is_array($decodedPlans) && !empty($decodedPlans)) {
+                    $pricingPlans = $decodedPlans;
+                }
+            }
+            $rawFaqs = \Illuminate\Support\Facades\DB::table('main_site_data')->where('type', 'landing_faqs')->value('value');
+            if ($rawFaqs) {
+                $decodedFaqs = json_decode($rawFaqs, true);
+                if (is_array($decodedFaqs) && !empty($decodedFaqs)) {
+                    $landingFaqs = $decodedFaqs;
+                }
+            }
+        }
+    } catch (\Throwable $e) {}
+
+    // Sensible fallback if main_site_data has not been seeded yet
+    if (!$pricingPlans) {
+        $pricingPlans = [
+            [
+                'name' => $t['pricing']['starter_name'] ?? 'Starter',
+                'price' => '350',
+                'period' => $t['pricing']['per_month'] ?? '/month',
+                'features' => [
+                    $t['pricing']['starter_f1'] ?? '2 routers',
+                    $t['pricing']['starter_f2'] ?? '150 customers',
+                    $t['pricing']['starter_f3'] ?? 'Mobile money, cards & bank',
+                    $t['pricing']['starter_f4'] ?? 'SMS, WhatsApp & email alerts',
+                    $t['pricing']['starter_f5'] ?? 'Unlimited admin users',
+                ],
+                'button_text' => $t['pricing']['starter_cta'] ?? 'Choose Starter',
+                'button_url' => $registerUrl . '?plan=starter',
+                'highlighted' => false,
+                'badge' => null,
+            ],
+            [
+                'name' => $t['pricing']['business_name'] ?? 'Business',
+                'price' => '1000',
+                'period' => $t['pricing']['per_month'] ?? '/month',
+                'features' => [
+                    $t['pricing']['business_f1'] ?? '5 routers',
+                    $t['pricing']['business_f2'] ?? '500 customers',
+                    $t['pricing']['business_f3'] ?? 'Resellers and vouchers',
+                    $t['pricing']['business_f4'] ?? 'SMS, WhatsApp & email alerts',
+                    $t['pricing']['business_f5'] ?? 'Unlimited admin users',
+                ],
+                'button_text' => $t['pricing']['business_cta'] ?? 'Choose Business',
+                'button_url' => $registerUrl . '?plan=business',
+                'highlighted' => true,
+                'badge' => $t['pricing']['popular'] ?? 'POPULAR',
+            ],
+            [
+                'name' => $t['pricing']['enterprise_name'] ?? 'Enterprise',
+                'price' => $t['pricing']['custom'] ?? 'Custom',
+                'period' => null,
+                'features' => [
+                    $t['pricing']['enterprise_f1'] ?? 'Unlimited routers',
+                    $t['pricing']['enterprise_f2'] ?? 'Custom branding',
+                    $t['pricing']['enterprise_f3'] ?? 'Priority support',
+                    $t['pricing']['enterprise_f4'] ?? 'Onboarding help',
+                ],
+                'button_text' => $t['pricing']['enterprise_cta'] ?? 'Talk to us',
+                'button_url' => $whatsAppUrl,
+                'highlighted' => false,
+                'badge' => null,
+            ],
+        ];
+    }
+
     $allTranslations = [
         'en' => trans('landing', [], 'en'),
         'sw' => trans('landing', [], 'sw'),
@@ -883,7 +958,9 @@
 
         @media (min-width: 900px) {
             .pricing-grid {
-                grid-template-columns: repeat(3, minmax(0, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                max-width: 1100px;
+                margin: 0 auto;
             }
         }
 
@@ -1500,97 +1577,54 @@
             </div>
 
             <div class="pricing-grid">
-                <!-- Starter Plan -->
-                <div class="p-card">
-                    <h3 data-i18n="pricing.starter_name">{{ $t['pricing']['starter_name'] }}</h3>
-                    <div class="p-price">
-                        <span data-price-kes="{{ $plansBaseKes['starter'] }}">$3</span>
-                        <small data-i18n="pricing.per_month">{{ $t['pricing']['per_month'] }}</small>
+                @foreach($pricingPlans as $plan)
+                    @php
+                        $pName = $plan['name'] ?? 'Plan';
+                        $rawPrice = trim((string)($plan['price'] ?? ''));
+                        // Extract numeric portion if available for currency conversion
+                        $numericStr = preg_replace('/[^\d.]/', '', $rawPrice);
+                        $hasNumericPrice = ($numericStr !== '' && is_numeric($numericStr) && floatval($numericStr) > 0);
+                        $period = !empty($plan['period']) ? trim((string)$plan['period']) : null;
+                        $isPopular = !empty($plan['highlighted']) || !empty($plan['badge']);
+                        $badgeText = !empty($plan['badge']) ? $plan['badge'] : ($isPopular ? 'POPULAR' : null);
+                        $btnUrl = !empty($plan['button_url']) ? $plan['button_url'] : $registerUrl;
+                        $btnText = !empty($plan['button_text']) ? $plan['button_text'] : 'Get Started';
+                        $features = is_array($plan['features'] ?? null) ? $plan['features'] : [];
+                    @endphp
+                    <div class="p-card {{ $isPopular ? 'popular' : '' }}">
+                        @if($badgeText)
+                            <span class="popular-badge">{{ $badgeText }}</span>
+                        @endif
+                        <h3>{{ $pName }}</h3>
+                        <div class="p-price">
+                            @if($hasNumericPrice)
+                                <span data-price-kes="{{ $numericStr }}">{{ $rawPrice }}</span>
+                            @else
+                                <span>{{ $rawPrice ?: 'Custom' }}</span>
+                            @endif
+                            @if($period)
+                                <small>{{ $period }}</small>
+                            @endif
+                        </div>
+                        @if(!empty($features))
+                            <ul class="p-features">
+                                @foreach($features as $feature)
+                                    <li>
+                                        <span class="tick-icon" aria-hidden="true">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                                <path d="M5 12l5 5L20 7"/>
+                                            </svg>
+                                        </span>
+                                        <span>{{ $feature }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @endif
+                        <a href="{{ $btnUrl }}" class="btn {{ $isPopular ? 'btn-orange' : 'btn-outline' }}">
+                            {{ $btnText }}
+                        </a>
                     </div>
-                    <ul class="p-features">
-                        <li>
-                            <span class="tick-icon" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
-                            <span data-i18n="pricing.starter_f1">{{ $t['pricing']['starter_f1'] }}</span>
-                        </li>
-                        <li>
-                            <span class="tick-icon" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
-                            <span data-i18n="pricing.starter_f2">{{ $t['pricing']['starter_f2'] }}</span>
-                        </li>
-                        <li>
-                            <span class="tick-icon" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
-                            <span data-i18n="pricing.starter_f3">{{ $t['pricing']['starter_f3'] }}</span>
-                        </li>
-                        <li>
-                            <span class="tick-icon" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
-                            <span data-i18n="pricing.starter_f4">{{ $t['pricing']['starter_f4'] }}</span>
-                        </li>
-                        <li>
-                            <span class="tick-icon" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
-                            <span data-i18n="pricing.starter_f5">{{ $t['pricing']['starter_f5'] }}</span>
-                        </li>
-                    </ul>
-                    <a href="{{ $registerUrl }}" class="btn btn-outline" data-i18n="pricing.starter_cta">{{ $t['pricing']['starter_cta'] }}</a>
-                </div>
-
-                <!-- Business Plan (Marked Popular, Ordered First on Phones) -->
-                <div class="p-card popular">
-                    <span class="popular-badge" data-i18n="pricing.popular">{{ $t['pricing']['popular'] }}</span>
-                    <h3 data-i18n="pricing.business_name">{{ $t['pricing']['business_name'] }}</h3>
-                    <div class="p-price">
-                        <span data-price-kes="{{ $plansBaseKes['business'] }}">$8</span>
-                        <small data-i18n="pricing.per_month">{{ $t['pricing']['per_month'] }}</small>
-                    </div>
-                    <ul class="p-features">
-                        <li>
-                            <span class="tick-icon" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
-                            <span data-i18n="pricing.business_f1">{{ $t['pricing']['business_f1'] }}</span>
-                        </li>
-                        <li>
-                            <span class="tick-icon" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
-                            <span data-i18n="pricing.business_f2">{{ $t['pricing']['business_f2'] }}</span>
-                        </li>
-                        <li>
-                            <span class="tick-icon" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
-                            <span data-i18n="pricing.business_f3">{{ $t['pricing']['business_f3'] }}</span>
-                        </li>
-                        <li>
-                            <span class="tick-icon" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
-                            <span data-i18n="pricing.business_f4">{{ $t['pricing']['business_f4'] }}</span>
-                        </li>
-                        <li>
-                            <span class="tick-icon" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
-                            <span data-i18n="pricing.business_f5">{{ $t['pricing']['business_f5'] }}</span>
-                        </li>
-                    </ul>
-                    <a href="{{ $registerUrl }}" class="btn btn-orange" data-i18n="pricing.business_cta">{{ $t['pricing']['business_cta'] }}</a>
-                </div>
-
-                <!-- Enterprise Plan -->
-                <div class="p-card">
-                    <h3 data-i18n="pricing.enterprise_name">{{ $t['pricing']['enterprise_name'] }}</h3>
-                    <div class="p-price">
-                        <span data-i18n="pricing.custom">{{ $t['pricing']['custom'] }}</span>
-                    </div>
-                    <ul class="p-features">
-                        <li>
-                            <span class="tick-icon" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
-                            <span data-i18n="pricing.enterprise_f1">{{ $t['pricing']['enterprise_f1'] }}</span>
-                        </li>
-                        <li>
-                            <span class="tick-icon" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
-                            <span data-i18n="pricing.enterprise_f2">{{ $t['pricing']['enterprise_f2'] }}</span>
-                        </li>
-                        <li>
-                            <span class="tick-icon" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
-                            <span data-i18n="pricing.enterprise_f3">{{ $t['pricing']['enterprise_f3'] }}</span>
-                        </li>
-                        <li>
-                            <span class="tick-icon" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
-                            <span data-i18n="pricing.enterprise_f4">{{ $t['pricing']['enterprise_f4'] }}</span>
-                        </li>
-                    </ul>
-                    <a href="{{ $whatsAppUrl }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline" data-i18n="pricing.enterprise_cta">{{ $t['pricing']['enterprise_cta'] }}</a>
-                </div>
+                @endforeach
             </div>
 
             <p class="pricing-note" data-i18n="pricing.note">{{ $t['pricing']['note'] }}</p>
@@ -1603,15 +1637,27 @@
             </div>
 
             <div class="faq-wrap">
-                @for($i = 1; $i <= 6; $i++)
-                    <details class="fq" {{ $i === 1 ? 'open' : '' }}>
-                        <summary>
-                            <span data-i18n="faq.q{{ $i }}">{{ $t['faq']['q' . $i] }}</span>
-                            <span class="fq-icon" aria-hidden="true">+</span>
-                        </summary>
-                        <p data-i18n="faq.a{{ $i }}">{{ $t['faq']['a' . $i] }}</p>
-                    </details>
-                @endfor
+                @if(!empty($landingFaqs))
+                    @foreach($landingFaqs as $idx => $faq)
+                        <details class="fq" {{ $idx === 0 ? 'open' : '' }}>
+                            <summary>
+                                <span>{{ $faq['q'] ?? '' }}</span>
+                                <span class="fq-icon" aria-hidden="true">+</span>
+                            </summary>
+                            <p>{{ $faq['a'] ?? '' }}</p>
+                        </details>
+                    @endforeach
+                @else
+                    @for($i = 1; $i <= 6; $i++)
+                        <details class="fq" {{ $i === 1 ? 'open' : '' }}>
+                            <summary>
+                                <span data-i18n="faq.q{{ $i }}">{{ $t['faq']['q' . $i] }}</span>
+                                <span class="fq-icon" aria-hidden="true">+</span>
+                            </summary>
+                            <p data-i18n="faq.a{{ $i }}">{{ $t['faq']['a' . $i] }}</p>
+                        </details>
+                    @endfor
+                @endif
             </div>
         </section>
 

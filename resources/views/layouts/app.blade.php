@@ -135,22 +135,39 @@
             border-radius: 0 !important;
             margin: 0 !important;
             box-shadow: none !important;
-            width: 16rem !important;
-            min-width: 16rem !important;
-            max-width: 16rem !important;
             transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.2s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
         }
 
-        .navbar-vertical-collapsed .navbar-vertical {
-            width: 72px !important;
-            min-width: 72px !important;
-            max-width: 72px !important;
+        .navbar-vertical .navbar-vertical-content,
+        .navbar-vertical .scrollbar {
+            background: var(--surface) !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            scrollbar-width: thin !important;
+            scrollbar-color: rgba(203, 213, 225, 0.4) transparent !important;
+            padding-bottom: 1.5rem !important;
         }
 
-        .navbar-vertical .navbar-vertical-content {
-            background: var(--surface) !important;
-            overflow-x: hidden !important;
-            padding-bottom: 1.5rem !important;
+        .navbar-vertical .navbar-vertical-content::-webkit-scrollbar,
+        .navbar-vertical .scrollbar::-webkit-scrollbar {
+            width: 4px !important;
+            background: transparent !important;
+        }
+
+        .navbar-vertical .navbar-vertical-content::-webkit-scrollbar-track,
+        .navbar-vertical .scrollbar::-webkit-scrollbar-track {
+            background: transparent !important;
+        }
+
+        .navbar-vertical .navbar-vertical-content::-webkit-scrollbar-thumb,
+        .navbar-vertical .scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(203, 213, 225, 0.4) !important;
+            border-radius: 9999px !important;
+        }
+
+        .navbar-vertical .navbar-vertical-content:hover::-webkit-scrollbar-thumb,
+        .navbar-vertical .scrollbar:hover::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.7) !important;
         }
 
         .navbar-vertical .navbar-brand {
@@ -337,13 +354,34 @@
         }
 
         @media (max-width: 1199.98px) {
+            /* Mobile drawer: hidden by default until toggled */
             .navbar-vertical {
+                display: none !important;
                 position: fixed !important;
                 top: 0 !important;
                 bottom: 0 !important;
                 left: 0 !important;
                 width: 280px !important;
-                z-index: 1050 !important;
+                max-width: 85vw !important;
+                z-index: 1060 !important;
+                background: #ffffff !important;
+                box-shadow: 4px 0 24px rgba(15, 23, 42, 0.18) !important;
+                border-right: 1px solid var(--border-ring) !important;
+            }
+
+            .navbar-vertical.show,
+            .navbar-vertical:has(#navbarVerticalCollapse.show),
+            .navbar-vertical.navbar-vertical-mobile-open {
+                display: flex !important;
+                flex-direction: column !important;
+            }
+
+            .navbar-vertical.show #navbarVerticalCollapse,
+            .navbar-vertical:has(#navbarVerticalCollapse.show) #navbarVerticalCollapse,
+            .navbar-vertical.navbar-vertical-mobile-open #navbarVerticalCollapse {
+                display: block !important;
+                flex: 1 1 auto !important;
+                overflow-y: auto !important;
             }
 
             .content,
@@ -351,7 +389,19 @@
             [data-layout="container"] .content {
                 margin-left: 0 !important;
                 width: 100% !important;
-                max-width: 100% !important;
+                max-width: 100vw !important;
+                overflow-x: hidden !important;
+            }
+
+            .navbar-vertical-backdrop {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(15, 23, 42, 0.45);
+                backdrop-filter: blur(2px);
+                z-index: 1055;
             }
         }
 
@@ -860,6 +910,54 @@
             }
         }
 
+        function setupMobileNavbar() {
+            const collapseEl = document.getElementById('navbarVerticalCollapse');
+            const navVertical = document.querySelector('.navbar-vertical');
+            if (!collapseEl || !navVertical) return;
+
+            let backdrop = document.querySelector('.navbar-vertical-backdrop');
+
+            function showNav() {
+                if (window.innerWidth < 1200) {
+                    navVertical.classList.add('navbar-vertical-mobile-open');
+                    if (!backdrop) {
+                        backdrop = document.createElement('div');
+                        backdrop.className = 'navbar-vertical-backdrop';
+                        backdrop.addEventListener('click', hideNav);
+                        document.body.appendChild(backdrop);
+                    }
+                }
+            }
+
+            function hideNav() {
+                navVertical.classList.remove('navbar-vertical-mobile-open');
+                if (typeof bootstrap !== 'undefined' && bootstrap.Collapse) {
+                    const bsCollapse = bootstrap.Collapse.getInstance(collapseEl);
+                    if (bsCollapse) bsCollapse.hide();
+                } else {
+                    collapseEl.classList.remove('show');
+                }
+                if (backdrop) {
+                    backdrop.remove();
+                    backdrop = null;
+                }
+            }
+
+            collapseEl.removeEventListener('show.bs.collapse', showNav);
+            collapseEl.removeEventListener('hide.bs.collapse', hideNav);
+            collapseEl.addEventListener('show.bs.collapse', showNav);
+            collapseEl.addEventListener('hide.bs.collapse', hideNav);
+
+            // Also close mobile menu if a nav item is clicked
+            navVertical.querySelectorAll('.nav-link').forEach(link => {
+                link.addEventListener('click', () => {
+                    if (window.innerWidth < 1200) {
+                        hideNav();
+                    }
+                });
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             if (typeof $ !== 'undefined') {
                 $.ajaxSetup({
@@ -875,11 +973,15 @@
             }
 
             handleNavbarHover();
+            setupMobileNavbar();
         });
 
 
         // Run on Livewire navigate
-        document.addEventListener('livewire:navigated', handleNavbarHover);
+        document.addEventListener('livewire:navigated', () => {
+            handleNavbarHover();
+            setupMobileNavbar();
+        });
 
         // For Livewire SPA support to maintain sidebar state
         document.addEventListener('livewire:navigated', () => {
