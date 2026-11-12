@@ -1,100 +1,94 @@
-<div class="container-fluid py-4" style="max-width: 900px;" @if($step === 2) wire:poll.3s="checkRouterOnline" @endif>
+<div class="mx-auto" style="max-width: 900px;" @if($step === 2) wire:poll.3s="checkRouterOnline" @endif>
     {{-- Page Header --}}
-    <div class="d-flex align-items-center justify-content-between mb-4">
-        <div>
-            <h3 class="fw-bold text-dark mb-1">Add Router</h3>
-            <p class="text-muted small mb-0">Connect and set up any MikroTik router in 4 verified steps.</p>
-        </div>
-        <a href="{{ route('mikrotik-sync') }}" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-x-lg me-1"></i>Cancel
-        </a>
-    </div>
+    <x-ui.page-header title="Add router" subtitle="Connect and set up any MikroTik router in 4 verified steps.">
+        <x-slot:actions>
+            <x-ui.button variant="secondary" :href="route('mikrotik-sync')">
+                <i class="bi bi-x-lg"></i> Cancel
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.page-header>
 
     {{-- 4-Step Progress Bar --}}
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body p-3">
-            <div class="row text-center g-2">
-                {{-- Step 1 --}}
-                <div class="col-3">
-                    <div class="d-flex flex-column align-items-center">
-                        <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold mb-1 {{ $step >= 1 ? 'bg-primary text-white' : 'bg-light text-muted border' }}" style="width: 38px; height: 38px;">
-                            @if($step > 1) <i class="bi bi-check-lg fs-5"></i> @else 1 @endif
-                        </div>
-                        <span class="small fw-semibold {{ $step === 1 ? 'text-primary' : ($step > 1 ? 'text-dark' : 'text-muted') }}">Name</span>
+    <x-ui.card class="mb-4 p-3">
+        <div class="row text-center g-2">
+            {{-- Step 1 --}}
+            <div class="col-3">
+                <div class="d-flex flex-column align-items-center">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center fw-semibold mb-1 {{ $step >= 1 ? 'bg-primary text-white' : 'bg-light text-muted border' }}" style="width: 34px; height: 34px; font-size: 0.75rem;">
+                        @if($step > 1) <i class="bi bi-check-lg"></i> @else 1 @endif
                     </div>
-                </div>
-                {{-- Step 2 --}}
-                <div class="col-3">
-                    <div class="d-flex flex-column align-items-center">
-                        <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold mb-1 {{ $step >= 2 ? 'bg-primary text-white' : 'bg-light text-muted border' }}" style="width: 38px; height: 38px;">
-                            @if($step > 2) <i class="bi bi-check-lg fs-5"></i> @else 2 @endif
-                        </div>
-                        <span class="small fw-semibold {{ $step === 2 ? 'text-primary' : ($step > 2 ? 'text-dark' : 'text-muted') }}">Connect</span>
-                    </div>
-                </div>
-                {{-- Step 3 --}}
-                <div class="col-3">
-                    <div class="d-flex flex-column align-items-center">
-                        <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold mb-1 {{ $step >= 3 ? 'bg-primary text-white' : 'bg-light text-muted border' }}" style="width: 38px; height: 38px;">
-                            @if($step > 3) <i class="bi bi-check-lg fs-5"></i> @else 3 @endif
-                        </div>
-                        <span class="small fw-semibold {{ $step === 3 ? 'text-primary' : ($step > 3 ? 'text-dark' : 'text-muted') }}">Ports</span>
-                    </div>
-                </div>
-                {{-- Step 4 --}}
-                <div class="col-3">
-                    <div class="d-flex flex-column align-items-center">
-                        <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold mb-1 {{ $step === 4 ? ($is_configured ? 'bg-success text-white' : ($apply_error ? 'bg-danger text-white' : 'bg-primary text-white')) : 'bg-light text-muted border' }}" style="width: 38px; height: 38px;">
-                            @if($is_configured) <i class="bi bi-check-all fs-4"></i> @elseif($apply_error) <i class="bi bi-exclamation-triangle fs-5"></i> @else 4 @endif
-                        </div>
-                        <span class="small fw-semibold {{ $step === 4 ? ($is_configured ? 'text-success' : ($apply_error ? 'text-danger' : 'text-primary')) : 'text-muted' }}">Done</span>
-                    </div>
+                    <span class="small fw-medium {{ $step === 1 ? 'text-orange-600' : ($step > 1 ? 'text-dark' : 'text-muted') }}" style="font-size: 0.75rem;">Name</span>
                 </div>
             </div>
-            {{-- Progress Line --}}
-            <div class="progress mt-2" style="height: 4px;">
-                <div class="progress-bar {{ $apply_error ? 'bg-danger' : ($is_configured ? 'bg-success' : 'bg-primary') }}" role="progressbar" style="width: {{ ($step - 1) * 33.33 + ($is_configured ? 33.34 : 10) }}%"></div>
+            {{-- Step 2 --}}
+            <div class="col-3">
+                <div class="d-flex flex-column align-items-center">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center fw-semibold mb-1 {{ $step >= 2 ? 'bg-primary text-white' : 'bg-light text-muted border' }}" style="width: 34px; height: 34px; font-size: 0.75rem;">
+                        @if($step > 2) <i class="bi bi-check-lg"></i> @else 2 @endif
+                    </div>
+                    <span class="small fw-medium {{ $step === 2 ? 'text-orange-600' : ($step > 2 ? 'text-dark' : 'text-muted') }}" style="font-size: 0.75rem;">Connect</span>
+                </div>
+            </div>
+            {{-- Step 3 --}}
+            <div class="col-3">
+                <div class="d-flex flex-column align-items-center">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center fw-semibold mb-1 {{ $step >= 3 ? 'bg-primary text-white' : 'bg-light text-muted border' }}" style="width: 34px; height: 34px; font-size: 0.75rem;">
+                        @if($step > 3) <i class="bi bi-check-lg"></i> @else 3 @endif
+                    </div>
+                    <span class="small fw-medium {{ $step === 3 ? 'text-orange-600' : ($step > 3 ? 'text-dark' : 'text-muted') }}" style="font-size: 0.75rem;">Ports</span>
+                </div>
+            </div>
+            {{-- Step 4 --}}
+            <div class="col-3">
+                <div class="d-flex flex-column align-items-center">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center fw-semibold mb-1 {{ $step === 4 ? ($is_configured ? 'bg-success text-white' : ($apply_error ? 'bg-danger text-white' : 'bg-primary text-white')) : 'bg-light text-muted border' }}" style="width: 34px; height: 34px; font-size: 0.75rem;">
+                        @if($is_configured) <i class="bi bi-check-all"></i> @elseif($apply_error) <i class="bi bi-exclamation-triangle"></i> @else 4 @endif
+                    </div>
+                    <span class="small fw-medium {{ $step === 4 ? ($is_configured ? 'text-success' : ($apply_error ? 'text-danger' : 'text-orange-600')) : 'text-muted' }}" style="font-size: 0.75rem;">Done</span>
+                </div>
             </div>
         </div>
-    </div>
+        {{-- Progress Line --}}
+        <div class="progress mt-2.5" style="height: 4px;">
+            <div class="progress-bar {{ $apply_error ? 'bg-danger' : ($is_configured ? 'bg-success' : 'bg-primary') }}" role="progressbar" style="width: {{ ($step - 1) * 33.33 + ($is_configured ? 33.34 : 10) }}%"></div>
+        </div>
+    </x-ui.card>
 
     {{-- ============================================================== --}}
     {{-- STEP 1 - NAME & LOCATION                                       --}}
     {{-- ============================================================== --}}
     @if($step === 1)
-        <div class="card shadow-sm border-0">
-            <div class="card-body p-4 p-md-5">
-                <div class="text-center mb-4">
-                    <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3" style="width: 64px; height: 64px;">
-                        <i class="bi bi-router fs-2"></i>
-                    </div>
-                    <h4 class="fw-bold text-dark">Name Your Router</h4>
-                    <p class="text-muted small">Give your router a friendly name and the building or town where it is installed.</p>
+        <x-ui.card>
+            <div class="text-center mb-4">
+                <div class="d-inline-flex align-items-center justify-content-center bg-orange-50 text-orange-600 rounded-circle mb-3" style="width: 48px; height: 48px;">
+                    <i class="bi bi-router fs-4"></i>
+                </div>
+                <h4 class="ui-section-title">Name your router</h4>
+                <p class="text-muted small mb-0">Give your router a friendly name and the building or town where it is installed.</p>
+            </div>
+
+            <form wire:submit.prevent="generateSetupScript">
+                <div class="mb-3">
+                    <label class="form-label">Router name <span class="text-danger">*</span></label>
+                    <input type="text" wire:model.live="router_name" class="form-control @error('router_name') is-invalid @enderror" placeholder="e.g. Main Gateway or Westlands Hub" autofocus required>
+                    @error('router_name') <div class="invalid-feedback">{{ $message }}</div> @enderror
                 </div>
 
-                <form wire:submit.prevent="generateSetupScript">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Router Name <span class="text-danger">*</span></label>
-                        <input type="text" wire:model.live="router_name" class="form-control form-control-lg @error('router_name') is-invalid @enderror" placeholder="e.g. Main Gateway or Westlands Hub" autofocus required>
-                        @error('router_name') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
+                <div class="mb-4">
+                    <label class="form-label">Location / branch <span class="text-danger">*</span></label>
+                    <input type="text" wire:model.live="location" class="form-control @error('location') is-invalid @enderror" placeholder="e.g. CBD Plaza 2nd Floor or Nakuru Town" required>
+                    @error('location') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    <div class="form-text">This helps you easily identify where this device is deployed.</div>
+                </div>
 
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Location / Branch <span class="text-danger">*</span></label>
-                        <input type="text" wire:model.live="location" class="form-control form-control-lg @error('location') is-invalid @enderror" placeholder="e.g. CBD Plaza 2nd Floor or Nakuru Town" required>
-                        @error('location') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        <div class="form-text">This helps you easily identify where this device is deployed.</div>
-                    </div>
-
-                    <button type="submit" 
-                            class="btn btn-primary btn-lg w-100 py-3 fw-bold" 
-                            @if(empty($router_name) || empty($location)) disabled @endif>
-                        <span>Next: Generate Setup Script</span>
-                        <i class="bi bi-arrow-right ms-2"></i>
-                    </button>
-                </form>
-            </div>
-        </div>
+                <button type="submit" 
+                        class="btn btn-primary w-100 py-2.5" 
+                        @if(empty($router_name) || empty($location)) disabled @endif>
+                    <span>Next: generate setup script</span>
+                    <i class="bi bi-arrow-right ms-1.5"></i>
+                </button>
+            </form>
+        </x-ui.card>
     @endif
 
     {{-- ============================================================== --}}

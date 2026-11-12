@@ -1,27 +1,25 @@
 <div>
-    <div class="container-fluid py-4">
+    <div>
 
         {{-- Header --}}
-        <div class="d-flex align-items-center justify-content-between mb-4">
-            <div>
-                <h4 class="fw-bold mb-0" style="color:#1a1f36;">
-                    <i class="bi bi-wallet2 me-2 text-danger"></i>{{ __('Expense Management') }}
-                </h4>
-                <p class="text-muted small mb-0">{{ __('Track all ISP operating costs') }}</p>
-            </div>
-            <button wire:click="openCreate"
-                class="btn btn-danger rounded-3 px-4 fw-semibold shadow-sm">
-                <i class="bi bi-plus-lg me-1"></i> {{ __('Add Expense') }}
-            </button>
-        </div>
+        <x-ui.page-header
+            :title="__('Expense management')"
+            :subtitle="__('Track all ISP operating costs')"
+        >
+            <x-slot:actions>
+                <button wire:click="openCreate" class="btn btn-primary">
+                    <i class="bi bi-plus-lg me-1"></i> {{ __('Add Expense') }}
+                </button>
+            </x-slot:actions>
+        </x-ui.page-header>
 
         {{-- Filter Bar --}}
-        <div class="card border-0 shadow-sm rounded-4 mb-4">
+        <div class="card mb-4">
             <div class="card-body py-3">
                 <div class="row g-3 align-items-end">
                     <div class="col-md-3">
-                        <label class="form-label small fw-semibold text-muted mb-1">{{ __('Category') }}</label>
-                        <select wire:model.live="filterCategory" class="form-select form-select-sm rounded-3">
+                        <label class="form-label mb-1">{{ __('Category') }}</label>
+                        <select wire:model.live="filterCategory" class="form-select form-select-sm">
                             <option value="">{{ __('All Categories') }}</option>
                             @foreach($categories as $key => $label)
                                 <option value="{{ $key }}">{{ __($label) }}</option>
@@ -29,8 +27,8 @@
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label small fw-semibold text-muted mb-1">{{ __('Month') }}</label>
-                        <select wire:model.live="filterMonth" class="form-select form-select-sm rounded-3">
+                        <label class="form-label mb-1">{{ __('Month') }}</label>
+                        <select wire:model.live="filterMonth" class="form-select form-select-sm">
                             <option value="">{{ __('All Months') }}</option>
                             @foreach($months as $num => $name)
                                 <option value="{{ $num }}">{{ __($name) }}</option>
@@ -38,8 +36,8 @@
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label small fw-semibold text-muted mb-1">{{ __('Year') }}</label>
-                        <select wire:model.live="filterYear" class="form-select form-select-sm rounded-3">
+                        <label class="form-label mb-1">{{ __('Year') }}</label>
+                        <select wire:model.live="filterYear" class="form-select form-select-sm">
                             <option value="">{{ __('All Years') }}</option>
                             @foreach($years as $y)
                                 <option value="{{ $y }}">{{ $y }}</option>
@@ -55,8 +53,8 @@
                                         $c = $colorMap[$key] ?? 'secondary';
                                         $style = $c === 'purple' ? 'background:#f3e8ff;color:#7c3aed;border-color:#c4b5fd;' : '';
                                     @endphp
-                                    <span class="badge rounded-pill px-3 py-2 small fw-semibold
-                                        {{ $c !== 'purple' ? "bg-{$c}-subtle text-{$c} border border-{$c}-subtle" : '' }}"
+                                    <span class="badge rounded-pill tabular-nums
+                                        {{ $c !== 'purple' ? "bg-{$c}" : '' }}"
                                         style="{{ $style }}">
                                         {{ __($label) }}: KES {{ number_format($totals[$key], 2) }}
                                     </span>
@@ -70,24 +68,23 @@
 
         {{-- Grand Total Banner --}}
         @if($grandTotal > 0)
-        <div class="alert rounded-4 border-0 mb-4 py-3 px-4 d-flex align-items-center"
-             style="background: linear-gradient(135deg,#fff0f0,#ffe5e5); border-left: 4px solid #ef4444 !important;">
+        <div class="alert alert-danger mb-4 py-3 px-4 d-flex align-items-center">
             <i class="bi bi-exclamation-circle-fill text-danger fs-5 me-3"></i>
             <div>
                 <span class="fw-semibold text-dark">{{ __('Total Expenses (current filter):') }}</span>
-                <span class="fw-bold text-danger fs-5 ms-2">KES {{ number_format($grandTotal, 2) }}</span>
+                <span class="fw-bold text-rose-600 text-lg tabular-nums ms-2">KES {{ number_format($grandTotal, 2) }}</span>
             </div>
         </div>
         @endif
 
         {{-- Expense Table --}}
-        <div class="card border-0 shadow-sm rounded-4">
+        <div class="card overflow-hidden">
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
-                        <thead style="background:#f8f9fc;">
-                            <tr class="small text-muted fw-semibold">
-                                <th class="ps-4 py-3">#</th>
+                        <thead>
+                            <tr>
+                                <th class="ps-4">#</th>
                                 <th>{{ __('Date') }}</th>
                                 <th>{{ __('Category') }}</th>
                                 <th>{{ __('Title / Linked To') }}</th>
@@ -108,8 +105,8 @@
                                         $c = $colorMap[$expense->category] ?? 'secondary';
                                         $style = $c === 'purple' ? 'background:#f3e8ff;color:#7c3aed;border:1px solid #c4b5fd;' : '';
                                     @endphp
-                                    <span class="badge rounded-pill small px-2
-                                        {{ $c !== 'purple' ? "bg-{$c}-subtle text-{$c} border border-{$c}-subtle" : '' }}"
+                                    <span class="badge rounded-pill
+                                        {{ $c !== 'purple' ? "bg-{$c}" : '' }}"
                                         style="{{ $style }}">
                                         {{ __($expense->category_label) }}
                                     </span>
@@ -132,28 +129,31 @@
                                 </td>
                                 <td class="text-muted small">{{ $expense->reference_no ?? '—' }}</td>
                                 <td class="small text-muted">{{ $expense->addedBy?->name ?? '—' }}</td>
-                                <td class="text-end fw-bold text-danger">KES {{ number_format($expense->amount, 2) }}</td>
+                                <td class="text-end fw-semibold text-rose-600 tabular-nums">KES {{ number_format($expense->amount, 2) }}</td>
                                 <td class="text-end pe-4">
                                     <button wire:click="triggerPrint({{ $expense->id }})"
-                                        class="btn btn-sm btn-outline-success rounded-3 me-1 py-1 px-2" title="{{ __('Print Voucher') }}">
+                                        class="btn btn-xs btn-secondary me-1" title="{{ __('Print Voucher') }}">
                                         <i class="bi bi-printer"></i>
                                     </button>
                                     <button wire:click="openEdit({{ $expense->id }})"
-                                        class="btn btn-sm btn-outline-primary rounded-3 me-1 py-1 px-2" title="{{ __('Edit') }}">
+                                        class="btn btn-xs btn-secondary me-1" title="{{ __('Edit') }}">
                                         <i class="bi bi-pencil"></i>
                                     </button>
                                     <button wire:click="delete({{ $expense->id }})"
                                         wire:confirm="{{ __('Delete this expense?') }}"
-                                        class="btn btn-sm btn-outline-danger rounded-3 py-1 px-2" title="{{ __('Delete') }}">
+                                        class="btn btn-xs btn-outline-danger" title="{{ __('Delete') }}">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </td>
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="8" class="text-center py-5 text-muted">
-                                    <i class="bi bi-inbox fs-2 d-block mb-2"></i>
-                                    {{ __('No expenses found for the selected filters.') }}
+                                <td colspan="8" class="p-0">
+                                    <x-ui.empty-state
+                                        icon="bi-inbox"
+                                        :title="__('No expenses found')"
+                                        :description="__('No expenses found for the selected filters.')"
+                                    />
                                 </td>
                             </tr>
                             @endforelse
@@ -161,7 +161,7 @@
                     </table>
                 </div>
                 @if($expenses->hasPages())
-                <div class="px-4 py-3 border-top">
+                <div class="card-footer py-3">
                     {{ $expenses->links() }}
                 </div>
                 @endif
@@ -171,22 +171,22 @@
 
     {{-- ── Add / Edit Modal ─────────────────────────────────────── --}}
     @if($showModal)
-    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.45);">
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(15, 23, 42, 0.4); backdrop-filter: blur(2px);">
         <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content border-0 shadow-lg rounded-4">
-                <div class="modal-header border-0 pb-0 px-4 pt-4">
-                    <h5 class="fw-bold mb-0">
-                        <i class="bi bi-{{ $editId ? 'pencil-square text-primary' : 'plus-circle text-danger' }} me-2"></i>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-{{ $editId ? 'pencil-square text-orange-500' : 'plus-circle text-orange-500' }} me-2"></i>
                         {{ $editId ? __('Edit Expense') : __('Add New Expense') }}
                     </h5>
                     <button wire:click="$set('showModal', false)" class="btn-close" type="button"></button>
                 </div>
-                <div class="modal-body px-4 pt-3">
+                <div class="modal-body p-4">
                     <div class="row g-3">
                         {{-- Category --}}
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold">{{ __('Category') }} <span class="text-danger">*</span></label>
-                            <select wire:model.live="category" class="form-select rounded-3 @error('category') is-invalid @enderror">
+                            <label class="form-label">{{ __('Category') }} <span class="text-danger">*</span></label>
+                            <select wire:model.live="category" class="form-select @error('category') is-invalid @enderror">
                                 @foreach($categories as $key => $label)
                                     <option value="{{ $key }}">{{ __($label) }}</option>
                                 @endforeach
@@ -196,31 +196,31 @@
 
                         {{-- Date --}}
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold">{{ __('Expense Date') }} <span class="text-danger">*</span></label>
-                            <input wire:model="expense_date" type="date" class="form-control rounded-3 @error('expense_date') is-invalid @enderror">
+                            <label class="form-label">{{ __('Expense Date') }} <span class="text-danger">*</span></label>
+                            <input wire:model="expense_date" type="date" class="form-control @error('expense_date') is-invalid @enderror">
                             @error('expense_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
 
                         {{-- ── Employee Salary: live-search user ── --}}
                         @if($category === 'employee_salary')
                         <div class="col-12">
-                            <div class="alert alert-info border-0 rounded-3 py-2 px-3 small mb-0">
+                            <div class="alert alert-info py-2 px-3 small mb-0">
                                 <i class="bi bi-person-badge me-1"></i>
                                 {{ __('Search and select an employee from the system user list below.') }}
                             </div>
                         </div>
                         <div class="col-12 position-relative">
-                            <label class="form-label small fw-semibold">
+                            <label class="form-label">
                                 {{ __('Employee (User)') }} <span class="text-muted fw-normal">— {{ __('Optional') }}</span>
                             </label>
                             @if($linkedUserId)
                                 {{-- Selected badge --}}
-                                <div class="d-flex align-items-center gap-2 p-2 rounded-3 border bg-info-subtle">
+                                <div class="d-flex align-items-center gap-2 p-2 rounded-xl border bg-slate-50">
                                     <i class="bi bi-person-check-fill text-info fs-5"></i>
                                     <div class="flex-grow-1">
                                         <div class="fw-semibold small text-dark">{{ $userSearch }}</div>
                                     </div>
-                                    <button wire:click="clearLinkedUser" type="button" class="btn btn-sm btn-outline-secondary rounded-3 py-0 px-2">
+                                    <button wire:click="clearLinkedUser" type="button" class="btn btn-xs btn-secondary">
                                         <i class="bi bi-x"></i> {{ __('Change') }}
                                     </button>
                                 </div>
@@ -228,22 +228,20 @@
                                 <input wire:model.live.debounce.300ms="userSearch"
                                     type="text"
                                     placeholder="{{ __('Type name, email or mobile to search…') }}"
-                                    class="form-control rounded-3"
+                                    class="form-control"
                                     autocomplete="off">
 
                                 @if($userSuggestions->isNotEmpty())
-                                <div class="position-absolute start-0 end-0 shadow-lg rounded-3 bg-white border mt-1 overflow-hidden"
+                                <div class="position-absolute start-0 end-0 rounded-xl bg-white ring-1 ring-slate-200/70 mt-1 overflow-hidden"
                                      style="z-index:9999; top:100%;">
                                     @foreach($userSuggestions as $user)
                                     <button wire:click="selectUser({{ $user->id }})"
                                         type="button"
-                                        class="d-flex align-items-center gap-3 w-100 px-3 py-2 border-0 bg-transparent text-start hover-bg-light"
-                                        style="cursor:pointer; transition:background .15s;"
-                                        onmouseover="this.style.background='#f0f9ff'"
-                                        onmouseout="this.style.background='transparent'">
-                                        <div class="rounded-circle bg-info-subtle d-flex align-items-center justify-content-center flex-shrink-0"
+                                        class="d-flex align-items-center gap-3 w-100 px-3 py-2 border-0 bg-transparent text-start hover:bg-slate-50"
+                                        style="cursor:pointer;">
+                                        <div class="rounded-circle bg-slate-100 d-flex align-items-center justify-content-center flex-shrink-0"
                                              style="width:34px;height:34px;">
-                                            <i class="bi bi-person-fill text-info"></i>
+                                            <i class="bi bi-person-fill text-slate-500"></i>
                                         </div>
                                         <div>
                                             <div class="fw-semibold small text-dark">{{ $user->name }}</div>
@@ -264,16 +262,15 @@
                         {{-- ── Reseller Commission Payout: select reseller ── --}}
                         @if($category === 'reseller_payout')
                         <div class="col-12">
-                            <div class="alert border-0 rounded-3 py-2 px-3 small mb-0"
-                                 style="background:#f3e8ff;color:#6d28d9;">
+                            <div class="alert alert-info py-2 px-3 small mb-0">
                                 <i class="bi bi-info-circle me-1"></i>
                                 {!! __('Selecting a reseller will automatically <strong>debit</strong> the payout amount from their wallet balance.') !!}
                             </div>
                         </div>
                         <div class="col-12">
-                            <label class="form-label small fw-semibold">{{ __('Reseller') }} <span class="text-danger">*</span></label>
+                            <label class="form-label">{{ __('Reseller') }} <span class="text-danger">*</span></label>
                             <select wire:model.live="linkedResellerId"
-                                class="form-select rounded-3 @error('linkedResellerId') is-invalid @enderror">
+                                class="form-select @error('linkedResellerId') is-invalid @enderror">
                                 <option value="">{{ __('— Select Reseller —') }}</option>
                                 @foreach($resellers as $r)
                                     <option value="{{ $r->id }}">
@@ -289,7 +286,7 @@
                             @if($linkedResellerId)
                                 @php $selReseller = $resellers->firstWhere('id', $linkedResellerId); @endphp
                                 @if($selReseller && $amount && (float)$amount > (float)$selReseller->balance)
-                                <div class="alert alert-warning rounded-3 py-2 px-3 small mt-2 mb-0">
+                                <div class="alert alert-warning py-2 px-3 small mt-2 mb-0">
                                     <i class="bi bi-exclamation-triangle-fill me-1"></i>
                                     {!! __('Amount <strong>KES :amount</strong> exceeds reseller balance <strong>KES :balance</strong>. Save will fail.', ['amount' => number_format((float)$amount, 2), 'balance' => number_format($selReseller->balance, 2)]) !!}
                                 </div>
@@ -308,38 +305,38 @@
 
                         {{-- Title --}}
                         <div class="col-md-8">
-                            <label class="form-label small fw-semibold">{{ __('Title') }} <span class="text-danger">*</span></label>
+                            <label class="form-label">{{ __('Title') }} <span class="text-danger">*</span></label>
                             <input wire:model="title" type="text" placeholder="{{ __('e.g. Office electricity bill') }}"
-                                class="form-control rounded-3 @error('title') is-invalid @enderror">
+                                class="form-control @error('title') is-invalid @enderror">
                             @error('title')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
 
                         {{-- Amount --}}
                         <div class="col-md-4">
-                            <label class="form-label small fw-semibold">{{ __('Amount') }} (KES ) <span class="text-danger">*</span></label>
+                            <label class="form-label">{{ __('Amount') }} (KES ) <span class="text-danger">*</span></label>
                             <input wire:model.live="amount" type="number" step="0.01" min="0" placeholder="0.00"
-                                class="form-control rounded-3 @error('amount') is-invalid @enderror">
+                                class="form-control @error('amount') is-invalid @enderror">
                             @error('amount')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
 
                         {{-- Reference --}}
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold">{{ __('Reference No') }}</label>
+                            <label class="form-label">{{ __('Reference No') }}</label>
                             <input wire:model="reference_no" type="text" placeholder="{{ __('Auto-generated if blank') }}"
-                                class="form-control rounded-3">
+                                class="form-control">
                         </div>
 
                         {{-- Description --}}
                         <div class="col-12">
-                            <label class="form-label small fw-semibold">{{ __('Description') }}</label>
+                            <label class="form-label">{{ __('Description') }}</label>
                             <textarea wire:model="description" rows="2" placeholder="{{ __('Additional notes…') }}"
-                                class="form-control rounded-3"></textarea>
+                                class="form-control"></textarea>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer border-0 px-4 pb-4">
-                    <button wire:click="$set('showModal', false)" class="btn btn-light rounded-3 px-4">{{ __('Cancel') }}</button>
-                    <button wire:click="save" class="btn btn-danger rounded-3 px-4 fw-semibold">
+                <div class="modal-footer">
+                    <button wire:click="$set('showModal', false)" class="btn btn-secondary">{{ __('Cancel') }}</button>
+                    <button wire:click="save" class="btn btn-primary">
                         <span wire:loading wire:target="save" class="spinner-border spinner-border-sm me-1"></span>
                         {{ $editId ? __('Update Expense') : __('Save Expense') }}
                     </button>

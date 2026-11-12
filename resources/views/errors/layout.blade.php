@@ -89,7 +89,7 @@
         <div class="badge">@yield('code', '500') – @yield('title', 'Error')</div>
         <h1>@yield('heading', 'Something went wrong')</h1>
         <p class="message">@yield('message', 'An unexpected error occurred. Please try again or contact support.')</p>
-        <a href="/" class="back-link">← Go Back Home</a>
+        <a href="{{ auth()->check() ? route('dashboard') : route('login') }}" class="back-link">← {{ auth()->check() ? 'Go Back to Dashboard' : 'Go to Login' }}</a>
     </div>
 </body>
 </html>

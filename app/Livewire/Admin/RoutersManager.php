@@ -698,9 +698,7 @@ class RoutersManager extends Component
             $pppCount = PPPSecrets::where('router_name', $rName)
                 ->where('status', '!=', 'removed')
                 ->count();
-            $custCount = CustomersInfo::where('router_id', $r->id)
-                ->orWhere('router_name', $rName)
-                ->count();
+            $custCount = CustomersInfo::where('router_id', $r->id)->count();
             $r->subscribers_count = max($pppCount, $custCount);
             
             // Connected live count

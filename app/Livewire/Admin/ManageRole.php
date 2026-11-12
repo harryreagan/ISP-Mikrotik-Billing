@@ -83,6 +83,11 @@ class ManageRole extends Component
             return;
         }
 
+        if (strtolower(trim($this->name)) === 'super admin') {
+            session()->flash('error', 'Super Admin is a reserved platform role.');
+            return;
+        }
+
         $this->validate([
             'name' => 'required|unique:roles,name,'.($this->roleId ?? 'NULL').'|max:255',
             'permissions' => 'array',
@@ -176,7 +181,7 @@ class ManageRole extends Component
 
     public function render()
     {
-        $roles = Role::where('name', '!=', 'Reseller')->orderBy('id')->paginate($this->perPage);
+        $roles = Role::whereNotIn('name', ['Reseller', 'Super Admin'])->orderBy('id')->paginate($this->perPage);
 
         return view('livewire.admin.role.manage-role', ['roles' => $roles])->layout('layouts.app');
     }

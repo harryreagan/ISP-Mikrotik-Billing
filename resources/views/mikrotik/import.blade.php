@@ -1,8 +1,9 @@
 <x-app-layout>
-    <div class="container mt-5">
+
+<div class="container mt-5">
         <h2>{{ __('Import and Preview Excel Data') }}</h2>
         <div class="float-end">
-            <a href="{{ url('/') }}" class="btn btn-primary btn-sm">&larr; {{ __('Back') }}</a>
+            <a href="{{ route('dashboard') }}" class="btn btn-primary btn-sm">&larr; {{ __('Back') }}</a>
         </div>
 
         @if(session('success'))

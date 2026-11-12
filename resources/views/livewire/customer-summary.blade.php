@@ -1,16 +1,18 @@
-<div class="px-4 zoom-in">
+<div class="ui-page-wrap">
     <x-slot name="header">
-        <h2 class="h4 font-weight-bold text-dark mb-0">
-            <i class="bi bi-file-earmark-bar-graph me-2 text-success"></i>{{ __('Customer Summary') }}
+        <h2 class="ui-page-title mb-0">
+            {{ __('Customer Summary') }}
         </h2>
     </x-slot>
 
-    <div class="row g-3 d-flex justify-content-center mb-3">
+    <x-ui.page-header :title="__('Customer Summary')" :subtitle="__('Search a customer to view their profile and full payment ledger')" />
+
+    <div class="row g-4">
         <!-- Search Panel -->
         <div class="col-lg-4 col-md-5 col-sm-12">
             <x-mikrotik.section-form>
                 <x-slot name="title">
-                    <span class="text-success fw-bold"><i class="bi bi-search me-2"></i>{{ __('Search Customer') }}</span>
+                    <span class="ui-section-title"><i class="bi bi-search me-2 text-orange-500"></i>{{ __('Search Customer') }}</span>
                 </x-slot>
                 <x-slot name="aside">
                     @include('livewire.partials.customer-search')
@@ -19,35 +21,34 @@
         </div>
 
         <!-- Customer Basic Info -->
-        <div class="col-lg-7 col-md-7 col-sm-12">
+        <div class="col-lg-8 col-md-7 col-sm-12">
             @if (!empty($info_data))
                 <x-mikrotik.section-form>
                     <x-slot name="title">
-                        <span class="text-success fw-bold"><i
-                                class="bi bi-person-badge me-2"></i>{{ __('Customer Information') }}</span>
+                        <span class="ui-section-title"><i
+                                class="bi bi-person-badge me-2 text-orange-500"></i>{{ __('Customer Information') }}</span>
                     </x-slot>
                     <x-slot name="aside">
                         <div class="table-responsive">
-                            <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.9rem;">
+                            <table class="table table-sm table-hover align-middle mb-0">
                                 <tbody>
                                     <tr>
                                         <td class="text-muted py-2">{{ __('Customer ID') }}</td>
-                                        <td class="fw-bold text-dark py-2">{{ $info_data->customer_unique_id }}</td>
+                                        <td class="fw-semibold text-dark py-2">{{ $info_data->customer_unique_id }}</td>
                                         <td class="text-muted py-2">{{ __('Name') }}</td>
-                                        <td class="fw-bold text-dark py-2">{{ $info_data->customer_name }}</td>
+                                        <td class="fw-semibold text-dark py-2">{{ $info_data->customer_name }}</td>
                                     </tr>
                                     <tr>
                                         <td class="text-muted py-2">{{ __('Billing Type') }}</td>
                                         <td class="py-2">
-                                            <span class="badge bg-light text-dark border px-2 py-1"
-                                                style="font-size: 0.75rem;">{{ __(ucfirst($info_data->billing->billing_type)) }}</span>
+                                            <span class="badge bg-secondary-subtle text-secondary">{{ __(ucfirst($info_data->billing->billing_type)) }}</span>
                                         </td>
                                         <td class="text-muted py-2">{{ __('PPPoE Username') }}</td>
                                         <td class="py-2">{{ $info_data->pppUser->username ?? 'N/A' }}</td>
                                     </tr>
                                     <tr>
                                         <td class="text-muted py-2">{{ __('Address') }}</td>
-                                        <td colspan="3" class="text-muted py-2" style="font-size: 0.85rem;">
+                                        <td colspan="3" class="text-muted py-2">
                                             @foreach ($info_data->customerAddress as $address)
                                                 {{ $address->input_type_dropdown }},
                                                 {{ $address->input_type_test }}
@@ -61,19 +62,18 @@
                                         <td class="text-muted py-2">{{ __('Status') }}</td>
                                         @php
                                             $badge = match ($info_data->status) {
-                                                'active' => 'bg-success',
-                                                'pending' => 'bg-warning text-dark',
-                                                'free' => 'bg-info text-dark',
-                                                default => 'bg-danger',
+                                                'active' => 'bg-success-subtle text-success',
+                                                'pending' => 'bg-warning-subtle text-warning',
+                                                'free' => 'bg-info-subtle text-info',
+                                                default => 'bg-danger-subtle text-danger',
                                             };
                                         @endphp
                                         <td class="py-2">
-                                            <span class="badge rounded-pill {{ $badge }} px-2.5 py-1"
-                                                style="font-size: 0.75rem;">{{ __(ucfirst($info_data->status)) }}</span>
+                                            <span class="badge {{ $badge }}">{{ __(ucfirst($info_data->status)) }}</span>
                                         </td>
                                         <td class="text-muted py-2">{{ __('Expire Date') }}</td>
                                         <td class="text-dark py-2">
-                                            <i class="bi bi-calendar-event text-success me-1"></i>
+                                            <i class="bi bi-calendar-event text-orange-500 me-1"></i>
                                             {{ \Carbon\Carbon::parse($this->info_data->billing->auto_disable_date)->format('d-M-Y') }}
                                         </td>
                                     </tr>
@@ -88,19 +88,18 @@
 
     <!-- Payments Ledger Summary Section -->
     @if (!empty($info_data))
-        <div class="row g-3 d-flex justify-content-center">
+        <div class="row g-4">
             <div class="col-12">
                 <x-mikrotik.section-form>
                     <x-slot name="title">
-                        <span class="text-success fw-bold"><i
-                                class="bi bi-credit-card-2-back me-2"></i>{{ __('Customer Payment Ledger') }}</span>
+                        <span class="ui-section-title"><i
+                                class="bi bi-credit-card-2-back me-2 text-orange-500"></i>{{ __('Customer Payment Ledger') }}</span>
                     </x-slot>
                     <x-slot name="aside">
                         <div class="table-responsive">
                             <table id="payment_summary"
-                                class="data-table table table-sm table-hover align-middle display table-bordered scrollbar"
-                                style="font-size: 0.85rem;">
-                                <thead class="table-success text-success text-center">
+                                class="data-table table table-sm table-hover align-middle display scrollbar">
+                                <thead class="text-center">
                                     <tr>
                                         <th class="py-2">{{ __('Date') }}</th>
                                         <th class="py-2">{{ __('Monthly Rent') }}</th>
@@ -137,7 +136,7 @@
                                                 $paymentSummary->previous_due -
                                                 ($paymentSummary->discount + $paymentSummary->advance);
                                         @endphp
-                                        <tr class="table-light fw-bold text-dark">
+                                        <tr class="fw-semibold text-dark">
                                             <td>{{ \Carbon\Carbon::parse($paymentSummary->summary_date)->format('d-M-Y') }}
                                             </td>
                                             <td>{{ $paymentSummary->monthly_rent }}</td>

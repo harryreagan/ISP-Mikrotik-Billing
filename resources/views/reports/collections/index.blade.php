@@ -2,74 +2,74 @@
     <x-slot name="header">
         {{ __('Collections') }}
     </x-slot>
-    <div class="row">
-        <div class="col">
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-body p-3">
-                    <form class="row g-3 align-items-end" id="collection-report-form" onsubmit="return false;">
-                        <div class="col-md-3 col-sm-6">
-                            <label for="from-date" class="form-label small fw-semibold text-muted mb-1">{{ __('From Date') }}</label>
-                            <input type="date" name="from-date" class="form-control" id="from-date" value="{{ now()->startOfMonth()->format('Y-m-d') }}">
-                        </div>
-                        <div class="col-md-3 col-sm-6">
-                            <label for="to-date" class="form-label small fw-semibold text-muted mb-1">{{ __('To Date') }}</label>
-                            <input type="date" name="to-date" class="form-control" id="to-date" value="{{ now()->format('Y-m-d') }}">
-                        </div>
-                        <div class="col-md-3 col-sm-6">
-                            <label for="collector" class="form-label small fw-semibold text-muted mb-1">{{ __('Collector') }}</label>
-                            <select name="collector" id="collector" class="form-select">
-                                <option value="">{{ __('All Collectors') }}</option>
-                                @foreach ($collectors as $collector)
-                                    <option value="{{ $collector->email }}">{{ $collector->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-md-3 col-sm-6 d-flex gap-2">
-                            <button type="submit" id="report-submit" class="btn btn-primary w-100">
-                                <i class="bi bi-funnel me-1"></i> {{ __('Filter') }}
-                            </button>
-                            <button type="button" id="report-reset" class="btn btn-outline-secondary" title="{{ __('Reset Filter') }}">
-                                <i class="bi bi-arrow-counterclockwise"></i>
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
+    <div class="ui-page-wrap">
+        <x-ui.page-header :title="__('Collections Report')" :subtitle="__('Filter and export customer payment collections by date range and collector')" />
 
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-striped align-middle w-100" id="collection-report-table">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>{{ __('Invoice No') }}</th>
-                                    <th>{{ __('Customer ID') }}</th>
-                                    <th>{{ __('Date') }}</th>
-                                    <th>{{ __('Customer Name') }}</th>
-                                    <th>{{ __('Mobile') }}</th>
-                                    <th>{{ __('IP/User') }}</th>
-                                    <th>{{ __('Address') }}</th>
-                                    <th class="text-end">{{ __('Bill') }}</th>
-                                    <th class="text-end">{{ __('Discount') }}</th>
-                                    <th class="text-end">{{ __('Collection') }}</th>
-                                    <th class="text-end">{{ __('Due') }}</th>
-                                    <th>{{ __('Method') }}</th>
-                                    <th>{{ __('Trx ID') }}</th>
-                                    <th>{{ __('Collected By') }}</th>
-                                </tr>
-                            </thead>
-                            <tfoot class="table-light fw-bold">
-                                <tr>
-                                    <th colspan="7" class="text-end">{{ __('Page Total:') }}</th>
-                                    <th class="text-end" id="footer-bill">0.00</th>
-                                    <th class="text-end text-warning" id="footer-discount">0.00</th>
-                                    <th class="text-end text-success" id="footer-collected">0.00</th>
-                                    <th class="text-end text-danger" id="footer-due">0.00</th>
-                                    <th colspan="3"></th>
-                                </tr>
-                            </tfoot>
-                        </table>
+        <div class="card">
+            <div class="card-body py-3">
+                <form class="row g-3 align-items-end" id="collection-report-form" onsubmit="return false;">
+                    <div class="col-md-3 col-sm-6">
+                        <label for="from-date" class="form-label mb-1">{{ __('From Date') }}</label>
+                        <input type="date" name="from-date" class="form-control form-control-sm" id="from-date" value="{{ now()->startOfMonth()->format('Y-m-d') }}">
                     </div>
+                    <div class="col-md-3 col-sm-6">
+                        <label for="to-date" class="form-label mb-1">{{ __('To Date') }}</label>
+                        <input type="date" name="to-date" class="form-control form-control-sm" id="to-date" value="{{ now()->format('Y-m-d') }}">
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <label for="collector" class="form-label mb-1">{{ __('Collector') }}</label>
+                        <select name="collector" id="collector" class="form-select form-select-sm">
+                            <option value="">{{ __('All Collectors') }}</option>
+                            @foreach ($collectors as $collector)
+                                <option value="{{ $collector->email }}">{{ $collector->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-3 col-sm-6 d-flex gap-2">
+                        <button type="submit" id="report-submit" class="btn btn-primary btn-sm w-100">
+                            <i class="bi bi-funnel me-1"></i> {{ __('Filter') }}
+                        </button>
+                        <button type="button" id="report-reset" class="btn btn-secondary btn-sm" title="{{ __('Reset Filter') }}">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle w-100" id="collection-report-table">
+                        <thead>
+                            <tr>
+                                <th>{{ __('Invoice No') }}</th>
+                                <th>{{ __('Customer ID') }}</th>
+                                <th>{{ __('Date') }}</th>
+                                <th>{{ __('Customer Name') }}</th>
+                                <th>{{ __('Mobile') }}</th>
+                                <th>{{ __('IP/User') }}</th>
+                                <th>{{ __('Address') }}</th>
+                                <th class="text-end">{{ __('Bill') }}</th>
+                                <th class="text-end">{{ __('Discount') }}</th>
+                                <th class="text-end">{{ __('Collection') }}</th>
+                                <th class="text-end">{{ __('Due') }}</th>
+                                <th>{{ __('Method') }}</th>
+                                <th>{{ __('Trx ID') }}</th>
+                                <th>{{ __('Collected By') }}</th>
+                            </tr>
+                        </thead>
+                        <tfoot class="fw-semibold border-top">
+                            <tr>
+                                <th colspan="7" class="text-end">{{ __('Page Total:') }}</th>
+                                <th class="text-end tabular-nums" id="footer-bill">0.00</th>
+                                <th class="text-end text-warning tabular-nums" id="footer-discount">0.00</th>
+                                <th class="text-end text-success tabular-nums" id="footer-collected">0.00</th>
+                                <th class="text-end text-danger tabular-nums" id="footer-due">0.00</th>
+                                <th colspan="3"></th>
+                            </tr>
+                        </tfoot>
+                    </table>
                 </div>
             </div>
         </div>

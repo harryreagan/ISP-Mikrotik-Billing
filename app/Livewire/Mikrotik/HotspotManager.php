@@ -7,6 +7,8 @@ use App\Models\HotspotSale;
 use App\Models\HotspotVoucher;
 use App\Models\PackageList;
 use App\Models\RouterList;
+use App\Services\CaptivePortalTemplates;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -20,6 +22,23 @@ class HotspotManager extends Component
     public string $selectedRouter = '';
 
     public string $activeTab = 'dashboard';
+
+    // ── Hotspot Packages Management & Live Preview ────────────────────────────
+    public ?int $editingPackageId = null;
+    public string $pkg_package = '';
+    public $pkg_price = '';
+    public string $pkg_plan_label = '';
+    public string $pkg_rate_limit = '5M/5M';
+    public int $pkg_validity_value = 1;
+    public string $pkg_validity_unit = 'hours';
+    public int $pkg_shared_users = 1;
+    public bool $pkg_push_to_mikrotik = true;
+    public bool $pkg_show_on_site = true;
+    public bool $showPackageModal = false;
+
+    // Portal Live Preview
+    public string $portalTemplate = 'midnight';
+    public string $portalPreviewDevice = 'mobile';
 
     // ── User form ────────────────────────────────────────────────────────────
     public string $u_name = '';
@@ -1285,11 +1304,196 @@ class HotspotManager extends Component
 
     public function getHotspotPackagesProperty()
     {
-        // Packages from local DB that match this router — for profile autofill
-        return PackageList::where('router_name', $this->selectedRouter)
-            ->orWhereNull('router_name')
-            ->orderBy('package')
+        $tenantId = auth()->user()?->tenant_id ?: 1;
+        return PackageList::forTenant($tenantId)
+            ->where(function($q) {
+                $q->where('type', 'hotspot')->orWhereNull('type');
+            })
+            ->where(function($q) {
+                if ($this->selectedRouter) {
+                    $q->where('router_name', $this->selectedRouter)->orWhereNull('router_name');
+                }
+            })
+            ->orderBy('price')
             ->get();
+    }
+
+    public function openNewPackageModal(): void
+    {
+        $this->editingPackageId = null;
+        $this->pkg_package = '';
+        $this->pkg_price = '';
+        $this->pkg_plan_label = '';
+        $this->pkg_rate_limit = '5M/5M';
+        $this->pkg_validity_value = 1;
+        $this->pkg_validity_unit = 'hours';
+        $this->pkg_shared_users = 1;
+        $this->pkg_push_to_mikrotik = true;
+        $this->pkg_show_on_site = true;
+        $this->showPackageModal = true;
+    }
+
+    public function closePackageModal(): void
+    {
+        $this->showPackageModal = false;
+        $this->editingPackageId = null;
+    }
+
+    public function editHotspotPackage(int $id): void
+    {
+        $tenantId = auth()->user()?->tenant_id ?: 1;
+        $pkg = PackageList::forTenant($tenantId)->findOrFail($id);
+
+        $this->editingPackageId = $pkg->id;
+        $this->pkg_package = $pkg->package;
+        $this->pkg_price = $pkg->price;
+        $this->pkg_plan_label = $pkg->plan_label ?: '';
+        $this->pkg_rate_limit = $pkg->mikrotik_rate_limit ?: ($pkg->speed ?: '5M/5M');
+        $this->pkg_validity_value = (int) ($pkg->validity_value ?: ($pkg->duration_value ?: 1));
+        $this->pkg_validity_unit = $pkg->validity_unit ?: ($pkg->duration_unit ?: 'hours');
+        $this->pkg_shared_users = (int) ($pkg->shared_users ?: 1);
+        $this->pkg_push_to_mikrotik = (bool) $pkg->push_to_mikrotik;
+        $this->pkg_show_on_site = (bool) ($pkg->show_on_site ?? true);
+        $this->showPackageModal = true;
+    }
+
+    public function saveHotspotPackage(): void
+    {
+        $this->validate([
+            'pkg_package' => 'required|string|max:100',
+            'pkg_price' => 'required|numeric|min:0',
+            'pkg_rate_limit' => 'nullable|string|max:50',
+            'pkg_validity_value' => 'required|integer|min:1',
+            'pkg_validity_unit' => 'required|string|in:minutes,hours,days,weeks,months',
+            'pkg_shared_users' => 'required|integer|min:1',
+        ]);
+
+        $tenantId = auth()->user()?->tenant_id ?: 1;
+
+        $planLabel = $this->pkg_plan_label ?: ($this->pkg_validity_value . ' ' . ucfirst($this->pkg_validity_unit));
+
+        $data = [
+            'tenant_id' => $tenantId,
+            'package' => $this->pkg_package,
+            'price' => $this->pkg_price,
+            'type' => 'hotspot',
+            'plan_label' => $planLabel,
+            'mikrotik_rate_limit' => $this->pkg_rate_limit,
+            'speed' => $this->pkg_rate_limit,
+            'validity_value' => $this->pkg_validity_value,
+            'validity_unit' => $this->pkg_validity_unit,
+            'duration_value' => $this->pkg_validity_value,
+            'duration_unit' => $this->pkg_validity_unit,
+            'shared_users' => $this->pkg_shared_users,
+            'router_name' => $this->selectedRouter ?: null,
+            'push_to_mikrotik' => $this->pkg_push_to_mikrotik,
+            'is_active' => true,
+            'show_on_site' => $this->pkg_show_on_site,
+            'show_public' => $this->pkg_show_on_site,
+        ];
+
+        if ($this->editingPackageId) {
+            $pkg = PackageList::forTenant($tenantId)->findOrFail($this->editingPackageId);
+            $pkg->update($data);
+            flash()->success("Hotspot package '{$this->pkg_package}' updated successfully!");
+        } else {
+            $pkg = PackageList::create($data);
+            flash()->success("Hotspot package '{$this->pkg_package}' created successfully!");
+        }
+
+        // Push to MikroTik Hotspot User Profile if enabled
+        if ($this->pkg_push_to_mikrotik && !empty($this->selectedRouter)) {
+            try {
+                $sessionTimeout = $this->formatSessionTimeout($this->pkg_validity_value, $this->pkg_validity_unit);
+                $this->ctrl()->addHotspotUserProfile($this->selectedRouter, [
+                    'name' => $this->pkg_package,
+                    'rate_limit' => $this->pkg_rate_limit,
+                    'shared_users' => $this->pkg_shared_users,
+                    'session_timeout' => $sessionTimeout,
+                    'idle_timeout' => '',
+                    'status_autorefresh' => '1m',
+                    'address_pool' => 'none',
+                ]);
+                flash()->info("MikroTik User Profile '{$this->pkg_package}' synced to router!");
+            } catch (\Throwable $e) {
+                \Log::warning("HotspotManager: Profile sync to {$this->selectedRouter} failed: " . $e->getMessage());
+            }
+        }
+
+        $this->showPackageModal = false;
+        try {
+            $this->userProfiles = $this->ctrl()->getHotspotUserProfiles($this->selectedRouter);
+        } catch (\Throwable $e) {}
+    }
+
+    public function deleteHotspotPackage(int $id): void
+    {
+        $tenantId = auth()->user()?->tenant_id ?: 1;
+        $pkg = PackageList::forTenant($tenantId)->findOrFail($id);
+        $name = $pkg->package;
+        $pkg->delete();
+        flash()->success("Package '{$name}' deleted.");
+    }
+
+    public function pushPackageToRouter(int $id): void
+    {
+        if (empty($this->selectedRouter)) {
+            flash()->error("Please select a router first.");
+            return;
+        }
+
+        $tenantId = auth()->user()?->tenant_id ?: 1;
+        $pkg = PackageList::forTenant($tenantId)->findOrFail($id);
+
+        try {
+            $sessionTimeout = $this->formatSessionTimeout((int) ($pkg->validity_value ?: 1), $pkg->validity_unit ?: 'hours');
+            $this->ctrl()->addHotspotUserProfile($this->selectedRouter, [
+                'name' => $pkg->package,
+                'rate_limit' => $pkg->mikrotik_rate_limit ?: ($pkg->speed ?: ''),
+                'shared_users' => $pkg->shared_users ?: 1,
+                'session_timeout' => $sessionTimeout,
+                'idle_timeout' => '',
+                'status_autorefresh' => '1m',
+                'address_pool' => 'none',
+            ]);
+            flash()->success("Profile '{$pkg->package}' successfully pushed to router {$this->selectedRouter}!");
+            $this->userProfiles = $this->ctrl()->getHotspotUserProfiles($this->selectedRouter);
+        } catch (\Throwable $e) {
+            flash()->error("Failed to push profile to router: " . $e->getMessage());
+        }
+    }
+
+    protected function formatSessionTimeout(int $val, string $unit): string
+    {
+        return match($unit) {
+            'minutes' => "{$val}m",
+            'hours'   => "{$val}h",
+            'days'    => ($val * 24) . 'h',
+            'weeks'   => ($val * 168) . 'h',
+            'months'  => ($val * 720) . 'h',
+            default   => "{$val}h",
+        };
+    }
+
+    public function getPortalPreviewHtmlProperty(): string
+    {
+        $tenantId = auth()->user()?->tenant_id ?: 1;
+        $settings = DB::table('isp_portal_settings')->where('tenant_id', $tenantId)->first();
+        $packages = $this->hotspotPackages;
+
+        return CaptivePortalTemplates::render(
+            $this->portalTemplate,
+            $settings ?: [
+                'brand_name' => 'High-Speed WiFi',
+                'brand_color' => '#ff6600',
+                'secondary_color' => '#0f172a',
+                'headline' => 'Welcome to High-Speed Internet',
+                'subheadline' => 'Instant automated M-Pesa activation with zero buffering.',
+                'terms_text' => 'By connecting, you agree to our fair use policy and terms of service.',
+                'payment_instructions' => 'Select a package, enter your M-Pesa phone number, and accept the STK push on your phone.',
+            ],
+            $packages
+        );
     }
 
     public function render()
@@ -1305,9 +1509,26 @@ class HotspotManager extends Component
         $sales = in_array($this->activeTab, ['income', 'report']) ? $this->sales : collect();
 
         $hotspotPackages = $this->hotspotPackages;
+        $portalPreviewHtml = $this->portalPreviewHtml;
+        $templatesCatalog = CaptivePortalTemplates::catalog();
+
+        $selectedRouter = $this->selectedRouter;
+        $users = $this->users;
+        $sessions = $this->sessions;
+        $userProfiles = $this->userProfiles;
+        $hosts = $this->hosts;
+        $servers = $this->servers;
+        $profiles = $this->profiles;
+        $ipPools = $this->ipPools;
+        $routerResources = $this->routerResources;
+        $hsLogs = $this->hsLogs;
+        $chartData = $this->chartData;
 
         return view('livewire.mikrotik.hotspot-manager', compact(
-            'routers', 'reportData', 'vouchers', 'voucherBatches', 'sales', 'hotspotPackages'
+            'routers', 'selectedRouter', 'users', 'sessions', 'userProfiles',
+            'hosts', 'servers', 'profiles', 'ipPools', 'routerResources', 'hsLogs', 'chartData',
+            'reportData', 'vouchers', 'voucherBatches', 'sales', 'hotspotPackages',
+            'portalPreviewHtml', 'templatesCatalog'
         ))->layout('layouts.app');
     }
 

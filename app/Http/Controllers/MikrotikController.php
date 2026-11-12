@@ -16,14 +16,24 @@ class MikrotikController extends Controller
 
     protected static array $sshPool = [];
 
+    protected static array $failedEndpoints = [];
+
     /**
      * Get or create a pooled API service instance
      */
-    protected function getPooledApiService(string $ip, int $port, string $username, string $password, int $timeout = 3): MikrotikApiService
+    protected function getPooledApiService(string $ip, int $port, string $username, string $password, int $timeout = 2): MikrotikApiService
     {
         $key = "{$ip}:{$port}:{$username}";
+        if (isset(self::$failedEndpoints["api:{$key}"])) {
+            throw new \RuntimeException(self::$failedEndpoints["api:{$key}"]);
+        }
         if (! isset(self::$apiPool[$key])) {
-            self::$apiPool[$key] = new MikrotikApiService($ip, $port, $username, $password, $timeout);
+            try {
+                self::$apiPool[$key] = new MikrotikApiService($ip, $port, $username, $password, $timeout);
+            } catch (\Throwable $e) {
+                self::$failedEndpoints["api:{$key}"] = $e->getMessage();
+                throw $e;
+            }
         }
 
         return self::$apiPool[$key];
@@ -32,11 +42,19 @@ class MikrotikController extends Controller
     /**
      * Get or create a pooled SSH service instance
      */
-    protected function getPooledSshService(string $ip, int $port, string $username, string $password, int $timeout = 5): MikrotikSSHService
+    protected function getPooledSshService(string $ip, int $port, string $username, string $password, int $timeout = 3): MikrotikSSHService
     {
         $key = "{$ip}:{$port}:{$username}";
+        if (isset(self::$failedEndpoints["ssh:{$key}"])) {
+            throw new \RuntimeException(self::$failedEndpoints["ssh:{$key}"]);
+        }
         if (! isset(self::$sshPool[$key])) {
-            self::$sshPool[$key] = new MikrotikSSHService($ip, $port, $username, $password, $timeout);
+            try {
+                self::$sshPool[$key] = new MikrotikSSHService($ip, $port, $username, $password, $timeout);
+            } catch (\Throwable $e) {
+                self::$failedEndpoints["ssh:{$key}"] = $e->getMessage();
+                throw $e;
+            }
         }
 
         return self::$sshPool[$key];
@@ -499,7 +517,7 @@ class MikrotikController extends Controller
 
     public function systemOverview(): array
     {
-        return $this->routerList(null, '/system/resource/print', '/system resource print');
+        return $this->routerList(null, '/system/resource/print', '/system resource print', [], false);
     }
 
     // ─── Generic CRUD Helpers ────────────────────────────────────────────────

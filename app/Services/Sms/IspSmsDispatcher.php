@@ -73,6 +73,10 @@ class IspSmsDispatcher
             Log::warning("[IspSmsDispatcher] Log recording warning: " . $e->getMessage());
         }
 
+        if ($tenantId) {
+            \Illuminate\Support\Facades\Cache::forget("sms_balance:{$tenantId}");
+        }
+
         return $sent;
     }
 

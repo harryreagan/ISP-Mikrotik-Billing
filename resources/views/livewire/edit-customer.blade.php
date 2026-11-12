@@ -1,9 +1,9 @@
-<div class="zoom-in">
+<div>
     <x-slot name="header">
-        <h2 class="h4 font-weight-bold">
-            {{ __('Edit Customer') }}
-        </h2>
+        {{ __('Edit customer') }}
     </x-slot>
+
+    <x-ui.page-header :title="__('Edit customer')" :subtitle="__('Click any underlined value below to edit subscriber, address, router, or billing details inline.')" />
 
     <div x-data="{ isEditing: null, tempValue: {} }" class="row g-2">
         <div class="col-md-6">

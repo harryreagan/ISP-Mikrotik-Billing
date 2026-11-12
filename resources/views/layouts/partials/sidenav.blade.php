@@ -7,7 +7,7 @@
                     <span class="toggle-line"></span>
                 </span>
             </button>
-            <a class="navbar-brand me-1 me-sm-3" href="{{url('/')}}">
+            <a class="navbar-brand me-1 me-sm-3" href="{{ route('dashboard') }}">
                 <div class="d-flex align-items-center">
                     <x-hsmart-logo color="dark" height="34px" />
                 </div>
@@ -30,7 +30,7 @@
             <span class="toggle-line"></span>
         </span>
     </button>
-    <a class="navbar-brand me-1 me-sm-3" href="{{url('/')}}">
+    <a class="navbar-brand me-1 me-sm-3" href="{{ route('dashboard') }}">
         <div class="d-flex align-items-center">
             <x-hsmart-logo color="dark" height="34px" />
         </div>
@@ -48,18 +48,9 @@
             document.querySelector('.navbar-vertical').classList.add(`navbar-${navbarStyle}`);
         }
     </script>
-    <div class="d-flex align-items-center">
-        <div class="toggle-icon-wrapper">
-            <button class="btn navbar-toggler-humburger-icon navbar-vertical-toggle" data-bs-placement="left" title="Toggle Navigation">
-                <span class="navbar-toggle-icon">
-                    <span class="toggle-line"></span>
-                </span>
-            </button>
-        </div>
-        <a class="navbar-brand" href="{{url('/')}}" style="text-decoration: none;">
-            <div class="d-flex align-items-center py-2 px-1">
-                <x-hsmart-logo color="dark" height="34px" />
-            </div>
+    <div class="d-flex align-items-center px-3 border-bottom border-200" style="height: 64px;">
+        <a class="navbar-brand m-0 p-0 text-decoration-none d-flex align-items-center" href="{{ route('dashboard') }}" style="text-decoration: none;">
+            <x-hsmart-logo color="dark" height="40px" />
         </a>
     </div>
     <div class="collapse navbar-collapse" id="navbarVerticalCollapse">

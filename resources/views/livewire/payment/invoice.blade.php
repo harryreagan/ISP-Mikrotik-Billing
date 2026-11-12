@@ -1,12 +1,18 @@
-<div class="px-4 zoom-in" x-data @focus-paid-amount.window="document.getElementById('paid_amount').focus()">
+<div class="zoom-in" x-data @focus-paid-amount.window="document.getElementById('paid_amount').focus()">
     <x-slot name="header">
         {{ __('Payment Invoice') }}
     </x-slot>
-    <div class="row g-2 d-flex justify-content-center">
+
+    <x-ui.page-header
+        :title="__('Payment invoice')"
+        :subtitle="__('Search customers to generate and print payment invoices')"
+    />
+
+    <div class="row g-4">
         <div class="{{ !empty($info_data) ? 'col-lg-4 col-md-5 col-sm-12' : 'col-lg-4 col-md-5 col-sm-12' }}">
             <x-mikrotik.section-form>
                 <x-slot name="title">
-                    <span class="text-success fw-bold"><i class="bi bi-search me-2"></i>{{ __('Search Customer') }}</span>
+                    <span class="ui-section-title"><i class="bi bi-search me-2 text-orange-500"></i>{{ __('Search Customer') }}</span>
                 </x-slot>
                 <x-slot name="aside">
                     @include('livewire.partials.customer-search')
@@ -17,7 +23,9 @@
         <div class="col-lg-8 col-md-7 col-sm-12">
             @if (!empty($info_data))
                 <x-mikrotik.section-form :class="'row'">
-                    <x-slot name="title">{{ __('Customer Info') }}</x-slot>
+                    <x-slot name="title">
+                        <span class="ui-section-title"><i class="bi bi-receipt me-2 text-orange-500"></i>{{ __('Customer Info') }}</span>
+                    </x-slot>
                     <x-slot name="aside">
                         <div id="print-section" class="col-md-12 p-0" style='height: 297mm;'>
                             <div class="container-fluid h-100">

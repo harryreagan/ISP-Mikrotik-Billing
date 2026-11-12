@@ -1,6 +1,12 @@
 {{-- theme, alerts and settings --}}
-<ul class="navbar-nav navbar-nav-icons ms-auto flex-row align-items-center">
-    <li class="nav-item dropdown" wire:ignore
+<ul class="navbar-nav navbar-nav-icons ms-auto flex-row align-items-center gap-1">
+    {{-- SMS Balance Indicator --}}
+    <li class="nav-item d-flex align-items-center me-1">
+        <x-sms-balance />
+    </li>
+
+    {{-- Live Telemetry Clock / Date Pill (Hidden on mobile) --}}
+    <li class="nav-item d-none d-md-flex align-items-center me-1" wire:ignore
         x-data="{
             current: new Date('{{ now()->format('Y-m-d H:i:s') }}'),
             timeString: '',
@@ -14,44 +20,22 @@
             },
             updateDisplay() {
                 const pad = n => n.toString().padStart(2, '0');
-                let hours = this.current.getHours();
+                const hours = pad(this.current.getHours());
                 const minutes = pad(this.current.getMinutes());
                 const seconds = pad(this.current.getSeconds());
-                const ampm = hours >= 12 ? 'PM' : 'AM';
-                hours = hours % 12 || 12;
-                this.timeString = `${pad(hours)}:${minutes}:${seconds} ${ampm}`;
+                this.timeString = `${hours}:${minutes}:${seconds}`;
                 this.dateString = this.current.toLocaleDateString('en-US', {
-                    weekday: 'short', month: 'short', day: 'numeric'
+                    weekday: 'short', day: 'numeric', month: 'short'
                 });
             }
         }"
         x-init="init()"
     >
-        <!-- Mobile Clock Icon -->
-        <a class="d-block d-lg-none nav-link btn-toolbar-icon"
-           id="clockDropdown" role="button" data-bs-toggle="dropdown"
-           aria-haspopup="true" aria-expanded="false" title="{{ __('Time') }}">
-            <i class="bi bi-clock fs-8 text-secondary"></i>
-        </a>
-
-        <!-- Dropdown for Mobile -->
-        <div class="dropdown-menu dropdown-caret dropdown-menu-end dropdown-menu-card dropdown-menu-notification dropdown-caret-bg mt-3"
-            aria-labelledby="clockDropdown">
-            <div class="card shadow-none py-3 px-4 text-center">
-                <div class="text-xs text-muted fw-medium" x-text="dateString"></div>
-                <div class="fs-8 fw-bold text-dark font-monospace my-1" x-text="timeString"></div>
-                <div class="text-xs text-muted">
-                    Africa/Nairobi (EAT)
-                </div>
-            </div>
-        </div>
-
-        <!-- Desktop Compact Telemetry Pill -->
-        <div class="d-none d-lg-flex align-items-center gap-2 px-3 py-1 me-2 rounded-pill bg-light border border-light-subtle" 
-             style="background: #F8F9FA !important; border-color: #E5E7EB !important; font-size: 13px;">
-            <span class="d-inline-block rounded-circle bg-success" style="width: 7px; height: 7px; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);"></span>
-            <span class="fw-bold text-dark font-monospace" x-text="timeString" style="font-size: 12.5px; letter-spacing: -0.2px;"></span>
-            <span class="text-muted" style="opacity: 0.4;">|</span>
+        <div class="d-flex align-items-center gap-2 px-3 rounded-pill bg-light" 
+             style="height: 36px; background-color: #f8fafc !important; border: 1px solid #e2e8f0 !important; font-size: 12.5px;">
+            <span class="rounded-circle bg-success" style="width: 7px; height: 7px; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);"></span>
+            <span class="fw-semibold text-dark font-monospace" x-text="timeString" style="font-size: 12px; font-variant-numeric: tabular-nums;"></span>
+            <span style="color: #cbd5e1;">|</span>
             <span class="text-secondary fw-medium" x-text="dateString" style="font-size: 12px;"></span>
             <span class="badge bg-secondary-subtle text-secondary-emphasis px-1.5 py-0.5 rounded" style="font-size: 9px; font-weight: 700; letter-spacing: 0.5px;">EAT</span>
         </div>
@@ -156,13 +140,18 @@
     <li class="nav-item dropdown ps-1">
         <a class="nav-link p-0 d-flex align-items-center" id="navbarDropdownUser" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
             @if (Laravel\Jetstream\Jetstream::managesProfilePhotos() && Auth::user()->profile_photo_url)
-                <div class="avatar avatar-l" style="border: 2px solid #E6E3F5; border-radius: 50%; padding: 1px; transition: border-color 0.2s;">
-                    <img class="rounded-circle" src="{{ Auth::user()->profile_photo_url }}" alt="{{ Auth::user()->name }}" style="width: 34px; height: 34px; object-fit: cover;" />
+                <div style="width: 36px; height: 36px; border-radius: 9999px; overflow: hidden; display: grid; place-items: center; border: 2px solid #FED7AA; flex-shrink: 0;">
+                    <img class="rounded-circle" src="{{ Auth::user()->profile_photo_url }}" alt="{{ Auth::user()->name }}" style="width: 100%; height: 100%; object-fit: cover;" />
                 </div>
             @else
-                <div class="avatar avatar-l d-flex align-items-center justify-content-center bg-primary text-dark fw-bold rounded-circle shadow-2xs" 
-                     style="width: 36px; height: 36px; font-size: 13px; border: 2px solid #FED7AA; color: #111111;">
-                    {{ strtoupper(substr(Auth::user()->name, 0, 2)) }}
+                @php
+                    $names = explode(' ', trim(Auth::user()->name ?: 'User'));
+                    $first = substr($names[0] ?? 'U', 0, 1);
+                    $second = isset($names[1]) ? substr($names[1], 0, 1) : substr($names[0], 1, 1);
+                    $initials = strtoupper($first . $second);
+                @endphp
+                <div style="width: 36px; height: 36px; border-radius: 9999px; overflow: hidden; display: grid; place-items: center; background-color: #F57C00; color: #FFFFFF; font-size: 12px; font-weight: 700; flex-shrink: 0; user-select: none;">
+                    {{ $initials }}
                 </div>
             @endif
         </a>

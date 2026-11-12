@@ -70,13 +70,7 @@ class ManageUser extends Component
 
     public function userRoles()
     {
-        $query = Role::where('name', '!=', 'Reseller');
-
-        if (! auth()->user()->hasRole('Super Admin')) {
-            $query->where('name', '!=', 'Super Admin');
-        }
-
-        $this->userRoles = $query->pluck('name')->all();
+        $this->userRoles = Role::whereNotIn('name', ['Reseller', 'Super Admin'])->pluck('name')->all();
     }
 
     public function newUser()

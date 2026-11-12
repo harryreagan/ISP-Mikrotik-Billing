@@ -1,97 +1,97 @@
 <div>
-    <div class="card border-0 shadow-sm mx-sm-0 mx-md-3 my-3">
-        <div class="card-body p-2">
-            <div class="row align-items-center">
-                @if ($routers->count() > 1)
-                    <div class="col-md-2">
-                        <label class="small text-muted fw-bold ps-1">{{ __('Router') }}</label>
-                        <select class="form-select border-0 bg-light" id="router_filter">
-                            <option value="">{{ __('All Routers') }}</option>
-                            @foreach($routers as $router)
-                                <option value="{{ $router->router_name }}">{{ $router->router_name }}</option>
-                            @endforeach
-                        </select>
+    <x-ui.page-header :title="__('Customers list')" :subtitle="__('Filter, export, and manage subscriber accounts and billing summaries.')" />
+
+    <x-ui.card class="mb-4 p-3">
+        <div class="row g-3 align-items-end">
+            @if ($routers->count() > 1)
+                <div class="col-md-2">
+                    <label class="form-label mb-1">{{ __('Router') }}</label>
+                    <select class="form-select" id="router_filter">
+                        <option value="">{{ __('All routers') }}</option>
+                        @foreach($routers as $router)
+                            <option value="{{ $router->router_name }}">{{ $router->router_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
+            <div class="{{ $routers->count() > 1 ? 'col-md-10' : 'col-md-12' }}">
+                <label class="form-label mb-1">{{ __('Filters') }}</label>
+                <div class="d-flex flex-wrap align-items-center gap-1.5">
+                    <div class="filter-group d-flex gap-1.5 overflow-auto pb-1">
+                        <input type="radio" class="btn-check" name="collection" id="all_list" autocomplete="off">
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3 shadow-none" for="all_list">
+                            <i class="bi bi-people-fill me-1"></i> {{ __('All customers') }} <span class="badge bg-white text-dark fw-semibold"></span>
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="collection" id="all_active_list" autocomplete="off" checked>
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3 shadow-none" for="all_active_list">
+                            <i class="bi bi-people-fill me-1"></i> {{ __('All active') }} <span class="badge bg-white text-dark fw-semibold"></span>
+                        </label>
+
+                        <input type="radio" class="btn-check" name="collection" id="collection_list" autocomplete="off">
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3 shadow-none" for="collection_list">
+                            <i class="bi bi-cash-stack me-1"></i> {{ __('Paid') }} <span class="badge bg-white text-success fw-semibold"></span>
+                        </label>
+
+                        <input type="radio" class="btn-check" name="collection" id="without_collection_list" autocomplete="off">
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3 shadow-none" for="without_collection_list">
+                            <i class="bi bi-wallet2 me-1"></i> {{ __('Unpaid') }} <span class="badge bg-white text-danger fw-semibold"></span>
+                        </label>
+
+                        <input type="radio" class="btn-check" name="collection" id="pending_customer" autocomplete="off">
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3 shadow-none" for="pending_customer">
+                            <i class="bi bi-clock-history me-1"></i> {{ __('Pending') }} <span class="badge bg-white text-warning fw-semibold"></span>
+                        </label>
+
+                        <input type="radio" class="btn-check" name="collection" id="disable_customer" autocomplete="off">
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3 shadow-none" for="disable_customer">
+                            <i class="bi bi-slash-circle me-1"></i> {{ __('Disabled') }} <span class="badge bg-white text-danger fw-semibold"></span>
+                        </label>
+
+                        <input type="radio" class="btn-check" name="collection" id="free_customer" autocomplete="off">
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3 shadow-none" for="free_customer">
+                            <i class="bi bi-gift me-1"></i> {{ __('Free') }} <span class="badge bg-white text-info fw-semibold"></span>
+                        </label>
+
+                        <input type="radio" class="btn-check" name="collection" id="inactive_customer" autocomplete="off">
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3 shadow-none" for="inactive_customer">
+                            <i class="bi bi-person-x me-1"></i> {{ __('Inactive') }} <span class="badge bg-white text-secondary fw-semibold"></span>
+                        </label>
+
+                        @foreach($resellers as $reseller)
+                            <input type="radio" class="btn-check" name="collection" id="reseller_{{ $reseller->id }}" data-reseller-id="{{ $reseller->id }}" autocomplete="off">
+                            <label class="btn btn-outline-secondary btn-sm rounded-pill px-3 shadow-none" for="reseller_{{ $reseller->id }}">
+                                <i class="bi bi-person-badge-fill me-1"></i> {{ $reseller->company ?: ($reseller->user->name ?? 'Reseller') }} <span class="badge bg-white text-dark fw-semibold"></span>
+                            </label>
+                        @endforeach
                     </div>
-                @endif
-                <div class="{{ $routers->count() > 1 ? 'col-md-10' : 'col-md-12' }}">
-                    <label class="small text-muted fw-bold ps-1">{{ __('FILTERS') }}</label>
-                    <div class="d-flex flex-wrap gap-1">
-                        <div class="filter-group d-flex gap-1 overflow-auto pb-1">
-                            <input type="radio" class="btn-check" name="collection" id="all_list" autocomplete="off">
-                            <label class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-none fw-600" for="all_list">
-                                <i class="bi bi-people-fill me-1"></i> {{ __('All Customers') }} <span class="badge bg-white text-primary fw-bold"></span>
-                            </label>
-                            
-                            <input type="radio" class="btn-check" name="collection" id="all_active_list" autocomplete="off" checked>
-                            <label class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-none fw-600" for="all_active_list">
-                                <i class="bi bi-people-fill me-1"></i> {{ __('All Active') }} <span class="badge bg-white text-primary fw-bold"></span>
-                            </label>
-
-                            <input type="radio" class="btn-check" name="collection" id="collection_list" autocomplete="off">
-                            <label class="btn btn-outline-success btn-sm rounded-pill px-3 shadow-none fw-600" for="collection_list">
-                                <i class="bi bi-cash-stack me-1"></i> {{ __('Paid') }} <span class="badge bg-white text-success fw-bold"></span>
-                            </label>
-
-                            <input type="radio" class="btn-check" name="collection" id="without_collection_list" autocomplete="off">
-                            <label class="btn btn-outline-indigo btn-sm rounded-pill px-3 shadow-none fw-600" for="without_collection_list">
-                                <i class="bi bi-wallet2 me-1"></i> {{ __('Unpaid') }} <span class="badge bg-white text-indigo fw-bold"></span>
-                            </label>
-
-                            <input type="radio" class="btn-check" name="collection" id="pending_customer" autocomplete="off">
-                            <label class="btn btn-outline-warning btn-sm rounded-pill px-3 shadow-none fw-600" for="pending_customer">
-                                <i class="bi bi-clock-history me-1"></i> {{ __('Pending') }} <span class="badge bg-white text-warning fw-bold"></span>
-                            </label>
-
-                            <input type="radio" class="btn-check" name="collection" id="disable_customer" autocomplete="off">
-                            <label class="btn btn-outline-danger btn-sm rounded-pill px-3 shadow-none fw-600" for="disable_customer">
-                                <i class="bi bi-slash-circle me-1"></i> {{ __('Disabled') }} <span class="badge bg-white text-danger fw-bold"></span>
-                            </label>
-
-                            <input type="radio" class="btn-check" name="collection" id="free_customer" autocomplete="off">
-                            <label class="btn btn-outline-info btn-sm rounded-pill px-3 shadow-none fw-600" for="free_customer">
-                                <i class="bi bi-gift me-1"></i> {{ __('Free') }} <span class="badge bg-white text-info fw-bold"></span>
-                            </label>
-
-                            <input type="radio" class="btn-check" name="collection" id="inactive_customer" autocomplete="off">
-                            <label class="btn btn-outline-secondary btn-sm rounded-pill px-3 shadow-none fw-600" for="inactive_customer">
-                                <i class="bi bi-person-x me-1"></i> {{ __('Inactive') }} <span class="badge bg-white text-secondary fw-bold"></span>
-                            </label>
-
-                            @foreach($resellers as $reseller)
-                                <input type="radio" class="btn-check" name="collection" id="reseller_{{ $reseller->id }}" data-reseller-id="{{ $reseller->id }}" autocomplete="off">
-                                <label class="btn btn-outline-purple btn-sm rounded-pill px-3 shadow-none fw-600" for="reseller_{{ $reseller->id }}">
-                                    <i class="bi bi-person-badge-fill me-1"></i> {{ $reseller->company ?: ($reseller->user->name ?? 'Reseller') }} <span class="badge bg-white text-purple fw-bold"></span>
-                                </label>
-                            @endforeach
-                        </div>
-                        <div class="ms-auto border-start ps-1 d-flex gap-1">
-                            @if(hasAccess(['Super Admin'], ['push-customers']))
-                                <button type="button" onclick="confirmPushAllCustomers()" class="btn btn-outline-warning btn-sm rounded-pill px-3 py-0 shadow-none fw-600" style="height: 2rem;" title="Push all customers to MikroTik">
-                                    <i class="bi bi-cloud-arrow-up-fill me-1"></i> {{ __('Push All') }}
-                                </button>
-                            @endif
-                            <button type="button" id="reset_table" class="btn btn-light btn-outline-dark btn-sm rounded-pill px-3 py-0 shadow-none fw-600" style="height: 2rem;" title="Reset all filters and search">
-                                <i class="bi bi-arrow-clockwise"></i> {{ __('Reset') }}
+                    <div class="ms-auto border-start ps-2 d-flex gap-1.5">
+                        @if(hasAccess(['Super Admin'], ['push-customers']))
+                            <button type="button" onclick="confirmPushAllCustomers()" class="btn btn-outline-warning btn-sm rounded-lg px-3" title="Push all customers to MikroTik">
+                                <i class="bi bi-cloud-arrow-up-fill me-1"></i> {{ __('Push all') }}
                             </button>
-                        </div>
+                        @endif
+                        <button type="button" id="reset_table" class="btn btn-outline-secondary btn-sm rounded-lg px-3" title="Reset all filters and search">
+                            <i class="bi bi-arrow-clockwise"></i> {{ __('Reset') }}
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    </x-ui.card>
 
-    <div class="card border-0 shadow-sm m-sm-0 m-md-3 p-0 overflow-hidden">
-        <div class="table-responsive bg-white px-3 pb-3" wire:ignore>
+    <x-ui.card class="p-3 overflow-hidden">
+        <div class="table-responsive" wire:ignore>
             <table class="customer-table table table-hover custom-data-table border-0 w-100" style="width:100%">
-                <thead class="bg-light">
+                <thead>
                     <tr>
                         <th class="text-center">{{ __('SL') }}</th>
-                        <th class="text-center">{{ __('Customer Identity') }}</th>
+                        <th class="text-center">{{ __('Customer identity') }}</th>
                         <th class="text-center">{{ __('Address') }}</th>
-                        <th class="text-center">{{ __('Billing Breakdown') }}</th>
-                        <th class="text-center">{{ __('Connection Info') }}</th>
-                        <th class="text-center">{{ __('Billing Summary') }}</th>
-                        <th class="text-center">{{ __('Auto Disable') }}</th>
+                        <th class="text-center">{{ __('Billing breakdown') }}</th>
+                        <th class="text-center">{{ __('Connection info') }}</th>
+                        <th class="text-center">{{ __('Billing summary') }}</th>
+                        <th class="text-center">{{ __('Auto disable') }}</th>
                         <th class="text-center">{{ __('Action') }}</th>
                         {{-- Raw columns for export (Indices 8-22) --}}
                         <th class="text-center">{{ __('ID') }}</th>
@@ -112,25 +112,25 @@
                     </tr>
                 </thead>
                 <tbody class="text-center"></tbody>
-                <tfoot class="bg-light border-top">
-                    <tr class="page-totals-row table-info">
+                <tfoot class="border-top">
+                    <tr class="page-totals-row">
                         @for($i=0; $i<23; $i++)
-                            <th id="page_total_{{ $i }}" @if($i==0) class="text-end fw-bold" @elseif($i==3) class="text-start small" @elseif($i==5) class="text-end" @endif>
-                                @if($i==0) {{ __('Page Totals:') }} @endif
+                            <th id="page_total_{{ $i }}" @if($i==0) class="text-end fw-semibold" @elseif($i==3) class="text-start small" @elseif($i==5) class="text-end" @endif>
+                                @if($i==0) {{ __('Page totals:') }} @endif
                             </th>
                         @endfor
                     </tr>
-                    <tr class="grand-totals-row table-primary">
+                    <tr class="grand-totals-row">
                         @for($i=0; $i<23; $i++)
-                            <th id="full_total_{{ $i }}" @if($i==0) class="text-end fw-bold" @elseif($i==3) class="text-start small" @elseif($i==5) class="text-end" @endif>
-                                @if($i==0) {{ __('Grand Totals:') }} @endif
+                            <th id="full_total_{{ $i }}" @if($i==0) class="text-end fw-semibold" @elseif($i==3) class="text-start small" @elseif($i==5) class="text-end" @endif>
+                                @if($i==0) {{ __('Grand totals:') }} @endif
                             </th>
                         @endfor
                     </tr>
                 </tfoot>
             </table>
         </div>
-    </div>
+    </x-ui.card>
 
     @if($editingCustomerId)
         <div class="modal fade show" tabindex="-1" style="display: block; background: rgba(0,0,0,0.5);" aria-modal="true" role="dialog" wire:key="edit-customer-modal-{{ $editingCustomerId }}">
@@ -239,116 +239,84 @@
 @push('styles')
     <style>
         .custom-data-table {
-            border-collapse: separate !important;
-            border-spacing: 0 8px !important;
-            font-size: 0.85rem !important;
+            border-collapse: collapse !important;
+            font-size: 0.875rem !important;
         }
         .custom-data-table thead th {
-            text-transform: uppercase;
-            font-weight: 700;
-            color: #6c757d;
-            border-bottom: 2px solid #f8f9fa !important;
-            padding: 12px 10px !important;
+            text-transform: none !important;
+            font-weight: 500 !important;
+            font-size: 0.75rem !important;
+            color: #64748b !important;
+            background: #f8fafc !important;
+            border-bottom: 1px solid #f1f5f9 !important;
+            padding: 0.75rem 1rem !important;
             white-space: nowrap;
         }
         .custom-data-table tbody tr {
             background-color: #fff !important;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-            transition: all 0.2s;
+            transition: background-color 0.15s ease;
         }
         .custom-data-table tbody tr:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-            background-color: #f8f9ff !important;
+            background-color: #f8fafc !important;
         }
         .custom-data-table td {
-            padding: 12px 10px !important;
+            padding: 0.75rem 1rem !important;
             vertical-align: middle !important;
-            border-top: 1px solid #f1f1f1 !important;
+            border-top: 1px solid #f1f5f9 !important;
         }
         .badge-soft {
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 500;
         }
         .action-btns .btn {
-            width: 32px !important;
-            height: 32px !important;
+            width: 30px !important;
+            height: 30px !important;
             padding: 0 !important;
             display: inline-flex !important;
             align-items: center !important;
             justify-content: center !important;
-            border-radius: 8px !important;
+            border-radius: 0.5rem !important;
             margin: 0 2px !important;
-            transition: all 0.2s !important;
         }
-        .action-btns .btn:hover {
-            transform: scale(1.1);
-        }
-        .fw-600 { font-weight: 600; }
-        .btn-outline-indigo {
-            color: #6610f2;
-            border-color: #6610f2;
-        }
-        .btn-outline-indigo:hover, .btn-check:checked + .btn-outline-indigo {
-            background-color: #6610f2;
-            color: #fff;
-        }
-        .text-indigo { color: #6610f2 !important; }
-        .bg-indigo { background-color: #6610f2; color: #fff; }
-        
-        .btn-outline-purple {
-            color: #6f42c1;
-            border-color: #6f42c1;
-        }
-        .btn-outline-purple:hover, .btn-check:checked + .btn-outline-purple {
-            background-color: #6f42c1;
-            color: #fff;
-        }
-        .text-purple { color: #6f42c1 !important; }
-        .bg-purple { background-color: #6f42c1; color: #fff; }
-        
         .billing-card {
             min-width: 120px;
             padding: 5px;
-            background: #fdfdfd;
-            border-radius: 6px;
+            border-radius: 0.5rem;
         }
-
         .btn-check:checked + .btn {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+            background-color: #fff7ed !important;
+            color: #ea580c !important;
+            border-color: #fed7aa !important;
         }
-        
         .filter-group::-webkit-scrollbar {
             height: 4px;
         }
         .filter-group::-webkit-scrollbar-thumb {
-            background: #e9ecef;
+            background: #e2e8f0;
             border-radius: 10px;
         }
         .filter-group .btn {
             flex: 0 0 auto !important;
             white-space: nowrap !important;
         }
-
-        /* DataTables Styling Overrides */
         .dt-container .dt-search input {
-            border: 0;
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 8px 15px;
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            border-radius: 0.5rem;
+            padding: 0.375rem 0.75rem;
+            font-size: 0.875rem;
         }
         .dt-container .dt-paging .dt-paging-button.current {
-            background: #0d6efd !important;
+            background: #f97316 !important;
             color: #fff !important;
             border: 0;
-            border-radius: 8px;
+            border-radius: 0.5rem;
         }
         .dt-buttons .btn {
-            border-radius: 8px !important;
-            font-size: 0.8rem !important;
+            border-radius: 0.5rem !important;
+            font-size: 0.75rem !important;
             margin-right: 4px !important;
             margin-bottom: 4px !important;
             flex: 0 0 auto !important;
@@ -358,24 +326,16 @@
             display: flex !important;
             flex-wrap: nowrap !important;
             overflow-x: auto !important;
-            -webkit-overflow-scrolling: touch !important;
             gap: 2px !important;
             max-width: 100% !important;
-            padding-bottom: 6px !important;
-        }
-        .dt-container .dt-buttons::-webkit-scrollbar {
-            height: 4px;
-        }
-        .dt-container .dt-buttons::-webkit-scrollbar-thumb {
-            background: #e9ecef;
-            border-radius: 10px;
+            padding-bottom: 4px !important;
         }
         .dt-paging {
             margin-top: 10px !important;
         }
         .dt-info {
-            font-size: 0.8rem;
-            color: #6c757d;
+            font-size: 0.75rem;
+            color: #64748b;
         }
     </style>
 @endpush

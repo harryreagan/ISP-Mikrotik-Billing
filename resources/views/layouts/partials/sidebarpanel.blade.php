@@ -4,16 +4,13 @@
 
             {{-- ── Dashboard (always visible) ── --}}
             <li class="nav-item">
-                <div class="row navbar-vertical-label-wrapper mt-3 mb-2">
-                    <div class="col-auto navbar-vertical-label">{{ __('RESELLER PANEL') }}</div>
-                    <div class="col ps-0">
-                        <hr class="mb-0 navbar-vertical-divider" />
-                    </div>
+                <div class="row navbar-vertical-label-wrapper mt-3 mb-1">
+                    <div class="col-auto navbar-vertical-label">{{ __('Reseller panel') }}</div>
                 </div>
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('reseller.dashboard') }}"
                     role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-speedometer2 me-2"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-speedometer2"></i></span>
                         <span class="nav-link-text ps-1">{{ __('Dashboard') }}</span>
                     </div>
                 </a>
@@ -22,16 +19,14 @@
             {{-- ── Customers ── --}}
             @canany(['view-customer', 'create-customer', 'edit-customer', 'delete-customer'])
                 <li class="nav-item">
-                    <div class="row navbar-vertical-label-wrapper mt-3 mb-2">
-                        <div class="col-auto navbar-vertical-label">{{ __('CUSTOMERS') }}</div>
-                        <div class="col ps-0">
-                            <hr class="mb-0 navbar-vertical-divider" />
-                        </div>
+                    <div class="row navbar-vertical-label-wrapper mt-3 mb-1">
+                        <div class="col-auto navbar-vertical-label">{{ __('Customers') }}</div>
+                        
                     </div>
                     <a wire:navigate.hover wire:current.exact="active" class="nav-link"
                         href="{{ route('reseller.customers.index') }}" role="button">
                         <div class="d-flex align-items-center">
-                            <span class="nav-link-icon"><i class="bi bi-people-fill"></i></span>
+                            <span class="nav-link-icon"><i class="bi bi-people"></i></span>
                             <span class="nav-link-text ps-1">{{ __('Customer List') }}</span>
                         </div>
                     </a>
@@ -39,7 +34,7 @@
                         <a wire:navigate.hover wire:current="active" class="nav-link"
                             href="{{ route('reseller.customers.create') }}" role="button">
                             <div class="d-flex align-items-center">
-                                <span class="nav-link-icon"><i class="bi bi-person-fill-add"></i></span>
+                                <span class="nav-link-icon"><i class="bi bi-person-plus"></i></span>
                                 <span class="nav-link-text ps-1">{{ __('New Customer') }}</span>
                             </div>
                         </a>
@@ -51,11 +46,8 @@
             @canany(['payment-collection', 'payment-collection-edit', 'payment-collection-invoice', 'payment-history',
                 'payment-collection-report', 'collection-list', 'without-collection-list', 'amount-collection'])
                 <li class="nav-item">
-                    <div class="row navbar-vertical-label-wrapper mt-3 mb-2">
-                        <div class="col-auto navbar-vertical-label">{{ __('FINANCE') }}</div>
-                        <div class="col ps-0">
-                            <hr class="mb-0 navbar-vertical-divider" />
-                        </div>
+                    <div class="row navbar-vertical-label-wrapper mt-3 mb-1">
+                        <div class="col-auto navbar-vertical-label">{{ __('Finance') }}</div>
                     </div>
                     @can('payment-collection')
                         <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('payment-collection') }}"
@@ -99,23 +91,20 @@
 
             {{-- ── Wallet & Vouchers (always visible to all resellers) ── --}}
             <li class="nav-item">
-                <div class="row navbar-vertical-label-wrapper mt-3 mb-2">
-                    <div class="col-auto navbar-vertical-label">{{ __('OUTREACH') }}</div>
-                    <div class="col ps-0">
-                        <hr class="mb-0 navbar-vertical-divider" />
-                    </div>
+                <div class="row navbar-vertical-label-wrapper mt-3 mb-1">
+                    <div class="col-auto navbar-vertical-label">{{ __('Outreach') }}</div>
                 </div>
                 <a wire:navigate.hover wire:current="active" class="nav-link"
                     href="{{ route('reseller.wallet.index') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-wallet2 text-success"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-wallet2"></i></span>
                         <span class="nav-link-text ps-1">{{ __('My Wallet') }}</span>
                     </div>
                 </a>
                 <a wire:navigate.hover wire:current="active" class="nav-link"
                     href="{{ route('reseller.vouchers.index') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-ticket-perforated-fill text-warning"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-ticket-perforated"></i></span>
                         <span class="nav-link-text ps-1">{{ __('My Vouchers') }}</span>
                     </div>
                 </a>
@@ -124,11 +113,8 @@
             {{-- ── Packages (if permitted) ── --}}
             @can('package-setup')
                 <li class="nav-item">
-                    <div class="row navbar-vertical-label-wrapper mt-3 mb-2">
-                        <div class="col-auto navbar-vertical-label">{{ __('ADMIN') }}</div>
-                        <div class="col ps-0">
-                            <hr class="mb-0 navbar-vertical-divider" />
-                        </div>
+                    <div class="row navbar-vertical-label-wrapper mt-3 mb-1">
+                        <div class="col-auto navbar-vertical-label">{{ __('Admin') }}</div>
                     </div>
                     <a wire:navigate.hover wire:current="active" class="nav-link"
                         href="{{ route('reseller.packages.index') }}" role="button">
@@ -139,6 +125,18 @@
                     </a>
                 </li>
             @endcan
+
+            <li class="nav-item mt-2">
+                <form method="POST" action="{{ route('logout') }}" class="m-0 p-0">
+                    @csrf
+                    <button type="submit" class="nav-link border-0 bg-transparent w-100 text-start text-danger fw-semibold" role="button">
+                        <div class="d-flex align-items-center">
+                            <span class="nav-link-icon"><i class="bi bi-box-arrow-right text-danger"></i></span>
+                            <span class="nav-link-text ps-1">{{ __('Log Out') }}</span>
+                        </div>
+                    </button>
+                </form>
+            </li>
 
         </ul>
     @else
@@ -172,15 +170,14 @@
             {{-- 1. CUSTOMERS                                                   --}}
             {{-- ══════════════════════════════════════════════════════════════ --}}
             <li class="nav-item">
-                <div class="row navbar-vertical-label-wrapper mt-3 mb-2">
-                    <div class="col-auto navbar-vertical-label">{{ __('CUSTOMERS') }}</div>
-                    <div class="col ps-0"><hr class="mb-0 navbar-vertical-divider" /></div>
+                <div class="row navbar-vertical-label-wrapper mt-3 mb-1">
+                    <div class="col-auto navbar-vertical-label">{{ __('Customers') }}</div>
                 </div>
 
                 {{-- Dashboard --}}
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('dashboard') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-speedometer2 me-2"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-speedometer2"></i></span>
                         <span class="nav-link-text ps-1">{{ __('Dashboard') }}</span>
                     </div>
                 </a>
@@ -188,7 +185,7 @@
                 {{-- Customers --}}
                 <a wire:navigate.hover wire:current="active" class="nav-link {{ request()->routeIs('admin.customers') || request()->routeIs('customers.index') || request()->routeIs('new-customer') ? 'active' : '' }}" href="{{ route('admin.customers') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-people-fill"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-people"></i></span>
                         <span class="nav-link-text ps-1">{{ __('Customers') }}</span>
                     </div>
                 </a>
@@ -196,16 +193,8 @@
                 {{-- Support Tickets --}}
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin-tickets') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-chat-left-text-fill"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-chat-left-text"></i></span>
                         <span class="nav-link-text ps-1">{{ __('Support Tickets') }}</span>
-                    </div>
-                </a>
-
-                {{-- Customer Reviews --}}
-                <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.reviews') }}" role="button">
-                    <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-chat-heart"></i></span>
-                        <span class="nav-link-text ps-1">{{ __('Customer Reviews') }}</span>
                     </div>
                 </a>
             </li>
@@ -214,15 +203,14 @@
             {{-- 2. NETWORK                                                     --}}
             {{-- ══════════════════════════════════════════════════════════════ --}}
             <li class="nav-item">
-                <div class="row navbar-vertical-label-wrapper mt-3 mb-2">
-                    <div class="col-auto navbar-vertical-label">{{ __('NETWORK') }}</div>
-                    <div class="col ps-0"><hr class="mb-0 navbar-vertical-divider" /></div>
+                <div class="row navbar-vertical-label-wrapper mt-3 mb-1">
+                    <div class="col-auto navbar-vertical-label">{{ __('Network') }}</div>
                 </div>
 
                 {{-- Routers --}}
                 <a wire:navigate.hover wire:current="active" class="nav-link {{ request()->routeIs('admin.routers') || request()->routeIs('mikrotik-sync') || request()->routeIs('admin.add-router') ? 'active' : '' }}" href="{{ route('admin.routers') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-router-fill text-warning"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-router"></i></span>
                         <span class="nav-link-text ps-1">{{ __('Routers') }}</span>
                     </div>
                 </a>
@@ -238,7 +226,7 @@
                 {{-- Captive Portal Customizer --}}
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.portal-customizer') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-palette-fill text-info"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-palette"></i></span>
                         <span class="nav-link-text ps-1">{{ __('Captive Portal') }}</span>
                     </div>
                 </a>
@@ -248,9 +236,8 @@
             {{-- 3. FINANCE                                                     --}}
             {{-- ══════════════════════════════════════════════════════════════ --}}
             <li class="nav-item">
-                <div class="row navbar-vertical-label-wrapper mt-3 mb-2">
-                    <div class="col-auto navbar-vertical-label">{{ __('FINANCE') }}</div>
-                    <div class="col ps-0"><hr class="mb-0 navbar-vertical-divider" /></div>
+                <div class="row navbar-vertical-label-wrapper mt-3 mb-1">
+                    <div class="col-auto navbar-vertical-label">{{ __('Finance') }}</div>
                 </div>
 
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('payment-collection') }}" role="button">
@@ -276,7 +263,7 @@
 
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.unmatched-payments') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-patch-question-fill text-warning"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-patch-question"></i></span>
                         <span class="nav-link-text ps-1">{{ __('Unmatched Payments') }}</span>
                         @php
                             $pendingUnmatchedCount = 0;
@@ -287,14 +274,14 @@
                             } catch (\Throwable $e) {}
                         @endphp
                         @if($pendingUnmatchedCount > 0)
-                            <span class="badge rounded-pill ms-auto bg-warning text-dark">{{ $pendingUnmatchedCount }}</span>
+                            <span class="badge rounded-pill ms-auto bg-warning">{{ $pendingUnmatchedCount }}</span>
                         @endif
                     </div>
                 </a>
 
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.payment-gateways') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-credit-card-2-front-fill text-primary"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-credit-card-2-front"></i></span>
                         <span class="nav-link-text ps-1">{{ __('Payment Gateways') }}</span>
                     </div>
                 </a>
@@ -308,7 +295,7 @@
 
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.profit-summary') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-graph-up-arrow text-success"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-graph-up-arrow"></i></span>
                         <span class="nav-link-text ps-1">{{ __('Profit & Loss') }}</span>
                     </div>
                 </a>
@@ -318,15 +305,14 @@
             {{-- 4. OUTREACH                                                    --}}
             {{-- ══════════════════════════════════════════════════════════════ --}}
             <li class="nav-item">
-                <div class="row navbar-vertical-label-wrapper mt-3 mb-2">
-                    <div class="col-auto navbar-vertical-label">{{ __('OUTREACH') }}</div>
-                    <div class="col ps-0"><hr class="mb-0 navbar-vertical-divider" /></div>
+                <div class="row navbar-vertical-label-wrapper mt-3 mb-1">
+                    <div class="col-auto navbar-vertical-label">{{ __('Outreach') }}</div>
                 </div>
 
                 {{-- SMS & Email Hub (Merged 5-Tab Interface) --}}
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.sms-email') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-chat-square-quote-fill text-warning"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-chat-square-quote"></i></span>
                         <span class="nav-link-text ps-1">{{ __('SMS & Email') }}</span>
                     </div>
                 </a>
@@ -334,7 +320,7 @@
                 {{-- Reseller Setup --}}
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.resellers.index') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-person-badge-fill"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-person-badge"></i></span>
                         <span class="nav-link-text ps-1">{{ __('Reseller Setup') }}</span>
                     </div>
                 </a>
@@ -342,7 +328,7 @@
                 {{-- Reseller Vouchers --}}
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.vouchers') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-ticket-perforated-fill text-warning"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-ticket-perforated"></i></span>
                         <span class="nav-link-text ps-1">{{ __('Reseller Vouchers') }}</span>
                     </div>
                 </a>
@@ -352,15 +338,14 @@
             {{-- 5. INSIGHTS/REPORTS                                            --}}
             {{-- ══════════════════════════════════════════════════════════════ --}}
             <li class="nav-item">
-                <div class="row navbar-vertical-label-wrapper mt-3 mb-2">
-                    <div class="col-auto navbar-vertical-label">{{ __('INSIGHTS/REPORTS') }}</div>
-                    <div class="col ps-0"><hr class="mb-0 navbar-vertical-divider" /></div>
+                <div class="row navbar-vertical-label-wrapper mt-3 mb-1">
+                    <div class="col-auto navbar-vertical-label">{{ __('Insights & reports') }}</div>
                 </div>
 
                 {{-- Collections Report --}}
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('collection-report.index') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-bar-chart-line-fill text-info"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-bar-chart-line"></i></span>
                         <span class="nav-link-text ps-1">{{ __('Collections Report') }}</span>
                     </div>
                 </a>
@@ -368,7 +353,7 @@
                 {{-- Customer Summary --}}
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('customer-summary') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-pie-chart-fill text-primary"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-pie-chart"></i></span>
                         <span class="nav-link-text ps-1">{{ __('Customer Summary') }}</span>
                     </div>
                 </a>
@@ -376,7 +361,7 @@
                 {{-- DIS Summary --}}
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('dis-report') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-graph-down text-danger"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-graph-down"></i></span>
                         <span class="nav-link-text ps-1">{{ __('DIS Summary') }}</span>
                     </div>
                 </a>
@@ -417,15 +402,14 @@
             {{-- 6. ADMIN                                                       --}}
             {{-- ══════════════════════════════════════════════════════════════ --}}
             <li class="nav-item">
-                <div class="row navbar-vertical-label-wrapper mt-3 mb-2">
-                    <div class="col-auto navbar-vertical-label">{{ __('ADMIN') }}</div>
-                    <div class="col ps-0"><hr class="mb-0 navbar-vertical-divider" /></div>
+                <div class="row navbar-vertical-label-wrapper mt-3 mb-1">
+                    <div class="col-auto navbar-vertical-label">{{ __('Admin') }}</div>
                 </div>
 
                 {{-- Package Setup --}}
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.packages') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-box2 text-primary"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-box2"></i></span>
                         <span class="nav-link-text ps-1">{{ __('Packages') }}</span>
                     </div>
                 </a>
@@ -433,7 +417,7 @@
                 {{-- Purchase Requests --}}
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.purchase-requests') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-cart-check-fill"></i></span>
+                        <span class="nav-link-icon"><i class="bi bi-cart-check"></i></span>
                         <span class="nav-link-text ps-1">{{ __('Purchase Requests') }}</span>
                     </div>
                 </a>
@@ -453,15 +437,25 @@
                         <span class="nav-link-text ps-1">{{ __('My Profile') }}</span>
                     </div>
                 </a>
+
+                {{-- Log Out --}}
+                <form method="POST" action="{{ route('logout') }}" class="m-0 p-0">
+                    @csrf
+                    <button type="submit" class="nav-link border-0 bg-transparent w-100 text-start text-danger fw-medium" role="button">
+                        <div class="d-flex align-items-center">
+                            <span class="nav-link-icon"><i class="bi bi-box-arrow-right text-danger"></i></span>
+                            <span class="nav-link-text ps-1">{{ __('Log Out') }}</span>
+                        </div>
+                    </button>
+                </form>
             </li>
 
             {{-- ── Dynamic Plugin Extensions (if any) ── --}}
             @if(!empty($sectionItems))
                 @foreach($sectionItems as $sectionTitle => $items)
                     <li class="nav-item">
-                        <div class="row navbar-vertical-label-wrapper mt-3 mb-2">
-                            <div class="col-auto navbar-vertical-label">{{ strtoupper($sectionTitle) }}</div>
-                            <div class="col ps-0"><hr class="mb-0 navbar-vertical-divider" /></div>
+                        <div class="row navbar-vertical-label-wrapper mt-3 mb-1">
+                            <div class="col-auto navbar-vertical-label">{{ ucfirst(strtolower($sectionTitle)) }}</div>
                         </div>
                         @foreach($items as $idx => $pItem)
                             @php
@@ -487,20 +481,28 @@
 @else
     <ul class="navbar-nav flex-column mb-3" id="navbarVerticalNav">
         <li class="nav-item">
-            <div class="row navbar-vertical-label-wrapper mt-3 mb-2">
-                <div class="col-auto navbar-vertical-label">{{ __('ACCOUNT') }}</div>
-                <div class="col ps-0"><hr class="mb-0 navbar-vertical-divider" /></div>
+            <div class="row navbar-vertical-label-wrapper mt-3 mb-1">
+                <div class="col-auto navbar-vertical-label">{{ __('Account') }}</div>
             </div>
             <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('profile.show') }}" role="button">
                 <div class="d-flex align-items-center">
-                    <span class="nav-link-icon"><i class="bi bi-person-fill"></i></span>
+                    <span class="nav-link-icon"><i class="bi bi-person"></i></span>
                     <span class="nav-link-text ps-1">{{ __('Profile') }}</span>
                 </div>
             </a>
+            <form method="POST" action="{{ route('logout') }}" class="m-0 p-0">
+                @csrf
+                <button type="submit" class="nav-link border-0 bg-transparent w-100 text-start text-danger fw-medium" role="button">
+                    <div class="d-flex align-items-center">
+                        <span class="nav-link-icon"><i class="bi bi-box-arrow-right text-danger"></i></span>
+                        <span class="nav-link-text ps-1">{{ __('Log Out') }}</span>
+                    </div>
+                </button>
+            </form>
         </li>
     </ul>
 @endif
 
-<div class="text-center py-2 mt-auto" style="font-size:0.72rem; color:#888; font-weight:600;">
+<div class="text-center py-2 mt-auto" style="font-size: 11px; color: #94a3b8; font-weight: 500;">
     &copy; {{ date('Y') }} HSmart WiFi Billing
 </div>

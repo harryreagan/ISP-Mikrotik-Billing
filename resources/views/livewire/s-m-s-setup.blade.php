@@ -3,116 +3,77 @@
         {{ __('SMS Gateway & Templates Setup') }}
     </x-slot>
 
+    <x-ui.page-header
+        :title="__('SMS gateway & templates setup')"
+        :subtitle="__('Manage SMS gateway balance, automatic templates, and bulk customer campaigns')"
+    />
+
     {{-- Top Section: Balance & Profile Dashboard --}}
     <div class="row g-4 mb-4">
         {{-- Gateway Balance Card --}}
         <div class="col-md-6">
-            <div class="card border-0 rounded-4 position-relative overflow-hidden gateway-dashboard-card" 
-                 style="background: linear-gradient(145deg, #072e33, #0f4c5c); color: white; box-shadow: 0 10px 25px -10px rgba(15, 76, 92, 0.3); border: 1px solid rgba(255, 255, 255, 0.08) !important;">
-                
-                {{-- Decorative background glow --}}
-                <div class="position-absolute" style="width: 180px; height: 180px; background: radial-gradient(circle, rgba(45, 212, 191, 0.2) 0%, rgba(45, 212, 191, 0) 70%); top: -50px; right: -50px; pointer-events: none; z-index: 1;"></div>
-                
-                <div class="card-body p-3.5 position-relative d-flex align-items-center justify-content-between" style="z-index: 2; min-height: 110px;">
-                    <div class="d-flex flex-column justify-content-center">
-                        <span class="text-white text-opacity-70 text-uppercase fw-semibold mb-1" style="font-size: 0.68rem; letter-spacing: 1px;">{{ __('SMS Balance') }}</span>
-                        @if(empty($balance) || !is_array($balance) || ($balance['status'] ?? '') === 'error' || empty($balance['data']))
-                            <div class="d-flex flex-column gap-0.5">
-                                <h4 class="fw-bold mb-0 text-white-50" style="font-size: 1.25rem;">{{ __('Connection Error') }}</h4>
-                                <span class="text-danger small" style="font-size: 0.7rem;">{{ __('Endpoint unreachable') }}</span>
-                            </div>
-                        @else
-                            <div class="d-flex align-items-baseline gap-1.5">
-                                <h2 class="fw-bold mb-0 text-white" style="letter-spacing: -0.5px; font-family: 'Outfit', 'Inter', sans-serif; font-size: 1.85rem;">
-                                    {{ is_numeric($balance['data']['remaining_balance'] ?? null) ? number_format((float) $balance['data']['remaining_balance']) : ($balance['data']['remaining_balance'] ?? 'N/A') }}
-                                </h2>
-                                <span class="fs-10 text-teal-300 text-opacity-90 fw-medium">{{ __('credits') }}</span>
-                            </div>
-                            @if(isset($balance['data']['expired_on']))
-                                <span class="text-white-50 mt-1 d-flex align-items-center gap-1" style="font-size: 0.72rem;">
-                                    <i class="bi bi-calendar-event text-teal-400" style="font-size: 0.8rem;"></i>
-                                    {{ __('Expiry:') }} <strong class="text-white">{{ \Carbon\Carbon::parse($balance['data']['expired_on'])->format('d M, Y') }}</strong>
-                                </span>
-                            @endif
-                        @endif
-                    </div>
-                    
-                    <div class="d-flex flex-column align-items-end justify-content-between gap-2">
-                        <div class="rounded-3 p-2 bg-white bg-opacity-10 text-white border border-white border-opacity-10 shadow-sm">
-                            <i class="bi bi-wallet2 fs-6 text-teal-300" style="color: #2dd4bf;"></i>
-                        </div>
-                        <span class="badge bg-emerald-500 bg-opacity-25 rounded-pill px-2.5 py-1 fs-11 text-uppercase fw-bold border border-emerald-500 border-opacity-20 d-flex align-items-center gap-1.5" style="letter-spacing: 0.5px; color: #34d399 !important; background-color: rgba(16, 185, 129, 0.15) !important;">
-                            <span class="d-inline-block rounded-circle pulse-dot" style="width: 5px; height: 5px; background-color: #10b981;"></span>
-                            {{ __('Active') }}
-                        </span>
-                    </div>
-                </div>
-            </div>
+            @php
+                $balVal = (empty($balance) || !is_array($balance) || ($balance['status'] ?? '') === 'error' || empty($balance['data']))
+                    ? __('Connection Error')
+                    : ((is_numeric($balance['data']['remaining_balance'] ?? null) ? number_format((float) $balance['data']['remaining_balance']) : ($balance['data']['remaining_balance'] ?? 'N/A')) . ' ' . __('credits'));
+                $balSub = (empty($balance) || !is_array($balance) || ($balance['status'] ?? '') === 'error' || empty($balance['data']))
+                    ? __('Endpoint unreachable')
+                    : (isset($balance['data']['expired_on']) ? (__('Expiry:') . ' ' . \Carbon\Carbon::parse($balance['data']['expired_on'])->format('d M, Y')) : __('Active'));
+            @endphp
+            <x-ui.stat-card
+                :label="__('SMS Balance')"
+                :value="$balVal"
+                :sub="$balSub"
+                color="green"
+            >
+                <x-slot:icon><i class="bi bi-wallet2"></i></x-slot:icon>
+            </x-ui.stat-card>
         </div>
 
         {{-- Gateway Profile Card --}}
         <div class="col-md-6">
-            <div class="card border-0 rounded-4 position-relative overflow-hidden gateway-dashboard-card" 
-                 style="background: linear-gradient(145deg, #120e36, #2d2685); color: white; box-shadow: 0 10px 25px -10px rgba(45, 38, 133, 0.3); border: 1px solid rgba(255, 255, 255, 0.08) !important;">
-                
-                {{-- Decorative background glow --}}
-                <div class="position-absolute" style="width: 180px; height: 180px; background: radial-gradient(circle, rgba(129, 140, 248, 0.2) 0%, rgba(129, 140, 248, 0) 70%); top: -50px; right: -50px; pointer-events: none; z-index: 1;"></div>
-                
-                <div class="card-body p-3.5 position-relative d-flex align-items-center justify-content-between" style="z-index: 2; min-height: 110px;">
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="bg-white bg-opacity-15 rounded-circle p-0.5 border border-white border-opacity-20 shadow-inner">
-                            <div class="bg-indigo-600 rounded-circle d-flex align-items-center justify-content-center fw-bold text-white shadow-sm" style="width: 42px; height: 42px; font-size: 1.1rem;">
-                                {{ strtoupper(substr(is_array($profile) && isset($profile['data']['first_name']) ? $profile['data']['first_name'] : 'N', 0, 1)) }}
-                            </div>
-                        </div>
-                        <div class="d-flex flex-column justify-content-center">
-                            <span class="text-white text-opacity-70 text-uppercase fw-semibold mb-0.5" style="font-size: 0.68rem; letter-spacing: 1px;">{{ __('Gateway Profile') }}</span>
-                            @if(empty($profile) || !is_array($profile) || ($profile['status'] ?? '') === 'error' || empty($profile['data']))
-                                <h4 class="fw-bold mb-0 text-white-50" style="font-size: 1.25rem;">{{ __('Profile Error') }}</h4>
-                            @else
-                                <h4 class="fw-bold mb-0 text-white" style="letter-spacing: -0.3px; font-family: 'Outfit', 'Inter', sans-serif; font-size: 1.25rem;">
-                                    {{ ($profile['data']['first_name'] ?? '') . ' ' . ($profile['data']['last_name'] ?? '') }}
-                                </h4>
-                                <span class="text-indigo-200 small d-flex align-items-center gap-1" style="color: #c7d2fe; font-size: 0.72rem;">
-                                    <i class="bi bi-envelope-open" style="font-size: 0.75rem;"></i>
-                                    {{ $profile['data']['email'] ?? 'N/A' }}
-                                </span>
-                            @endif
-                        </div>
-                    </div>
-                    
-                    <div class="d-flex flex-column align-items-end justify-content-between gap-2">
-                        <div class="rounded-3 p-2 bg-white bg-opacity-10 text-white border border-white border-opacity-10 shadow-sm">
-                            <i class="bi bi-shield-check fs-6 text-indigo-300" style="color: #a5b4fc;"></i>
-                        </div>
-                        <span class="badge bg-indigo-500 bg-opacity-25 rounded-pill px-2.5 py-1 fs-11 text-uppercase fw-bold border border-indigo-500 border-opacity-20" style="letter-spacing: 0.5px; color: #c7d2fe !important; background-color: rgba(99, 102, 241, 0.15) !important;">
-                            {{ __('Verified') }}
-                        </span>
-                    </div>
-                </div>
-            </div>
+            @php
+                $profVal = (empty($profile) || !is_array($profile) || ($profile['status'] ?? '') === 'error' || empty($profile['data']))
+                    ? __('Profile Error')
+                    : (($profile['data']['first_name'] ?? '') . ' ' . ($profile['data']['last_name'] ?? ''));
+                $profSub = (empty($profile) || !is_array($profile) || ($profile['status'] ?? '') === 'error' || empty($profile['data']))
+                    ? __('Unverified')
+                    : ($profile['data']['email'] ?? 'N/A');
+            @endphp
+            <x-ui.stat-card
+                :label="__('Gateway Profile')"
+                :value="$profVal"
+                :sub="$profSub"
+                color="purple"
+            >
+                <x-slot:icon><i class="bi bi-shield-check"></i></x-slot:icon>
+            </x-ui.stat-card>
         </div>
     </div>
 
     {{-- Templates & Bulk SMS Section --}}
-    <div class="card border-0 shadow-sm rounded-4 mb-4">
-        <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center flex-wrap gap-3">
-            <div class="d-flex align-items-center gap-2 bg-light p-1 rounded-3">
-                <button 
-                    type="button" 
-                    wire:click="switchTab('templates')" 
-                    class="btn btn-sm rounded-3 px-3 py-2 fw-semibold d-flex align-items-center gap-2 border-0 shadow-none transition-all {{ $activeTab === 'templates' ? 'bg-white text-primary shadow-sm' : 'text-muted' }}"
-                >
-                    <i class="bi bi-chat-left-quote-fill"></i>{{ __('SMS Templates') }}
-                </button>
-                <button 
-                    type="button" 
-                    wire:click="switchTab('bulk')" 
-                    class="btn btn-sm rounded-3 px-3 py-2 fw-semibold d-flex align-items-center gap-2 border-0 shadow-none transition-all {{ $activeTab === 'bulk' ? 'bg-white text-primary shadow-sm' : 'text-muted' }}"
-                >
-                    <i class="bi bi-send-fill"></i>{{ __('Send Bulk SMS') }}
-                </button>
-            </div>
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <ul class="nav nav-tabs border-0 mb-0">
+                <li class="nav-item">
+                    <button 
+                        type="button" 
+                        wire:click="switchTab('templates')" 
+                        class="nav-link {{ $activeTab === 'templates' ? 'active' : '' }}"
+                    >
+                        <i class="bi bi-chat-left-quote-fill me-1"></i>{{ __('SMS Templates') }}
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button 
+                        type="button" 
+                        wire:click="switchTab('bulk')" 
+                        class="nav-link {{ $activeTab === 'bulk' ? 'active' : '' }}"
+                    >
+                        <i class="bi bi-send-fill me-1"></i>{{ __('Send Bulk SMS') }}
+                    </button>
+                </li>
+            </ul>
             
             @if($activeTab === 'templates')
                 {{-- Search templates --}}
@@ -123,9 +84,9 @@
                     <input 
                         type="text" 
                         wire:model.live="search" 
-                        class="form-control form-control-sm rounded-3 ps-5" 
+                        class="form-control form-control-sm ps-5" 
                         placeholder="{{ __('Search templates...') }}" 
-                        style="width: 250px; min-height: 38px; border: 1px solid #e2e8f0;"
+                        style="width: 250px;"
                     >
                 </div>
             @endif

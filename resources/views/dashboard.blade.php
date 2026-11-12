@@ -7,21 +7,13 @@
     @endphp
 
     {{-- Personalized Greeting Header --}}
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-        <div>
-            <h1 class="mb-1" style="font-size: clamp(28px, 3vw, 36px); font-weight: 800; font-family: var(--font-sans); color: #111;">
-                {{ $greeting }}, <span style="color: #6D3FE0;">{{ $userFirstName }}</span>! 👋
-            </h1>
-            <p class="text-muted mb-0" style="font-size: 0.92rem;">
-                {{ __('Here is what is happening across your WiFi network and M-Pesa collections today.') }}
-            </p>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-            <span class="badge" style="background:#ECFDF5; color:#059669; border:1px solid #A7F3D0; padding:8px 16px; border-radius:999px; font-weight:700; font-size:0.8rem;">
-                <i class="bi bi-circle-fill me-1" style="font-size:7px;"></i> {{ __('System Operational') }}
-            </span>
-        </div>
-    </div>
+    <x-ui.page-header :title="$greeting . ', ' . $userFirstName" :subtitle="__('Here is what is happening across your WiFi network and M-Pesa collections today.')">
+        <x-slot:actions>
+            <x-ui.badge tone="success">
+                <i class="bi bi-circle-fill me-1" style="font-size: 6px;"></i> {{ __('System operational') }}
+            </x-ui.badge>
+        </x-slot:actions>
+    </x-ui.page-header>
 
     @php
         $tenantId = auth()->user()->tenant_id;
@@ -36,179 +28,125 @@
 
     @if ($completedCount < 5)
     {{-- ISP Fast-Track Launch Checklist --}}
-    <div class="card border-0 shadow-sm mb-4" style="border-radius: 18px; background: linear-gradient(135deg, #161B2E, #23224B); color: #fff;">
-        <div class="card-body p-4">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
-                <div>
-                    <span class="badge mb-1" style="background: rgba(244,123,6,0.2); color: #FF9B38; border: 1px solid rgba(244,123,6,0.4); font-weight: 700; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase;">
-                        ★ Fast-Track Setup Checklist
-                    </span>
-                    <h4 class="fw-bold mb-0 text-white">Complete your ISP Network Configuration ({{ $completedCount }}/5)</h4>
+    <x-ui.card class="mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+            <div>
+                <div class="mb-1">
+                    <x-ui.badge tone="warning">{{ __('Setup checklist') }}</x-ui.badge>
                 </div>
-                <div class="text-end">
-                    <span class="fw-bold fs-5 text-white">{{ $progressPct }}%</span>
-                    <div class="progress" style="width: 140px; height: 8px; background: rgba(255,255,255,0.15); border-radius: 999px;">
-                        <div class="progress-bar" style="width: {{ $progressPct }}%; background: #F47B06; border-radius: 999px;"></div>
-                    </div>
-                </div>
+                <h2 class="ui-section-title mb-0">Complete your ISP network configuration ({{ $completedCount }}/5)</h2>
             </div>
-
-            <div class="row g-2 pt-2">
-                <!-- Step 1: Core Router -->
-                <div class="col-12 col-md-4 col-xl">
-                    <a href="{{ route('admin.router-wizard') }}" class="text-decoration-none d-block p-3 rounded-3 h-100" style="background: {{ $hasRouter ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.06)' }}; border: 1px solid {{ $hasRouter ? 'rgba(16, 185, 129, 0.35)' : 'rgba(255, 255, 255, 0.1)' }};">
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                            <span class="fw-bold text-white small">1. Add Router</span>
-                            <i class="bi {{ $hasRouter ? 'bi-check-circle-fill text-success' : 'bi-arrow-right-circle text-muted' }}"></i>
-                        </div>
-                        <p class="mb-0 text-white-50" style="font-size: 0.76rem;">{{ $hasRouter ? 'Connected & Synced' : 'Run 4-Step API Wizard' }}</p>
-                    </a>
-                </div>
-
-                <!-- Step 2: M-Pesa Gateways -->
-                <div class="col-12 col-md-4 col-xl">
-                    <a href="{{ route('admin.payment-gateways') }}" class="text-decoration-none d-block p-3 rounded-3 h-100" style="background: {{ $hasPayments ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.06)' }}; border: 1px solid {{ $hasPayments ? 'rgba(16, 185, 129, 0.35)' : 'rgba(255, 255, 255, 0.1)' }};">
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                            <span class="fw-bold text-white small">2. M-Pesa Setup</span>
-                            <i class="bi {{ $hasPayments ? 'bi-check-circle-fill text-success' : 'bi-arrow-right-circle text-muted' }}"></i>
-                        </div>
-                        <p class="mb-0 text-white-50" style="font-size: 0.76rem;">{{ $hasPayments ? 'Till / Paybill Active' : 'PayHero or Till Setup' }}</p>
-                    </a>
-                </div>
-
-                <!-- Step 3: SMS Gateway -->
-                <div class="col-12 col-md-4 col-xl">
-                    <a href="{{ route('admin.sms-gateways') }}" class="text-decoration-none d-block p-3 rounded-3 h-100" style="background: {{ $hasSms ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.06)' }}; border: 1px solid {{ $hasSms ? 'rgba(16, 185, 129, 0.35)' : 'rgba(255, 255, 255, 0.1)' }};">
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                            <span class="fw-bold text-white small">3. SMS & OTP</span>
-                            <i class="bi {{ $hasSms ? 'bi-check-circle-fill text-success' : 'bi-arrow-right-circle text-muted' }}"></i>
-                        </div>
-                        <p class="mb-0 text-white-50" style="font-size: 0.76rem;">{{ $hasSms ? 'Gateway Verified' : 'Blessed / Advanta / AT' }}</p>
-                    </a>
-                </div>
-
-                <!-- Step 4: Packages -->
-                <div class="col-12 col-md-6 col-xl">
-                    <a href="{{ route('admin.packages') }}" class="text-decoration-none d-block p-3 rounded-3 h-100" style="background: {{ $hasPackage ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.06)' }}; border: 1px solid {{ $hasPackage ? 'rgba(16, 185, 129, 0.35)' : 'rgba(255, 255, 255, 0.1)' }};">
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                            <span class="fw-bold text-white small">4. WiFi Packages</span>
-                            <i class="bi {{ $hasPackage ? 'bi-check-circle-fill text-success' : 'bi-arrow-right-circle text-muted' }}"></i>
-                        </div>
-                        <p class="mb-0 text-white-50" style="font-size: 0.76rem;">{{ $hasPackage ? 'Bandwidth Configured' : 'Hourly / Monthly Plans' }}</p>
-                    </a>
-                </div>
-
-                <!-- Step 5: Captive Portal -->
-                <div class="col-12 col-md-6 col-xl">
-                    <a href="{{ route('admin.portal-customizer') }}" class="text-decoration-none d-block p-3 rounded-3 h-100" style="background: {{ $hasPortal ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.06)' }}; border: 1px solid {{ $hasPortal ? 'rgba(16, 185, 129, 0.35)' : 'rgba(255, 255, 255, 0.1)' }};">
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                            <span class="fw-bold text-white small">5. Captive Portal</span>
-                            <i class="bi {{ $hasPortal ? 'bi-check-circle-fill text-success' : 'bi-arrow-right-circle text-muted' }}"></i>
-                        </div>
-                        <p class="mb-0 text-white-50" style="font-size: 0.76rem;">{{ $hasPortal ? 'Custom Brand Set' : 'Logo & Color Customizer' }}</p>
-                    </a>
+            <div class="text-end">
+                <span class="fw-semibold text-slate-800" style="font-size: 0.875rem;">{{ $progressPct }}%</span>
+                <div class="progress mt-1" style="width: 140px; height: 6px; background: #f1f5f9; border-radius: 999px;">
+                    <div class="progress-bar" style="width: {{ $progressPct }}%; background: #f97316; border-radius: 999px;"></div>
                 </div>
             </div>
         </div>
-    </div>
+
+        <div class="row g-3 pt-1">
+            <!-- Step 1: Core Router -->
+            <div class="col-12 col-md-4 col-xl">
+                <a href="{{ route('admin.router-wizard') }}" class="text-decoration-none d-block p-3 h-100" style="border-radius: 0.75rem; background: {{ $hasRouter ? '#ecfdf5' : '#f8fafc' }}; border: 1px solid {{ $hasRouter ? '#a7f3d0' : 'rgba(226, 232, 240, 0.8)' }};">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="fw-semibold text-slate-800" style="font-size: 0.75rem;">1. Add router</span>
+                        <i class="bi {{ $hasRouter ? 'bi-check-circle-fill text-success' : 'bi-arrow-right-circle text-muted' }}"></i>
+                    </div>
+                    <p class="mb-0 text-muted" style="font-size: 0.75rem;">{{ $hasRouter ? 'Connected & synced' : 'Run 4-step API wizard' }}</p>
+                </a>
+            </div>
+
+            <!-- Step 2: M-Pesa Gateways -->
+            <div class="col-12 col-md-4 col-xl">
+                <a href="{{ route('admin.payment-gateways') }}" class="text-decoration-none d-block p-3 h-100" style="border-radius: 0.75rem; background: {{ $hasPayments ? '#ecfdf5' : '#f8fafc' }}; border: 1px solid {{ $hasPayments ? '#a7f3d0' : 'rgba(226, 232, 240, 0.8)' }};">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="fw-semibold text-slate-800" style="font-size: 0.75rem;">2. M-Pesa setup</span>
+                        <i class="bi {{ $hasPayments ? 'bi-check-circle-fill text-success' : 'bi-arrow-right-circle text-muted' }}"></i>
+                    </div>
+                    <p class="mb-0 text-muted" style="font-size: 0.75rem;">{{ $hasPayments ? 'Till / Paybill active' : 'PayHero or Till setup' }}</p>
+                </a>
+            </div>
+
+            <!-- Step 3: SMS Gateway -->
+            <div class="col-12 col-md-4 col-xl">
+                <a href="{{ route('admin.sms-gateways') }}" class="text-decoration-none d-block p-3 h-100" style="border-radius: 0.75rem; background: {{ $hasSms ? '#ecfdf5' : '#f8fafc' }}; border: 1px solid {{ $hasSms ? '#a7f3d0' : 'rgba(226, 232, 240, 0.8)' }};">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="fw-semibold text-slate-800" style="font-size: 0.75rem;">3. SMS & OTP</span>
+                        <i class="bi {{ $hasSms ? 'bi-check-circle-fill text-success' : 'bi-arrow-right-circle text-muted' }}"></i>
+                    </div>
+                    <p class="mb-0 text-muted" style="font-size: 0.75rem;">{{ $hasSms ? 'Gateway verified' : 'Blessed / Advanta / AT' }}</p>
+                </a>
+            </div>
+
+            <!-- Step 4: Packages -->
+            <div class="col-12 col-md-6 col-xl">
+                <a href="{{ route('admin.packages') }}" class="text-decoration-none d-block p-3 h-100" style="border-radius: 0.75rem; background: {{ $hasPackage ? '#ecfdf5' : '#f8fafc' }}; border: 1px solid {{ $hasPackage ? '#a7f3d0' : 'rgba(226, 232, 240, 0.8)' }};">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="fw-semibold text-slate-800" style="font-size: 0.75rem;">4. WiFi packages</span>
+                        <i class="bi {{ $hasPackage ? 'bi-check-circle-fill text-success' : 'bi-arrow-right-circle text-muted' }}"></i>
+                    </div>
+                    <p class="mb-0 text-muted" style="font-size: 0.75rem;">{{ $hasPackage ? 'Bandwidth configured' : 'Hourly / monthly plans' }}</p>
+                </a>
+            </div>
+
+            <!-- Step 5: Captive Portal -->
+            <div class="col-12 col-md-6 col-xl">
+                <a href="{{ route('admin.portal-customizer') }}" class="text-decoration-none d-block p-3 h-100" style="border-radius: 0.75rem; background: {{ $hasPortal ? '#ecfdf5' : '#f8fafc' }}; border: 1px solid {{ $hasPortal ? '#a7f3d0' : 'rgba(226, 232, 240, 0.8)' }};">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="fw-semibold text-slate-800" style="font-size: 0.75rem;">5. Captive portal</span>
+                        <i class="bi {{ $hasPortal ? 'bi-check-circle-fill text-success' : 'bi-arrow-right-circle text-muted' }}"></i>
+                    </div>
+                    <p class="mb-0 text-muted" style="font-size: 0.75rem;">{{ $hasPortal ? 'Custom brand set' : 'Logo & color customizer' }}</p>
+                </a>
+            </div>
+        </div>
+    </x-ui.card>
     @endif
 
     {{-- Modern Stat Cards Row --}}
     <div class="row g-3 mb-4">
         <!-- Card 1: Active Users -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #7C3AED, #5B34E6); color: #fff; border-radius: 16px; transition: transform 0.3s ease;">
-                <div class="card-body position-relative z-1">
-                    <div class="d-flex justify-content-between align-items-sm-center">
-                        <div>
-                            <h6 class="text-uppercase fw-bold mb-1" style="font-size: 0.72rem; letter-spacing: 1px; opacity: 0.85;">{{ __('Active PPPoE Users') }}</h6>
-                            <h3 class="fw-bold mb-0">{{ $customersData['active'] ?? 0 }} <span style="font-size: 0.85rem; font-weight: normal; opacity: 0.75;">/ {{ $customersData['total'] ?? 0 }}</span></h3>
-                        </div>
-                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background: rgba(255,255,255,0.2);">
-                            <i class="bi bi-people-fill fs-4"></i>
-                        </div>
-                    </div>
-                    <div class="mt-3 pt-2 border-top border-white border-opacity-25">
-                        <span class="small fw-medium" style="opacity: 0.9;"><i class="bi bi-person-plus-fill me-1"></i>{{ $customersData['recent'] ?? 0 }} {{ __('New this month') }}</span>
-                        <span class="small float-end" style="opacity: 0.9;"><i class="bi bi-x-circle me-1 text-light"></i>{{ __('Inactive') }}</span>
-                    </div>
+            <x-ui.stat-card :label="__('Active PPPoE users')" :value="($customersData['active'] ?? 0) . ' / ' . ($customersData['total'] ?? 0)" color="purple">
+                <x-slot:icon><i class="bi bi-people-fill"></i></x-slot:icon>
+                <div class="d-flex justify-content-between align-items-center w-100">
+                    <span><i class="bi bi-person-plus-fill me-1"></i>{{ $customersData['recent'] ?? 0 }} {{ __('New this month') }}</span>
+                    <span><i class="bi bi-x-circle me-1"></i>{{ __('Inactive') }}</span>
                 </div>
-                <div class="position-absolute end-0 bottom-0" style="opacity: 0.15; transform: translate(10%, 10%); z-index: 0; pointer-events: none;">
-                    <i class="bi bi-person-check-fill" style="font-size: 5.5rem;"></i>
-                </div>
-            </div>
+            </x-ui.stat-card>
         </div>
 
         <!-- Card 2: Today PPPoE Collection -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #0EA5E9, #1E88E5); color: #fff; border-radius: 16px; transition: transform 0.3s ease;">
-                <div class="card-body position-relative z-1">
-                    <div class="d-flex justify-content-between align-items-sm-center">
-                        <div>
-                            <h6 class="text-uppercase fw-bold mb-1" style="font-size: 0.72rem; letter-spacing: 1px; opacity: 0.85;">{{ __("Today's PPPoE Sales") }}</h6>
-                            <h3 class="fw-bold mb-0">KES {{ number_format($billInformationData['today_paid_amount'] ?? 0, 0) }}</h3>
-                        </div>
-                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background: rgba(255,255,255,0.2);">
-                            <i class="bi bi-wallet2 fs-4"></i>
-                        </div>
-                    </div>
-                    <div class="mt-3 pt-2 border-top border-white border-opacity-25">
-                        <span class="small fw-medium" style="opacity: 0.9;"><i class="bi bi-calendar3 me-1"></i>{{ __('Total Mo:') }} KES {{ number_format($billInformationData['paid_amount'] ?? 0, 0) }}</span>
-                        <span class="small float-end" style="opacity: 0.9;"><i class="bi bi-arrow-up-right me-1"></i>{{ __('PPPoE Only') }}</span>
-                    </div>
+            <x-ui.stat-card :label="__('Today\'s PPPoE sales')" :value="'KES ' . number_format($billInformationData['today_paid_amount'] ?? 0, 0)" color="blue">
+                <x-slot:icon><i class="bi bi-wallet2"></i></x-slot:icon>
+                <div class="d-flex justify-content-between align-items-center w-100">
+                    <span><i class="bi bi-calendar3 me-1"></i>{{ __('Total mo:') }} KES {{ number_format($billInformationData['paid_amount'] ?? 0, 0) }}</span>
+                    <span><i class="bi bi-arrow-up-right me-1"></i>{{ __('PPPoE only') }}</span>
                 </div>
-                <div class="position-absolute end-0 bottom-0" style="opacity: 0.15; transform: translate(10%, 10%); z-index: 0; pointer-events: none;">
-                    <i class="bi bi-cash-stack" style="font-size: 5.5rem;"></i>
-                </div>
-            </div>
+            </x-ui.stat-card>
         </div>
 
         <!-- Card 3: Today Hotspot Sales -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #F59E0B, #E8790B); color: #fff; border-radius: 16px; transition: transform 0.3s ease;">
-                <div class="card-body position-relative z-1">
-                    <div class="d-flex justify-content-between align-items-sm-center">
-                        <div>
-                            <h6 class="text-uppercase fw-bold mb-1" style="font-size: 0.72rem; letter-spacing: 1px; opacity: 0.85;">{{ __("Today's Hotspot Sales") }}</h6>
-                            <h3 class="fw-bold mb-0">KES {{ number_format($billInformationData['hotspot_today'] ?? 0, 0) }}</h3>
-                        </div>
-                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background: rgba(255,255,255,0.2);">
-                            <i class="bi bi-wifi fs-4"></i>
-                        </div>
-                    </div>
-                    <div class="mt-3 pt-2 border-top border-white border-opacity-25">
-                        <span class="small fw-medium" style="opacity: 0.9;"><i class="bi bi-calendar3 me-1"></i>{{ __('Total Mo:') }} KES {{ number_format($billInformationData['hotspot_total'] ?? 0, 0) }}</span>
-                        <span class="small float-end" style="opacity: 0.9;"><i class="bi bi-arrow-up-right me-1"></i>{{ __('Hotspot Only') }}</span>
-                    </div>
+            <x-ui.stat-card :label="__('Today\'s hotspot sales')" :value="'KES ' . number_format($billInformationData['hotspot_today'] ?? 0, 0)" color="orange">
+                <x-slot:icon><i class="bi bi-wifi"></i></x-slot:icon>
+                <div class="d-flex justify-content-between align-items-center w-100">
+                    <span><i class="bi bi-calendar3 me-1"></i>{{ __('Total mo:') }} KES {{ number_format($billInformationData['hotspot_total'] ?? 0, 0) }}</span>
+                    <span><i class="bi bi-arrow-up-right me-1"></i>{{ __('Hotspot only') }}</span>
                 </div>
-                <div class="position-absolute end-0 bottom-0" style="opacity: 0.15; transform: translate(10%, 10%); z-index: 0; pointer-events: none;">
-                    <i class="bi bi-router-fill" style="font-size: 5.5rem;"></i>
-                </div>
-            </div>
+            </x-ui.stat-card>
         </div>
 
         <!-- Card 4: Total Revenue YTD -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #10B981, #059669); color: #fff; border-radius: 16px; transition: transform 0.3s ease;">
-                <div class="card-body position-relative z-1">
-                    <div class="d-flex justify-content-between align-items-sm-center">
-                        <div>
-                            <h6 class="text-uppercase fw-bold mb-1" style="font-size: 0.72rem; letter-spacing: 1px; opacity: 0.85;">{{ __('Total Global Revenue') }}</h6>
-                            <h3 class="fw-bold mb-0">KES {{ number_format(($billInformationData['paid_amount'] ?? 0) + ($billInformationData['hotspot_total'] ?? 0), 0) }}</h3>
-                        </div>
-                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background: rgba(255,255,255,0.2);">
-                            <i class="bi bi-graph-up-arrow fs-4"></i>
-                        </div>
-                    </div>
-                    <div class="mt-3 pt-2 border-top border-white border-opacity-25">
-                        <span class="small fw-semibold text-warning" style="opacity: 1;"><i class="bi bi-exclamation-triangle-fill me-1"></i>{{ __('Pending Due:') }} KES {{ number_format($billInformationData['due_amount'] ?? 0, 0) }}</span>
-                        <span class="small float-end" style="opacity: 0.9;">{{ __('Total Arrears') }}</span>
-                    </div>
+            <x-ui.stat-card :label="__('Total global revenue')" :value="'KES ' . number_format(($billInformationData['paid_amount'] ?? 0) + ($billInformationData['hotspot_total'] ?? 0), 0)" color="green">
+                <x-slot:icon><i class="bi bi-graph-up-arrow"></i></x-slot:icon>
+                <div class="d-flex justify-content-between align-items-center w-100">
+                    <span><i class="bi bi-exclamation-triangle-fill me-1"></i>{{ __('Pending due:') }} KES {{ number_format($billInformationData['due_amount'] ?? 0, 0) }}</span>
+                    <span>{{ __('Total arrears') }}</span>
                 </div>
-                <div class="position-absolute end-0 bottom-0" style="opacity: 0.15; transform: translate(10%, 10%); z-index: 0; pointer-events: none;">
-                    <i class="bi bi-bank2" style="font-size: 5.5rem;"></i>
-                </div>
-            </div>
+            </x-ui.stat-card>
         </div>
     </div>
 
@@ -216,117 +154,101 @@
     <div class="row g-3 mb-4">
         <!-- Card 1: Total Resellers -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: #1B2238; color: #fff; border-radius: 16px;">
-                <div class="card-body position-relative z-1">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="text-uppercase fw-bold mb-1 text-white-50" style="font-size: 0.72rem; letter-spacing: 1px;">{{ __('Total Resellers') }}</h6>
-                            <h3 class="fw-bold mb-0">{{ $resellerData['total_resellers'] ?? 0 }}</h3>
-                        </div>
-                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background: rgba(255,255,255,0.15);">
-                            <i class="bi bi-people fs-4 text-info"></i>
-                        </div>
-                    </div>
-                    <div class="mt-3 pt-2 border-top border-white border-opacity-10 small text-white-50">
-                        <span>{{ __('Active:') }} <strong>{{ $resellerData['active_resellers'] ?? 0 }}</strong></span>
-                        <span class="float-end">{{ __('Suspended:') }} <strong>{{ $resellerData['suspended_resellers'] ?? 0 }}</strong></span>
-                    </div>
+            <x-ui.stat-card :label="__('Total resellers')" :value="$resellerData['total_resellers'] ?? 0" color="navy">
+                <x-slot:icon><i class="bi bi-people"></i></x-slot:icon>
+                <div class="d-flex justify-content-between align-items-center w-100">
+                    <span>{{ __('Active:') }} <strong>{{ $resellerData['active_resellers'] ?? 0 }}</strong></span>
+                    <span>{{ __('Suspended:') }} <strong>{{ $resellerData['suspended_resellers'] ?? 0 }}</strong></span>
                 </div>
-            </div>
+            </x-ui.stat-card>
         </div>
 
         <!-- Card 2: Reseller Customers -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #7C3AED, #5B34E6); color: #fff; border-radius: 16px;">
-                <div class="card-body position-relative z-1">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="text-uppercase fw-bold mb-1 text-white-50" style="font-size: 0.72rem; letter-spacing: 1px;">{{ __('Reseller Customers') }}</h6>
-                            <h3 class="fw-bold mb-0">{{ $resellerData['total_customers'] ?? 0 }}</h3>
-                        </div>
-                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background: rgba(255,255,255,0.15);">
-                            <i class="bi bi-person-check fs-4 text-warning"></i>
-                        </div>
-                    </div>
-                    <div class="mt-3 pt-2 border-top border-white border-opacity-10 small text-white-50">
-                        <span>{{ __('Active:') }} <strong>{{ $resellerData['active_customers'] ?? 0 }}</strong></span>
-                        <span class="float-end">{{ __('Pending:') }} <strong>{{ $resellerData['pending_customers'] ?? 0 }}</strong></span>
-                    </div>
+            <x-ui.stat-card :label="__('Reseller customers')" :value="$resellerData['total_customers'] ?? 0" color="purple">
+                <x-slot:icon><i class="bi bi-person-check"></i></x-slot:icon>
+                <div class="d-flex justify-content-between align-items-center w-100">
+                    <span>{{ __('Active:') }} <strong>{{ $resellerData['active_customers'] ?? 0 }}</strong></span>
+                    <span>{{ __('Pending:') }} <strong>{{ $resellerData['pending_customers'] ?? 0 }}</strong></span>
                 </div>
-            </div>
+            </x-ui.stat-card>
         </div>
 
         <!-- Card 3: Total Reseller Balance -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #0EA5E9, #1E88E5); color: #fff; border-radius: 16px;">
-                <div class="card-body position-relative z-1">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="text-uppercase fw-bold mb-1 text-white-50" style="font-size: 0.72rem; letter-spacing: 1px;">{{ __('Wallet Balances') }}</h6>
-                            <h3 class="fw-bold mb-0">KES {{ number_format($resellerData['total_balance'] ?? 0, 2) }}</h3>
-                        </div>
-                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background: rgba(255,255,255,0.15);">
-                            <i class="bi bi-cash-stack fs-4 text-success"></i>
-                        </div>
-                    </div>
-                    <div class="mt-3 pt-2 border-top border-white border-opacity-10 small text-white-50">
-                        {{ __('Cumulative reseller wallet balance.') }}
-                    </div>
-                </div>
-            </div>
+            <x-ui.stat-card :label="__('Wallet balances')" :value="'KES ' . number_format($resellerData['total_balance'] ?? 0, 2)" :sub="__('Cumulative reseller wallet balance.')" color="blue">
+                <x-slot:icon><i class="bi bi-cash-stack"></i></x-slot:icon>
+            </x-ui.stat-card>
         </div>
 
         <!-- Card 4: Total Reseller Commission -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm overflow-hidden h-100" style="background: linear-gradient(135deg, #EC4899, #DB2777); color: #fff; border-radius: 16px;">
-                <div class="card-body position-relative z-1">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="text-uppercase fw-bold mb-1 text-white-50" style="font-size: 0.72rem; letter-spacing: 1px;">{{ __('Total Commissions') }}</h6>
-                            <h3 class="fw-bold mb-0">KES {{ number_format($resellerData['total_commission'] ?? 0, 2) }}</h3>
-                        </div>
-                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background: rgba(255,255,255,0.15);">
-                            <i class="bi bi-percent fs-4 text-light"></i>
-                        </div>
-                    </div>
-                    <div class="mt-3 pt-2 border-top border-white border-opacity-10 small text-white-50">
-                        {{ __('Total reseller commission awarded.') }}
-                    </div>
-                </div>
-            </div>
+            <x-ui.stat-card :label="__('Total commissions')" :value="'KES ' . number_format($resellerData['total_commission'] ?? 0, 2)" :sub="__('Total reseller commission awarded.')" color="pink">
+                <x-slot:icon><i class="bi bi-percent"></i></x-slot:icon>
+            </x-ui.stat-card>
         </div>
     </div>
 
     <div class="row g-4 mb-4">
-        {{-- Clean Empty State when no active routers are syncing --}}
         @php
             $hasActiveRouters = false;
+            $totalRoutersCount = 0;
+            $onlineRoutersCount = 0;
             if (is_array($systemOverview)) {
                 foreach ($systemOverview as $rData) {
                     if (is_array($rData) && ($rData['status'] ?? false)) {
                         $hasActiveRouters = true;
-                        break;
+                        $totalRoutersCount++;
+                        if ($rData['is_online'] ?? true) {
+                            $onlineRoutersCount++;
+                        }
                     }
                 }
             }
         @endphp
 
-        @if (!$hasActiveRouters)
-            <div class="col-12 mb-2">
-                <div class="card p-4 text-center bg-white shadow-sm" style="border: 1px dashed var(--card-border); border-radius: 18px;">
-                    <div class="rounded-circle bg-light d-inline-flex align-items-center justify-content-center mx-auto mb-2" style="width: 54px; height: 54px;">
-                        <i class="bi bi-router text-muted fs-3"></i>
-                    </div>
-                    <h5 class="fw-bold mb-1" style="color: #111;">{{ __('No Active MikroTik Routers Connected') }}</h5>
-                    <p class="text-muted mb-3" style="font-size: 0.88rem; max-width: 480px; margin: 0 auto;">
-                        {{ __('Connect your MikroTik Core router via API (Port 8728) or WireGuard to monitor real-time CPU, RAM, and live PPPoE interfaces.') }}
-                    </p>
-                    <div>
-                        <a href="{{ route('admin.router-wizard') }}" class="btn btn-primary btn-sm px-3 py-2" style="font-weight: 700;">
-                            <i class="bi bi-magic me-1"></i> {{ __('Add Router Wizard') }}
-                        </a>
-                    </div>
+        {{-- Routers Section Header with Quick Actions --}}
+        <div class="col-12 mb-n2">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <h2 class="ui-section-title mb-0">{{ __('MikroTik routers & telemetry') }}</h2>
+                    @if ($hasActiveRouters)
+                        <x-ui.badge :tone="$onlineRoutersCount > 0 ? 'success' : 'neutral'">
+                            {{ $onlineRoutersCount }} {{ __('online') }} / {{ $totalRoutersCount }} {{ __('total') }}
+                        </x-ui.badge>
+                    @endif
                 </div>
+                <div class="d-flex align-items-center gap-2">
+                    <x-ui.button variant="secondary" :href="route('admin.routers')">
+                        <i class="bi bi-hdd-network me-1"></i> {{ __('View all routers') }}
+                    </x-ui.button>
+                    <x-ui.button variant="primary" :href="route('admin.router-wizard')">
+                        <i class="bi bi-plus-lg me-1"></i> {{ __('Add router') }}
+                    </x-ui.button>
+                </div>
+            </div>
+        </div>
+
+        @if (!$hasActiveRouters)
+            <div class="col-12 mb-1">
+                <x-ui.card :padding="false">
+                    <x-ui.empty-state
+                        icon="bi-router"
+                        :title="__('No active MikroTik routers connected')"
+                        :description="__('Connect your MikroTik core router via API (Port 8728) or WireGuard to monitor real-time CPU, RAM, and live PPPoE interfaces.')"
+                    >
+                        <div class="d-flex flex-wrap justify-content-center align-items-center gap-2 mt-3">
+                            <a href="{{ route('admin.router-wizard') }}" class="btn btn-primary d-inline-flex align-items-center gap-1 shadow-sm px-3 py-2">
+                                <i class="bi bi-plus-lg"></i>
+                                <span>{{ __('Add Router') }}</span>
+                            </a>
+                            <a href="{{ route('admin.routers') }}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1 px-3 py-2">
+                                <i class="bi bi-hdd-network"></i>
+                                <span>{{ __('View All Routers') }}</span>
+                            </a>
+                        </div>
+                    </x-ui.empty-state>
+                </x-ui.card>
             </div>
         @endif
 
@@ -337,6 +259,8 @@
                     if (!is_array($routerData) || !($routerData['status'] ?? false)) {
                         continue;
                     }
+
+                    $isRouterOnline = (bool) ($routerData['is_online'] ?? true);
 
                     $info = is_array($routerData['data'] ?? null) 
                         ? ($routerData['data'][0] ?? $routerData['data']) 
@@ -349,93 +273,129 @@
                     $cpuColor = $cpuLoad > 80 ? 'bg-danger' : ($cpuLoad > 50 ? 'bg-warning' : 'bg-success');
 
                     // Memory Math
-                    $memTotal = max(1, (int)($info['total-memory'] ?? 1));
-                    $memFree = (int)($info['free-memory'] ?? 0);
-                $memUsed = $memTotal - $memFree;
-                $memPct = $memTotal > 0 ? round(($memUsed / $memTotal) * 100) : 0;
+                    $memTotalRaw = (int) ($info['total-memory'] ?? 0);
+                    $memFreeRaw = (int) ($info['free-memory'] ?? 0);
+                    $memUsed = max(0, $memTotalRaw - $memFreeRaw);
+                    $memPct = $memTotalRaw > 0
+                        ? round(($memUsed / $memTotalRaw) * 100)
+                        : (int) ($routerData['memory_load'] ?? 0);
 
-                // HDD Math
-                $hddTotal = (int)($info['total-hdd-space'] ?? 1);
-                $hddFree = (int)($info['free-hdd-space'] ?? 0);
-                $hddUsed = $hddTotal - $hddFree;
-                $hddPct = $hddTotal > 0 ? round(($hddUsed / $hddTotal) * 100) : 0;
+                    // HDD Math
+                    $hddTotalRaw = (int) ($info['total-hdd-space'] ?? 0);
+                    $hddFreeRaw = (int) ($info['free-hdd-space'] ?? 0);
+                    $hddUsed = max(0, $hddTotalRaw - $hddFreeRaw);
+                    $hddPct = $hddTotalRaw > 0 ? round(($hddUsed / $hddTotalRaw) * 100) : 0;
 
-                $cardId = 'router_' . \Illuminate\Support\Str::slug($routerName);
+                    $activeTotal = (int) ($routerData['active_total'] ?? 0);
+                    $activePpp = (int) ($routerData['active_ppp'] ?? 0);
+                    $activeHs = (int) ($routerData['active_hs'] ?? 0);
 
-                if (!function_exists('formatRouterBytesLg')) {
-                    function formatRouterBytesLg($bytes) {
-                        if ($bytes == 0) return '0 B';
-                        $k = 1024;
-                        $sizes = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
-                        $i = floor(log($bytes) / log($k));
-                        return round($bytes / pow($k, $i), 2) . ' ' . $sizes[$i];
+                    $cardId = 'router_' . \Illuminate\Support\Str::slug($routerName);
+
+                    if (!function_exists('formatRouterBytesLg')) {
+                        function formatRouterBytesLg($bytes) {
+                            if ($bytes <= 0) return '0 B';
+                            $k = 1024;
+                            $sizes = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+                            $i = floor(log($bytes) / log($k));
+                            return round($bytes / pow($k, $i), 2) . ' ' . $sizes[$i];
+                        }
                     }
-                }
-            @endphp
+                @endphp
 
             <div class="col-12 col-md-6 col-lg-4 col-xxl-4 d-flex flex-fill">
-                {{-- Refined Router Card with Full Details --}}
-                <div class="card border-0 shadow-sm rounded-4 w-100 overflow-hidden d-flex flex-column router-overview-card" style="min-height: 460px;">
-                    <div class="px-3 py-2" style="background: linear-gradient(135deg, #0f172a, #1e293b); color: white;">
-                        <div class="d-flex align-items-center">
-                            <i class="bi bi-hdd-network fs-2 text-info me-3" style="font-size: 1.5rem;"></i>
+                {{-- Refined Router Card with Online/Offline Status & Full Analytics --}}
+                <div class="card w-100 overflow-hidden d-flex flex-column router-overview-card" style="min-height: 460px;">
+                    <div class="px-4 py-3 border-bottom d-flex align-items-center justify-content-between gap-2">
+                        <div class="d-flex align-items-center gap-3 overflow-hidden">
+                            <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 36px; height: 36px; background: {{ $isRouterOnline ? '#ecfdf5' : '#fef2f2' }};">
+                                <i class="bi bi-hdd-network {{ $isRouterOnline ? 'text-success' : 'text-danger' }}"></i>
+                            </div>
                             <div class="flex-grow-1 overflow-hidden">
-                                <h5 class="fw-bold mb-0 text-white text-truncate">{{ $info['board-name'] ?? $routerName }}</h5>
-                                <div class="text-white-50 mt-1 d-flex gap-2 flex-wrap align-items-center" style="font-size: 0.7rem;">
-                                    <span class="badge bg-info bg-opacity-25 text-dark border border-info border-opacity-25 p-1">{{ strtoupper($info['platform'] ?? 'N/A') }}</span>
+                                <div class="d-flex align-items-center gap-2">
+                                    <h3 class="ui-section-title mb-0 text-truncate" title="{{ $routerName }}">{{ $routerName }}</h3>
+                                    <x-ui.badge :tone="$isRouterOnline ? 'success' : 'danger'">
+                                        <i class="bi bi-circle-fill me-1" style="font-size: 5px;"></i>
+                                        {{ $isRouterOnline ? __('Online') : __('Offline') }}
+                                    </x-ui.badge>
+                                </div>
+                                <div class="text-muted mt-1 d-flex gap-1 flex-wrap align-items-center" style="font-size: 0.6875rem;">
+                                    <span>{{ $info['board-name'] ?? 'MikroTik' }}</span>
+                                    @if(!empty($routerData['ip']))
+                                        <span>•</span>
+                                        <span class="font-monospace">{{ $routerData['ip'] }}</span>
+                                    @endif
                                     <span>•</span>
-                                    <span class="text-white text-opacity-75">{{ $info['architecture-name'] ?? 'N/A' }}</span>
-                                    <span>•</span>
-                                    <span class="badge {{
-                                        ($routerData['type'] ?? '') === 'API' ? 'bg-success-subtle text-success-emphasis border border-success-subtle' : 'bg-warning-subtle text-warning-emphasis border border-warning-subtle'
-                                    }}">
-                                        {{ __(':type Connection', ['type' => $routerData['type'] ?? 'N/A']) }}
-                                    </span>
+                                    <x-ui.badge :tone="$isRouterOnline ? 'info' : 'neutral'">
+                                        {{ __(':type', ['type' => $routerData['type'] ?? 'API']) }}
+                                    </x-ui.badge>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="card-body bg-light router-card-body p-0 d-flex flex-column h-100">
-                        <div class="px-4 py-2 border-bottom router-card-subheader">
-                            <div class="row text-center mb-4">
-                                <div class="col">
-                                    <small class="text-muted d-block mb-1 fw-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">{{ __('Uptime') }}</small>
-                                    <span class="fw-bold text-dark uptime-clock"
-                                          style="font-size: 0.85rem;"
+                    <div class="card-body router-card-body p-0 d-flex flex-column h-100">
+                        <div class="px-4 py-3 border-bottom router-card-subheader">
+                            <div class="row text-center mb-3 g-2">
+                                <div class="col-4">
+                                    <small class="text-muted d-block mb-1 fw-medium" style="font-size: 0.6875rem;">{{ __('Uptime') }}</small>
+                                    <span class="fw-semibold text-dark uptime-clock"
+                                          style="font-size: 0.75rem;"
                                           data-uptime="{{ $info['uptime'] ?? '0s' }}">
-                                        {{ str_replace(['w', 'd', 'h', 'm', 's'], ['w ', 'd ', 'h ', 'm ', 's '], $info['uptime'] ?? 'N/A') }}
+                                        {{ $isRouterOnline ? str_replace(['w', 'd', 'h', 'm', 's'], ['w ', 'd ', 'h ', 'm ', 's '], $info['uptime'] ?? 'Active') : __('Offline') }}
                                     </span>
                                 </div>
-                                <div class="col border-start">
-                                    <small class="text-muted d-block mb-1 fw-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">{{ __('Version') }}</small>
-                                    <span class="fw-bold text-dark" style="font-size: 0.85rem;">{{ $info['version'] ?? 'N/A' }}</span>
+                                <div class="col-4 border-start">
+                                    <small class="text-muted d-block mb-1 fw-medium" style="font-size: 0.6875rem;">{{ __('Active sessions') }}</small>
+                                    <span class="fw-semibold text-dark" style="font-size: 0.75rem;">
+                                        {{ $activeTotal }} <span class="text-muted fw-normal" style="font-size: 0.6875rem;">({{ $activePpp }}P / {{ $activeHs }}H)</span>
+                                    </span>
+                                </div>
+                                <div class="col-4 border-start">
+                                    <small class="text-muted d-block mb-1 fw-medium" style="font-size: 0.6875rem;">{{ __('Version') }}</small>
+                                    <span class="fw-semibold text-dark" style="font-size: 0.75rem;">{{ $info['version'] ?? 'N/A' }}</span>
                                 </div>
                             </div>
 
                             <div class="space-y-3">
                                 <div class="mb-3">
-                                    <div class="d-flex justify-content-between text-dark mb-1" style="font-size:0.75rem; font-weight:700;">
-                                        <span>{{ __('CPU Usage') }}</span>
-                                        <span class="text-info fw-bold">{{ ($info['cpu-count'] ?? '?') . ' × ' . ($info['cpu-frequency'] ?? '?') }} MHz<span class="text-muted fw-normal">({{ $cpuLoad }}%)</span></span>
+                                    <div class="d-flex justify-content-between text-dark mb-1" style="font-size:0.75rem; font-weight:500;">
+                                        <span>{{ __('CPU usage') }}</span>
+                                        <span class="text-slate-600 fw-semibold">
+                                            @if(($info['cpu-frequency'] ?? '-') !== '-')
+                                                {{ ($info['cpu-count'] ?? '1') . ' × ' . $info['cpu-frequency'] }} MHz
+                                            @endif
+                                            <span class="text-muted fw-normal">({{ $cpuLoad }}%)</span>
+                                        </span>
                                     </div>
                                     <div class="progress" style="height: 6px; border-radius:10px; background: rgba(0,0,0,0.05);">
                                         <div class="progress-bar {{ $cpuColor }}" role="progressbar" style="width: {{ $cpuLoad }}%;"></div>
                                     </div>
                                 </div>
                                 <div class="mb-3">
-                                    <div class="d-flex justify-content-between text-dark mb-1" style="font-size:0.75rem; font-weight:700;">
-                                        <span>{{ __('Memory Usage') }}</span>
-                                        <span>{{ formatRouterBytesLg($memUsed) }} / {{ formatRouterBytesLg($memTotal) }} <span class="text-muted fw-normal ms-1">({{ $memPct }}%)</span></span>
+                                    <div class="d-flex justify-content-between text-dark mb-1" style="font-size:0.75rem; font-weight:500;">
+                                        <span>{{ __('Memory usage') }}</span>
+                                        <span>
+                                            @if($memTotalRaw > 0)
+                                                {{ formatRouterBytesLg($memUsed) }} / {{ formatRouterBytesLg($memTotalRaw) }}
+                                            @endif
+                                            <span class="text-muted fw-normal ms-1">({{ $memPct }}%)</span>
+                                        </span>
                                     </div>
                                     <div class="progress" style="height: 6px; border-radius:10px; background: rgba(0,0,0,0.05);">
                                         <div class="progress-bar bg-success" role="progressbar" style="width: {{ $memPct }}%;"></div>
                                     </div>
                                 </div>
-                                <div class="mb-3">
-                                    <div class="d-flex justify-content-between text-dark mb-1" style="font-size:0.75rem; font-weight:700;">
-                                        <span>{{ __('Storage Usage') }}</span>
-                                        <span>{{ formatRouterBytesLg($hddUsed) }} / {{ formatRouterBytesLg($hddTotal) }} <span class="text-muted fw-normal ms-1">({{ $hddPct }}%)</span></span>
+                                <div class="mb-1">
+                                    <div class="d-flex justify-content-between text-dark mb-1" style="font-size:0.75rem; font-weight:500;">
+                                        <span>{{ __('Storage usage') }}</span>
+                                        <span>
+                                            @if($hddTotalRaw > 0)
+                                                {{ formatRouterBytesLg($hddUsed) }} / {{ formatRouterBytesLg($hddTotalRaw) }} <span class="text-muted fw-normal ms-1">({{ $hddPct }}%)</span>
+                                            @else
+                                                <span class="text-muted fw-normal">{{ $routerData['last_seen_at'] ? __('Last seen :time', ['time' => $routerData['last_seen_at']]) : ($isRouterOnline ? __('Connected') : __('Unreachable')) }}</span>
+                                            @endif
+                                        </span>
                                     </div>
                                     <div class="progress" style="height: 6px; border-radius:10px; background: rgba(0,0,0,0.05);">
                                         <div class="progress-bar bg-warning" role="progressbar" style="width: {{ $hddPct }}%;"></div>
@@ -450,16 +410,19 @@
                                 {{-- Part 1: Platform & Architecture --}}
                                 <div class="accordion-item border-0">
                                     <h2 class="accordion-header">
-                                        <button class="accordion-button collapsed py-3 px-4 fw-bold router-accordion-button text-info" type="button" data-bs-toggle="collapse" data-bs-target="#plat_{{ $cardId }}" style="font-size: 0.72rem;">
-                                            <i class="bi bi-info-square me-2"></i> {{ __('Platform & Architecture') }}
+                                        <button class="accordion-button collapsed py-2.5 px-4 fw-medium router-accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#plat_{{ $cardId }}" style="font-size: 0.75rem;">
+                                            <i class="bi bi-info-square me-2 text-muted"></i> {{ __('Platform & architecture') }}
                                         </button>
                                     </h2>
                                     <div id="plat_{{ $cardId }}" class="accordion-collapse collapse" data-bs-parent="#acc_{{ $cardId }}">
                                         <div class="accordion-body p-3 router-accordion-body border-top">
-                                            <div class="d-flex flex-column gap-2" style="font-size: 0.72rem;">
-                                                <div class="d-flex justify-content-between"><span>{{ __('Board Name') }}</span><span class="fw-bold">{{ $info['board-name'] ?? 'N/A' }}</span></div>
-                                                <div class="d-flex justify-content-between"><span>{{ __('Platform') }}</span><span class="fw-bold">{{ $info['platform'] ?? 'N/A' }}</span></div>
-                                                <div class="d-flex justify-content-between"><span>{{ __('Architecture') }}</span><span class="fw-bold text-info">{{ $info['architecture-name'] ?? 'N/A' }}</span></div>
+                                            <div class="d-flex flex-column gap-2" style="font-size: 0.75rem;">
+                                                <div class="d-flex justify-content-between"><span class="text-muted">{{ __('Board name') }}</span><span class="fw-semibold">{{ $info['board-name'] ?? 'N/A' }}</span></div>
+                                                <div class="d-flex justify-content-between"><span class="text-muted">{{ __('Platform') }}</span><span class="fw-semibold">{{ $info['platform'] ?? 'N/A' }}</span></div>
+                                                <div class="d-flex justify-content-between"><span class="text-muted">{{ __('Architecture') }}</span><span class="fw-semibold">{{ $info['architecture-name'] ?? 'N/A' }}</span></div>
+                                                @if(!empty($routerData['location']))
+                                                    <div class="d-flex justify-content-between"><span class="text-muted">{{ __('Location') }}</span><span class="fw-semibold">{{ $routerData['location'] }}</span></div>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>
@@ -468,17 +431,17 @@
                                 {{-- Part 2: System & Software --}}
                                 <div class="accordion-item border-0">
                                     <h2 class="accordion-header">
-                                        <button class="accordion-button collapsed py-3 px-4 fw-bold router-accordion-button text-primary" type="button" data-bs-toggle="collapse" data-bs-target="#sys_{{ $cardId }}" style="font-size: 0.72rem;">
-                                            <i class="bi bi-gear-wide-connected me-2"></i> {{ __('System Diagnostics & Build') }}
+                                        <button class="accordion-button collapsed py-2.5 px-4 fw-medium router-accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#sys_{{ $cardId }}" style="font-size: 0.75rem;">
+                                            <i class="bi bi-gear-wide-connected me-2 text-muted"></i> {{ __('System diagnostics & build') }}
                                         </button>
                                     </h2>
                                     <div id="sys_{{ $cardId }}" class="accordion-collapse collapse" data-bs-parent="#acc_{{ $cardId }}">
                                         <div class="accordion-body p-3 router-accordion-body border-top">
-                                            <div class="d-flex flex-column gap-2" style="font-size: 0.72rem;">
-                                                <div class="d-flex justify-content-between"><span>{{ __('OS Version') }}</span><span class="fw-bold text-primary">{{ $info['version'] ?? 'N/A' }}</span></div>
-                                                <div class="d-flex justify-content-between"><span>{{ __('Factory OS') }}</span><span class="fw-bold">{{ $info['factory-software'] ?? 'N/A' }}</span></div>
-                                                <div class="d-flex justify-content-between"><span>{{ __('Build Timestamp') }}</span><span class="fw-bold">{{ $info['build-time'] ?? 'N/A' }}</span></div>
-                                                <div class="d-flex justify-content-between"><span>{{ __('Uptime') }}</span><span class="fw-bold text-dark">{{ $info['uptime'] ?? 'N/A' }}</span></div>
+                                            <div class="d-flex flex-column gap-2" style="font-size: 0.75rem;">
+                                                <div class="d-flex justify-content-between"><span class="text-muted">{{ __('OS version') }}</span><span class="fw-semibold">{{ $info['version'] ?? 'N/A' }}</span></div>
+                                                <div class="d-flex justify-content-between"><span class="text-muted">{{ __('Factory OS') }}</span><span class="fw-semibold">{{ $info['factory-software'] ?? 'N/A' }}</span></div>
+                                                <div class="d-flex justify-content-between"><span class="text-muted">{{ __('Last seen / build') }}</span><span class="fw-semibold">{{ $info['build-time'] ?? 'N/A' }}</span></div>
+                                                <div class="d-flex justify-content-between"><span class="text-muted">{{ __('Uptime') }}</span><span class="fw-semibold text-dark">{{ $info['uptime'] ?? 'N/A' }}</span></div>
                                             </div>
                                         </div>
                                     </div>
@@ -487,25 +450,38 @@
                                 {{-- Part 3: Hardware Information --}}
                                 <div class="accordion-item border-0">
                                     <h2 class="accordion-header">
-                                        <button class="accordion-button collapsed py-3 px-4 fw-bold router-accordion-button text-warning" type="button" data-bs-toggle="collapse" data-bs-target="#hw_{{ $cardId }}" style="font-size: 0.72rem;">
-                                            <i class="bi bi-gpu-card me-2"></i> {{ __('Hardware Information') }}
+                                        <button class="accordion-button collapsed py-2.5 px-4 fw-medium router-accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#hw_{{ $cardId }}" style="font-size: 0.75rem;">
+                                            <i class="bi bi-gpu-card me-2 text-muted"></i> {{ __('Hardware information') }}
                                         </button>
                                     </h2>
                                     <div id="hw_{{ $cardId }}" class="accordion-collapse collapse" data-bs-parent="#acc_{{ $cardId }}">
                                         <div class="accordion-body p-3 router-accordion-body border-top">
-                                            <div class="d-flex flex-column gap-2" style="font-size: 0.72rem;">
-                                                <div class="d-flex justify-content-between"><span>{{ __('CPU') }}</span><span class="fw-bold">{{ $info['cpu'] ?? 'N/A' }}</span></div>
-                                                <div class="d-flex justify-content-between"><span>{{ __('CPU count/freq/load') }}</span><span class="fw-bold text-info">{{ ($info['cpu-count'] ?? '?') }} / {{ ($info['cpu-frequency'] ?? '?') }} / {{ $info['cpu-load'] ?? '0' }}%</span></div>
-                                                <div class="d-flex justify-content-between"><span>{{ __('Hdd') }}</span><span class="fw-bold text-dark">{{ formatRouterBytesLg($hddUsed) }} / {{ formatRouterBytesLg($hddTotal) }}</span></div>
-                                                <div class="d-flex justify-content-between"><span>{{ __('Write Total') }}</span><span class="fw-bold text-warning">{{ $info['write-sect-total'] ?? '0' }}</span></div>
-                                                <div class="d-flex justify-content-between"><span>{{ __('Write Since Reboot') }}</span><span class="fw-bold text-warning">{{ $info['write-sect-since-reboot'] ?? '0' }}</span></div>
-                                                <div class="d-flex justify-content-between"><span>{{ __('Temp / Voltage') }}</span><span class="fw-bold text-dark"><span class="text-danger">{{ isset($info['temperature']) ? $info['temperature'].'°C' : 'N/A' }}</span> | <span class="text-primary">{{ isset($info['voltage']) ? $info['voltage'].'V' : 'N/A' }}</span></span></div>
+                                            <div class="d-flex flex-column gap-2" style="font-size: 0.75rem;">
+                                                <div class="d-flex justify-content-between"><span class="text-muted">{{ __('CPU') }}</span><span class="fw-semibold">{{ $info['cpu'] ?? 'N/A' }}</span></div>
+                                                <div class="d-flex justify-content-between"><span class="text-muted">{{ __('CPU count/freq/load') }}</span><span class="fw-semibold">{{ ($info['cpu-count'] ?? '?') }} / {{ ($info['cpu-frequency'] ?? '?') }} / {{ $info['cpu-load'] ?? '0' }}%</span></div>
+                                                <div class="d-flex justify-content-between"><span class="text-muted">{{ __('HDD') }}</span><span class="fw-semibold text-dark">{{ formatRouterBytesLg($hddUsed) }} / {{ formatRouterBytesLg($hddTotalRaw) }}</span></div>
+                                                <div class="d-flex justify-content-between"><span class="text-muted">{{ __('Write total') }}</span><span class="fw-semibold">{{ $info['write-sect-total'] ?? '0' }}</span></div>
+                                                <div class="d-flex justify-content-between"><span class="text-muted">{{ __('Write since reboot') }}</span><span class="fw-semibold">{{ $info['write-sect-since-reboot'] ?? '0' }}</span></div>
+                                                <div class="d-flex justify-content-between"><span class="text-muted">{{ __('Temp / voltage') }}</span><span class="fw-semibold text-dark"><span>{{ isset($info['temperature']) ? $info['temperature'].'°C' : 'N/A' }}</span> | <span>{{ isset($info['voltage']) ? $info['voltage'].'V' : 'N/A' }}</span></span></div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
                             </div>
+                        </div>
+
+                        <div class="px-4 py-2.5 border-top bg-slate-50 d-flex justify-content-between align-items-center" style="font-size: 0.75rem;">
+                            <span class="text-muted">
+                                @if(!empty($routerData['last_seen_at']))
+                                    <i class="bi bi-clock me-1"></i>{{ __('Seen :time', ['time' => $routerData['last_seen_at']]) }}
+                                @else
+                                    <i class="bi bi-shield-check me-1"></i>{{ $isRouterOnline ? __('Live telemetry') : __('Offline status') }}
+                                @endif
+                            </span>
+                            <a href="{{ route('admin.routers') }}" class="text-decoration-none fw-semibold" style="color: var(--accent);">
+                                {{ __('View all routers') }} <i class="bi bi-arrow-right ms-1"></i>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -515,81 +491,70 @@
 
         {{-- Analytical Graphs Section --}}
         <div class="col-12 col-md-6 col-lg-4 col-xxl-4 d-flex flex-fill">
-            <div class="card border-0 shadow-sm rounded-4 w-100 overflow-hidden d-flex flex-column" style="min-height: 460px; border: 1px solid rgba(0,0,0,0.08); background: var(--bs-card-bg);">
-                <div class="card-header py-3 border-0">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-people-fill text-primary me-2"></i>{{ __('Customer Segmentation') }}</h6>
-                </div>
-                <div class="card-body p-0 d-flex align-items-center justify-content-center" id="customers"></div>
-            </div>
+            <x-ui.card :title="__('Customer segmentation')" class="w-100 d-flex flex-column" style="min-height: 460px;">
+                <div class="d-flex align-items-center justify-content-center flex-grow-1" id="customers"></div>
+            </x-ui.card>
         </div>
 
         {{-- Billing Overview: full-width, two-panel --}}
         <div class="col-12 d-flex flex-fill">
-            <div class="card border-0 shadow-sm rounded-4 w-100 overflow-hidden" style="border: 1px solid rgba(0,0,0,0.08); background: var(--bs-card-bg);">
-                <div class="card-header py-3 border-0 d-flex align-items-center justify-content-between">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-cash-stack text-success me-2"></i>{{ __('Billing Overview') }}</h6>
-                    <div class="d-flex gap-1 flex-wrap">
-                        <span class="badge rounded-pill px-2 py-1" style="font-size:10px;background:rgba(34,197,94,0.12);color:#16a34a;"><i class="bi bi-circle-fill me-1" style="font-size:7px;"></i>{{ __('Active') }}</span>
-                        <span class="badge rounded-pill px-2 py-1" style="font-size:10px;background:rgba(99,102,241,0.12);color:#4f46e5;"><i class="bi bi-circle-fill me-1" style="font-size:7px;"></i>{{ __('Free') }}</span>
-                        <span class="badge rounded-pill px-2 py-1" style="font-size:10px;background:rgba(239,68,68,0.12);color:#dc2626;"><i class="bi bi-circle-fill me-1" style="font-size:7px;"></i>{{ __('Inactive') }}</span>
-                        <span class="badge rounded-pill px-2 py-1" style="font-size:10px;background:rgba(251,146,60,0.12);color:#ea580c;"><i class="bi bi-circle-fill me-1" style="font-size:7px;"></i>{{ __('Pending') }}</span>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="row g-0">
-                        {{-- LEFT: Global Summary Chart (all 8 metrics) --}}
-                        <div class="col-12 col-lg-7 border-end" style="border-color:rgba(0,0,0,0.06)!important;">
-                            <div class="px-2 pt-2 pb-0">
-                                <p class="mb-0 text-muted fw-semibold" style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;">{{ __('Global Summary') }}</p>
-                            </div>
-                            <div id="billInformation"></div>
+            <x-ui.card :title="__('Billing overview')" :padding="false" class="w-100 overflow-hidden">
+                <x-slot:actions>
+                    <x-ui.badge tone="success">{{ __('Active') }}</x-ui.badge>
+                    <x-ui.badge tone="info">{{ __('Free') }}</x-ui.badge>
+                    <x-ui.badge tone="danger">{{ __('Inactive') }}</x-ui.badge>
+                    <x-ui.badge tone="warning">{{ __('Pending') }}</x-ui.badge>
+                </x-slot:actions>
+                <div class="row g-0">
+                    {{-- LEFT: Global Summary Chart (all 8 metrics) --}}
+                    <div class="col-12 col-lg-7 border-end">
+                        <div class="px-4 pt-3 pb-0">
+                            <p class="mb-0 text-muted fw-medium" style="font-size: 0.75rem;">{{ __('Global summary') }}</p>
                         </div>
-                        {{-- RIGHT: Per-Status Grouped Chart + Mini-tiles --}}
-                        <div class="col-12 col-lg-5 d-flex flex-column">
-                            <div class="px-2 pt-2 pb-0">
-                                <p class="mb-0 text-muted fw-semibold" style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;">{{ __('By Status') }}</p>
-                            </div>
-                            <div id="billByStatus" style="flex:1;"></div>
-                            {{-- Summary mini-tiles --}}
-                            <div class="row g-0 border-top" style="border-color:rgba(0,0,0,0.06)!important;">
-                                @php
-                                    $tileConfig = [
-                                        'active'   => ['color'=>'#16a34a','bg'=>'rgba(34,197,94,0.08)','icon'=>'bi-check-circle-fill'],
-                                        'free'     => ['color'=>'#4f46e5','bg'=>'rgba(99,102,241,0.08)','icon'=>'bi-gift-fill'],
-                                        'inactive' => ['color'=>'#dc2626','bg'=>'rgba(239,68,68,0.08)','icon'=>'bi-x-circle-fill'],
-                                        'pending'  => ['color'=>'#ea580c','bg'=>'rgba(251,146,60,0.08)','icon'=>'bi-hourglass-split'],
-                                    ];
-                                @endphp
-                                @foreach(['active','free','inactive','pending'] as $st)
-                                @php $tc = $tileConfig[$st]; $bd = $billInformationData['by_status'][$st]; @endphp
-                                <div class="col-6 p-2" style="border-right:{{ $loop->odd ? '1px solid rgba(0,0,0,0.06)' : 'none' }};border-bottom:{{ $loop->iteration <= 2 ? '1px solid rgba(0,0,0,0.06)' : 'none' }};">
-                                    <div class="rounded-3 p-2" style="background:{{ $tc['bg'] }};">
-                                        <div class="d-flex align-items-center gap-1 mb-1">
-                                            <i class="bi {{ $tc['icon'] }}" style="color:{{ $tc['color'] }};font-size:11px;"></i>
-                                            <span class="fw-semibold" style="font-size:11px;color:{{ $tc['color'] }};text-transform:capitalize;">{{ __($st) }}</span>
-                                        </div>
-                                        <div style="font-size:10px;color:#6b7280;">
-                                            <div>{{ __('Rent:') }} <strong style="color:#111;">{{ number_format($bd['monthly_rent'],0) }}</strong></div>
-                                            <div>{{ __('Adv:') }} <strong style="color:#16a34a;">{{ number_format($bd['advance'],0) }}</strong></div>
-                                            <div>{{ __('Due:') }} <strong style="color:#dc2626;">{{ number_format(abs($bd['due_amount']),0) }}</strong></div>
-                                        </div>
+                        <div id="billInformation" class="px-2"></div>
+                    </div>
+                    {{-- RIGHT: Per-Status Grouped Chart + Mini-tiles --}}
+                    <div class="col-12 col-lg-5 d-flex flex-column">
+                        <div class="px-4 pt-3 pb-0">
+                            <p class="mb-0 text-muted fw-medium" style="font-size: 0.75rem;">{{ __('By status') }}</p>
+                        </div>
+                        <div id="billByStatus" class="px-2" style="flex:1;"></div>
+                        {{-- Summary mini-tiles --}}
+                        <div class="row g-0 border-top">
+                            @php
+                                $tileConfig = [
+                                    'active'   => ['color'=>'#16a34a','bg'=>'#ecfdf5','icon'=>'bi-check-circle-fill'],
+                                    'free'     => ['color'=>'#0284c7','bg'=>'#f0f9ff','icon'=>'bi-gift-fill'],
+                                    'inactive' => ['color'=>'#e11d48','bg'=>'#fff1f2','icon'=>'bi-x-circle-fill'],
+                                    'pending'  => ['color'=>'#d97706','bg'=>'#fffbeb','icon'=>'bi-hourglass-split'],
+                                ];
+                            @endphp
+                            @foreach(['active','free','inactive','pending'] as $st)
+                            @php $tc = $tileConfig[$st]; $bd = $billInformationData['by_status'][$st]; @endphp
+                            <div class="col-6 p-2.5" style="border-right:{{ $loop->odd ? '1px solid rgba(226,232,240,0.7)' : 'none' }};border-bottom:{{ $loop->iteration <= 2 ? '1px solid rgba(226,232,240,0.7)' : 'none' }};">
+                                <div class="rounded-3 p-2.5" style="background:{{ $tc['bg'] }};">
+                                    <div class="d-flex align-items-center gap-1.5 mb-1">
+                                        <i class="bi {{ $tc['icon'] }}" style="color:{{ $tc['color'] }};font-size:11px;"></i>
+                                        <span class="fw-semibold" style="font-size:11px;color:{{ $tc['color'] }};text-transform:capitalize;">{{ __($st) }}</span>
+                                    </div>
+                                    <div style="font-size:11px;color:#64748b;">
+                                        <div>{{ __('Rent:') }} <strong style="color:#1e293b;">{{ number_format($bd['monthly_rent'],0) }}</strong></div>
+                                        <div>{{ __('Adv:') }} <strong style="color:#16a34a;">{{ number_format($bd['advance'],0) }}</strong></div>
+                                        <div>{{ __('Due:') }} <strong style="color:#e11d48;">{{ number_format(abs($bd['due_amount']),0) }}</strong></div>
                                     </div>
                                 </div>
-                                @endforeach
                             </div>
+                            @endforeach
                         </div>
                     </div>
                 </div>
-            </div>
+            </x-ui.card>
         </div>
 
         <div class="col-12 col-md-12 col-lg-12 col-xxxl-12 d-flex flex-fill">
-            <div class="card border-0 shadow-sm rounded-4 w-100 overflow-hidden d-flex flex-column" style="min-height: 460px; border: 1px solid rgba(0,0,0,0.08); background: var(--bs-card-bg);">
-                <div class="card-header py-3 border-0 text-center">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-graph-up-arrow text-danger me-2"></i>{{ __('Income & Revenue Overview') }}</h6>
-                </div>
-                <div class="card-body p-3" id="income_revenue"></div>
-            </div>
+            <x-ui.card :title="__('Income & revenue overview')" class="w-100 d-flex flex-column" style="min-height: 460px;">
+                <div id="income_revenue"></div>
+            </x-ui.card>
         </div>
     </div>
     @push('scripts')
@@ -948,12 +913,6 @@
 
     @push('styles')
         <style>
-            .card:hover {
-                transform: translateY(-5px);
-                transition: all 0.3s ease;
-                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-            }
-
             /* Dark Mode Support for Router Overview Cards */
             .router-overview-card {
                 background-color: #ffffff;

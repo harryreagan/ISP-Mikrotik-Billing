@@ -1,46 +1,33 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="h4 font-weight-bold text-dark mb-0">
-            <i class="bi bi-people-fill me-2 text-success"></i>{{ __('Reseller Management') }}
+            <i class="bi bi-people-fill me-2 text-orange-500"></i>{{ __('Reseller Management') }}
         </h2>
     </x-slot>
 
-    {{-- Month/Year Filter Bar --}}
-    <div class="card border-0 shadow-sm rounded-3 mb-4">
-        <div class="card-body py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
-            <div class="d-flex align-items-center gap-3">
-                <div class="rounded-3 p-2 bg-success-subtle text-success">
-                    <i class="bi bi-funnel fs-5"></i>
-                </div>
-                <div>
-                    <h6 class="mb-0 fw-bold text-dark">{{ __('Filter Statistics') }}</h6>
-                    <small class="text-muted">
-                        @if($month === 'all')
-                            {{ __('Showing all-time collections and profit') }}
-                        @else
-                            {{ __('Showing statistics for') }} {{ \Carbon\Carbon::create($year, $month, 1)->format('F Y') }}
-                        @endif
-                    </small>
-                </div>
-            </div>
-
+    <x-ui.page-header
+        :title="__('Reseller management')"
+        :subtitle="$month === 'all' ? __('Showing all-time collections and profit') : (__('Showing statistics for') . ' ' . \Carbon\Carbon::create($year, $month, 1)->format('F Y'))"
+    >
+        <x-slot:actions>
             <form method="GET" action="{{ route('admin.resellers.index') }}" class="d-flex align-items-center gap-2">
-                <select name="month" id="month-select" class="form-select form-select-sm rounded-3" style="width:140px;">
+                <select name="month" id="month-select" class="form-select form-select-sm" style="width:140px;">
                     @foreach($months as $num => $name)
                         <option value="{{ $num }}" @selected((string)$num === (string)$month)>{{ $name }}</option>
                     @endforeach
                 </select>
-                <select name="year" id="year-select" class="form-select form-select-sm rounded-3" style="width:100px;" @disabled($month === 'all')>
+                <select name="year" id="year-select" class="form-select form-select-sm" style="width:100px;" @disabled($month === 'all')>
                     @foreach($years as $y)
                         <option value="{{ $y }}" @selected($y == $year)>{{ $y }}</option>
                     @endforeach
                 </select>
-                <button type="submit" class="btn btn-sm btn-success rounded-3 px-3 fw-semibold">
+                <button type="submit" class="btn btn-sm btn-secondary">
                     {{ __('Apply Filter') }}
                 </button>
+                <a href="{{ route('admin.resellers.create') }}" wire:navigate class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>{{ __('Create Reseller') }}</a>
             </form>
-        </div>
-    </div>
+        </x-slot:actions>
+    </x-ui.page-header>
 
     <script>
         function toggleYearSelect() {
@@ -66,84 +53,64 @@
     <div class="row g-3 mb-4">
         {{-- Total Collections --}}
         <div class="col-xl col-md-4 col-sm-6">
-            <div class="card border-0 shadow-sm rounded-3 reseller-kpi-card" style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border: 1px solid #bae6fd !important;">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between" style="min-height: 85px;">
-                    <div>
-                        <span class="text-uppercase fw-bold text-muted d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.8px;">{{ __('Total Collections') }}</span>
-                        <h4 class="fw-extrabold text-dark mb-0" style="font-family: 'Outfit', 'Inter', sans-serif; letter-spacing: -0.5px; font-size: 1.4rem;">KES {{ number_format($resellers->sum('total_collected'), 2) }}</h4>
-                    </div>
-                    <div class="rounded-3 p-2 d-flex align-items-center justify-content-center" style="background: rgba(14, 165, 233, 0.1); color: #0284c7; width: 40px; height: 40px;">
-                        <i class="bi bi-wallet2 fs-5"></i>
-                    </div>
-                </div>
-            </div>
+            <x-ui.stat-card
+                :label="__('Total Collections')"
+                :value="'KES ' . number_format($resellers->sum('total_collected'), 2)"
+                color="blue"
+            >
+                <x-slot:icon><i class="bi bi-wallet2"></i></x-slot:icon>
+            </x-ui.stat-card>
         </div>
 
         {{-- Total Reseller Profit --}}
         <div class="col-xl col-md-4 col-sm-6">
-            <div class="card border-0 shadow-sm rounded-3 reseller-kpi-card" style="background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1px solid #bbf7d0 !important;">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between" style="min-height: 85px;">
-                    <div>
-                        <span class="text-uppercase fw-bold text-muted d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.8px;">{{ __('Resellers Profit') }}</span>
-                        <h4 class="fw-extrabold text-dark mb-0" style="font-family: 'Outfit', 'Inter', sans-serif; letter-spacing: -0.5px; font-size: 1.4rem;">KES {{ number_format($resellers->sum('total_profit'), 2) }}</h4>
-                    </div>
-                    <div class="rounded-3 p-2 d-flex align-items-center justify-content-center" style="background: rgba(40, 167, 69, 0.15); color: #28a745; width: 40px; height: 40px;">
-                        <i class="bi bi-graph-up-arrow fs-5"></i>
-                    </div>
-                </div>
-            </div>
+            <x-ui.stat-card
+                :label="__('Resellers Profit')"
+                :value="'KES ' . number_format($resellers->sum('total_profit'), 2)"
+                color="green"
+            >
+                <x-slot:icon><i class="bi bi-graph-up-arrow"></i></x-slot:icon>
+            </x-ui.stat-card>
         </div>
 
         {{-- Total Paid Out (Cash) --}}
         <div class="col-xl col-md-4 col-sm-6">
-            <div class="card border-0 shadow-sm rounded-3 reseller-kpi-card" style="background: linear-gradient(135deg, #faf5ff, #f3e8ff); border: 1px solid #d8b4fe !important;">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between" style="min-height: 85px;">
-                    <div>
-                        <span class="text-uppercase fw-bold text-muted d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.8px;">{{ __('Total Paid Out (Cash)') }}</span>
-                        <h4 class="fw-extrabold text-dark mb-0" style="font-family: 'Outfit', 'Inter', sans-serif; letter-spacing: -0.5px; font-size: 1.4rem;">KES {{ number_format($resellers->sum('total_payout'), 2) }}</h4>
-                    </div>
-                    <div class="rounded-3 p-2 d-flex align-items-center justify-content-center" style="background: rgba(124, 58, 237, 0.1); color: #7c3aed; width: 40px; height: 40px;">
-                        <i class="bi bi-cash-stack fs-5"></i>
-                    </div>
-                </div>
-            </div>
+            <x-ui.stat-card
+                :label="__('Total Paid Out (Cash)')"
+                :value="'KES ' . number_format($resellers->sum('total_payout'), 2)"
+                color="pink"
+            >
+                <x-slot:icon><i class="bi bi-cash-stack"></i></x-slot:icon>
+            </x-ui.stat-card>
         </div>
 
         {{-- Active Resellers --}}
         <div class="col-xl col-md-4 col-sm-6">
-            <div class="card border-0 shadow-sm rounded-3 reseller-kpi-card" style="background: linear-gradient(135deg, #f0fdfa, #ccfbf1); border: 1px solid #99f6e4 !important;">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between" style="min-height: 85px;">
-                    <div>
-                        <span class="text-uppercase fw-bold text-muted d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.8px;">{{ __('Active Resellers') }}</span>
-                        <h4 class="fw-extrabold text-dark mb-0" style="font-family: 'Outfit', 'Inter', sans-serif; letter-spacing: -0.5px; font-size: 1.4rem;">{{ $resellers->where('status', 'active')->count() }}</h4>
-                    </div>
-                    <div class="rounded-3 p-2 d-flex align-items-center justify-content-center" style="background: rgba(13, 148, 136, 0.1); color: #0d9488; width: 40px; height: 40px;">
-                        <i class="bi bi-person-check-fill fs-5"></i>
-                    </div>
-                </div>
-            </div>
+            <x-ui.stat-card
+                :label="__('Active Resellers')"
+                :value="$resellers->where('status', 'active')->count()"
+                color="navy"
+            >
+                <x-slot:icon><i class="bi bi-person-check-fill"></i></x-slot:icon>
+            </x-ui.stat-card>
         </div>
 
         {{-- Suspended Resellers --}}
         <div class="col-xl col-md-4 col-sm-6">
-            <div class="card border-0 shadow-sm rounded-3 reseller-kpi-card" style="background: linear-gradient(135deg, #fef2f2, #fee2e2); border: 1px solid #fecaca !important;">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between" style="min-height: 85px;">
-                    <div>
-                        <span class="text-uppercase fw-bold text-muted d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.8px;">{{ __('Suspended') }}</span>
-                        <h4 class="fw-extrabold text-dark mb-0" style="font-family: 'Outfit', 'Inter', sans-serif; letter-spacing: -0.5px; font-size: 1.4rem;">{{ $resellers->where('status', 'suspended')->count() }}</h4>
-                    </div>
-                    <div class="rounded-3 p-2 d-flex align-items-center justify-content-center" style="background: rgba(220, 38, 38, 0.1); color: #dc2626; width: 40px; height: 40px;">
-                        <i class="bi bi-person-x-fill fs-5"></i>
-                    </div>
-                </div>
-            </div>
+            <x-ui.stat-card
+                :label="__('Suspended')"
+                :value="$resellers->where('status', 'suspended')->count()"
+                color="pink"
+            >
+                <x-slot:icon><i class="bi bi-person-x-fill"></i></x-slot:icon>
+            </x-ui.stat-card>
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm rounded-3 mb-4">
-        <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-person-badge-fill text-success me-2"></i>{{ __('All Resellers') }}</h5>
-            <a href="{{ route('admin.resellers.create') }}" wire:navigate class="btn btn-sm btn-success rounded-3"><i class="bi bi-plus-lg me-1"></i>{{ __('Create Reseller') }}</a>
+    <div class="card mb-4 overflow-hidden">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="ui-section-title mb-0"><i class="bi bi-person-badge-fill text-orange-500 me-2"></i>{{ __('All Resellers') }}</h5>
+            <a href="{{ route('admin.resellers.create') }}" wire:navigate class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>{{ __('Create Reseller') }}</a>
         </div>
         <div class="card-body p-0">
             @if(session('success'))
@@ -154,10 +121,10 @@
             @endif
 
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
-                    <thead class="table-success text-success">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
                         <tr>
-                            <th class="ps-4 py-3">{{ __('Name') }}</th>
+                            <th class="ps-4">{{ __('Name') }}</th>
                             <th>{{ __('Email / Phone') }}</th>
                             <th>{{ __('Company') }}</th>
                             <th class="text-center">{{ __('Commission') }}</th>
@@ -184,7 +151,7 @@
                         @forelse($resellers as $reseller)
                             <tr>
                                 <td class="ps-4">
-                                    <div class="fw-bold text-dark">{{ $reseller->user->name ?? 'N/A' }}</div>
+                                    <div class="fw-semibold text-dark">{{ $reseller->user->name ?? 'N/A' }}</div>
                                     <small class="text-muted">ID: #{{ $reseller->id }}</small>
                                 </td>
                                 <td>
@@ -192,32 +159,32 @@
                                     <small class="text-muted">{{ $reseller->phone ?? 'N/A' }}</small>
                                 </td>
                                 <td>{{ $reseller->company ?? 'N/A' }}</td>
-                                <td class="text-center"><span class="badge bg-success-subtle text-success border border-success px-2 py-1">{{ $reseller->commission_percentage }}%</span></td>
-                                <td class="text-end text-muted">KES {{ number_format($reseller->totalCollections(), 2) }}</td>
-                                <td class="text-end fw-bold text-success">KES {{ number_format($reseller->totalProfit(), 2) }}</td>
-                                <td class="text-end fw-bold text-success">KES {{ number_format($reseller->balance, 2) }}</td>
+                                <td class="text-center"><span class="badge bg-info">{{ $reseller->commission_percentage }}%</span></td>
+                                <td class="text-end text-muted tabular-nums">KES {{ number_format($reseller->totalCollections(), 2) }}</td>
+                                <td class="text-end fw-semibold text-emerald-600 tabular-nums">KES {{ number_format($reseller->totalProfit(), 2) }}</td>
+                                <td class="text-end fw-semibold text-emerald-600 tabular-nums">KES {{ number_format($reseller->balance, 2) }}</td>
                                 <td class="text-center">
-                                    <span class="badge {{ $reseller->status === 'active' ? 'bg-success-subtle text-success border border-success' : 'bg-danger-subtle text-danger border border-danger' }} px-2.5 py-1 text-uppercase" style="font-size: 0.72rem;">
-                                        {{ __($reseller->status) }}
+                                    <span class="badge {{ $reseller->status === 'active' ? 'bg-success' : 'bg-danger' }}">
+                                        {{ __(ucfirst($reseller->status)) }}
                                     </span>
                                 </td>
                                 <td class="text-center pe-4">
                                     <div class="d-inline-flex gap-1">
                                         <!-- Adjust Balance Button -->
-                                        <button type="button" class="btn btn-xs btn-outline-success p-1" style="border-radius: 4px;" data-bs-toggle="modal" data-bs-target="#adjustModal{{ $reseller->id }}" title="{{ __('Adjust Wallet') }}">
+                                        <button type="button" class="btn btn-xs btn-secondary" data-bs-toggle="modal" data-bs-target="#adjustModal{{ $reseller->id }}" title="{{ __('Adjust Wallet') }}">
                                             <i class="bi bi-cash-coin"></i>
                                         </button>
                                         <!-- View Ledger Button -->
-                                        <button type="button" class="btn btn-xs btn-outline-info p-1 view-transactions-btn" style="border-radius: 4px;" data-reseller-id="{{ $reseller->id }}" title="{{ __('View Ledger') }}">
+                                        <button type="button" class="btn btn-xs btn-secondary view-transactions-btn" data-reseller-id="{{ $reseller->id }}" title="{{ __('View Ledger') }}">
                                             <i class="bi bi-clock-history"></i>
                                         </button>
                                         <!-- Edit -->
-                                        <a href="{{ route('admin.resellers.edit', $reseller->id) }}" wire:navigate class="btn btn-xs btn-outline-primary p-1" style="border-radius: 4px;" title="{{ __('Edit Reseller') }}"><i class="bi bi-pencil-square"></i></a>
+                                        <a href="{{ route('admin.resellers.edit', $reseller->id) }}" wire:navigate class="btn btn-xs btn-secondary" title="{{ __('Edit Reseller') }}"><i class="bi bi-pencil-square"></i></a>
                                         <!-- Delete -->
                                         <form action="{{ route('admin.resellers.destroy', $reseller->id) }}" method="POST" onsubmit="return confirm('{{ __('Are you sure you want to delete this reseller?') }}')">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="btn btn-xs btn-outline-danger p-1" style="border-radius: 4px;" title="{{ __('Delete') }}"><i class="bi bi-trash"></i></button>
+                                            <button type="submit" class="btn btn-xs btn-outline-danger" title="{{ __('Delete') }}"><i class="bi bi-trash"></i></button>
                                         </form>
                                     </div>
 
@@ -226,14 +193,14 @@
                                         <div class="modal-dialog modal-dialog-centered">
                                             <form action="{{ route('admin.resellers.adjust-balance', $reseller->id) }}" method="POST">
                                                 @csrf
-                                                <div class="modal-content border-0 shadow-lg rounded-3 bg-white text-dark">
-                                                    <div class="modal-header border-0 pb-0">
-                                                        <h5 class="modal-title fw-bold text-success" id="adjustModalLabel{{ $reseller->id }}">{{ __('Adjust Wallet:') }} {{ $reseller->user->name }}</h5>
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title" id="adjustModalLabel{{ $reseller->id }}">{{ __('Adjust Wallet:') }} {{ $reseller->user->name }}</h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                     </div>
                                                     <div class="modal-body">
                                                         <div class="mb-3">
-                                                            <label class="form-label fw-semibold text-muted mb-1">{{ __('Adjustment Type') }}</label>
+                                                            <label class="form-label mb-1">{{ __('Adjustment Type') }}</label>
                                                             <select name="type" class="form-select" required>
                                                                 <option value="credit">{{ __('Credit (Add Balance)') }}</option>
                                                                 <option value="debit">{{ __('Debit (Deduct Balance)') }}</option>
@@ -241,17 +208,17 @@
                                                             </select>
                                                         </div>
                                                         <div class="mb-3">
-                                                            <label class="form-label fw-semibold text-muted mb-1">{{ __('Amount (BDT)') }}</label>
+                                                            <label class="form-label mb-1">{{ __('Amount (KES)') }}</label>
                                                             <input type="number" step="0.01" name="amount" class="form-control" placeholder="0.00" required min="0.01">
                                                         </div>
                                                         <div class="mb-3">
-                                                            <label class="form-label fw-semibold text-muted mb-1">{{ __('Description / Reason') }}</label>
+                                                            <label class="form-label mb-1">{{ __('Description / Reason') }}</label>
                                                             <textarea name="description" class="form-control" rows="3" placeholder="{{ __('e.g. Received cash payment from reseller / Withdrawal request') }}" required></textarea>
                                                         </div>
                                                     </div>
-                                                    <div class="modal-footer border-0 pt-0">
-                                                        <button type="button" class="btn btn-sm btn-light rounded-3 px-3 py-1.5" data-bs-dismiss="modal">{{ __('Close') }}</button>
-                                                        <button type="submit" class="btn btn-sm btn-success rounded-3 px-4 py-1.5 fw-semibold">{{ __('Apply Adjustment') }}</button>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
+                                                        <button type="submit" class="btn btn-sm btn-primary">{{ __('Apply Adjustment') }}</button>
                                                     </div>
                                                 </div>
                                             </form>
@@ -261,7 +228,13 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="text-center text-muted py-4">{{ __('No resellers found.') }}</td>
+                                <td colspan="9" class="p-0">
+                                    <x-ui.empty-state
+                                        icon="bi-people"
+                                        :title="__('No resellers found')"
+                                        :description="__('No resellers found.')"
+                                    />
+                                </td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -273,33 +246,33 @@
     <!-- Transactions Modal -->
     <div class="modal fade" id="transactionsModal" tabindex="-1" aria-labelledby="transactionsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content border-0 shadow-lg rounded-3 text-start bg-white text-dark">
-                <div class="modal-header border-0 bg-light py-3 px-4">
-                    <h5 class="modal-title fw-bold text-success" id="transactionsModalLabel">
-                        <i class="bi bi-wallet2 me-2"></i>{{ __('Wallet Ledger:') }} <span id="modalResellerName"></span>
+            <div class="modal-content text-start">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="transactionsModalLabel">
+                        <i class="bi bi-wallet2 me-2 text-orange-500"></i>{{ __('Wallet Ledger:') }} <span id="modalResellerName"></span>
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4">
                     <!-- Filters -->
-                    <div class="row g-2 mb-4 align-items-end bg-light p-3 rounded-3 border">
+                    <div class="row g-2 mb-4 align-items-end bg-slate-50 p-3 rounded-xl">
                         <div class="col-sm-3">
-                            <label class="form-label small fw-bold text-muted mb-1">{{ __('Start Date') }}</label>
+                            <label class="form-label mb-1">{{ __('Start Date') }}</label>
                             <input type="date" id="filterStartDate" class="form-control form-control-sm">
                         </div>
                         <div class="col-sm-3">
-                            <label class="form-label small fw-bold text-muted mb-1">{{ __('End Date') }}</label>
+                            <label class="form-label mb-1">{{ __('End Date') }}</label>
                             <input type="date" id="filterEndDate" class="form-control form-control-sm">
                         </div>
                         <div class="col-sm-4">
-                            <label class="form-label small fw-bold text-muted mb-1">{{ __('Transaction Type') }}</label>
+                            <label class="form-label mb-1">{{ __('Transaction Type') }}</label>
                             <select id="filterTxType" class="form-select form-select-sm">
                                 <option value="all">{{ __('All Transactions') }}</option>
                                 <option value="payout_only">{{ __('Commission Payouts Only') }}</option>
                             </select>
                         </div>
                         <div class="col-sm-2">
-                            <button type="button" id="btnApplyFilter" class="btn btn-sm btn-success w-100 fw-semibold">
+                            <button type="button" id="btnApplyFilter" class="btn btn-sm btn-primary w-100">
                                 <i class="bi bi-funnel-fill me-1"></i>{{ __('Filter') }}
                             </button>
                         </div>
@@ -307,7 +280,7 @@
 
                     <!-- Loader -->
                     <div id="transactionsLoader" class="text-center py-5">
-                        <div class="spinner-border text-success" role="status">
+                        <div class="spinner-border text-orange-500" role="status">
                             <span class="visually-hidden">Loading...</span>
                         </div>
                     </div>
@@ -315,14 +288,14 @@
                     <!-- Table container -->
                     <div id="transactionsTableContainer" class="d-none">
                         <div class="table-responsive">
-                            <table class="table align-middle table-hover mb-0" style="font-size: 0.85rem;">
-                                <thead class="table-success text-success text-center">
-                                    <tr class="fw-semibold">
-                                        <th class="py-2">{{ __('Date') }}</th>
-                                        <th class="py-2 text-start">{{ __('Description') }}</th>
-                                        <th class="py-2">{{ __('Reference') }}</th>
-                                        <th class="py-2 text-end">{{ __('Amount') }}</th>
-                                        <th class="py-2 text-center">{{ __('Type') }}</th>
+                            <table class="table align-middle table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>{{ __('Date') }}</th>
+                                        <th class="text-start">{{ __('Description') }}</th>
+                                        <th>{{ __('Reference') }}</th>
+                                        <th class="text-end">{{ __('Amount') }}</th>
+                                        <th class="text-center">{{ __('Type') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody id="transactionsList">
@@ -332,8 +305,8 @@
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer border-0 py-3 bg-light">
-                    <button type="button" class="btn btn-sm btn-light rounded-3 px-4 py-2" data-bs-dismiss="modal">{{ __('Close') }}</button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
                 </div>
             </div>
         </div>

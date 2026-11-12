@@ -40,6 +40,7 @@ class SmsEmailHub extends Component
     public string $success_keyword = 'success';
     public bool $is_default = true;
     public bool $is_fallback = true;
+    public float $low_balance_threshold = 100.0;
 
     // Test SMS Modal
     public string $test_phone = '';
@@ -112,6 +113,7 @@ class SmsEmailHub extends Component
             $this->success_keyword  = $gw->success_keyword;
             $this->is_default       = (bool) $gw->is_default;
             $this->is_fallback      = (bool) $gw->is_fallback;
+            $this->low_balance_threshold = isset($gw->low_balance_threshold) ? (float) $gw->low_balance_threshold : 100.0;
             $this->api_key          = '••••••••••••••••';
             $this->api_secret       = '••••••••••••••••';
         }
@@ -216,9 +218,10 @@ class SmsEmailHub extends Component
             'http_method'      => $this->http_method,
             'body_template'    => $this->body_template,
             'success_keyword'  => $this->success_keyword,
-            'is_default'       => $this->is_default,
-            'is_fallback'      => $this->is_fallback,
-            'updated_at'       => now(),
+            'is_default'            => $this->is_default,
+            'is_fallback'           => $this->is_fallback,
+            'low_balance_threshold' => max(0, (float) $this->low_balance_threshold),
+            'updated_at'            => now(),
         ];
 
         // Only update secrets if newly provided (not mask)
@@ -233,6 +236,8 @@ class SmsEmailHub extends Component
             ['tenant_id' => $tenantId],
             $updateData
         );
+
+        \Illuminate\Support\Facades\Cache::forget("sms_balance:{$tenantId}");
 
         $this->campaignStatusType = 'success';
         $this->campaignStatus = "SMS Gateway settings saved successfully.";

@@ -13,14 +13,14 @@
     <style>
         :root {
             --font-sans: 'Jost', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            --bg-page: #FAFAF8;
-            --ink: #111111;
-            --secondary: #666666;
-            --primary: #F47B06;
-            --primary-hover: #E86F00;
-            --accent: #6D3FE0;
-            --navy: #161B2E;
-            --border: #E6E3F5;
+            --bg-page: #f8fafc;
+            --ink: #1e293b;
+            --secondary: #64748b;
+            --primary: #f97316;
+            --primary-hover: #ea580c;
+            --accent: #f97316;
+            --navy: #0f172a;
+            --border: rgba(226, 232, 240, 0.85);
         }
         *, *::before, *::after {
             box-sizing: border-box;

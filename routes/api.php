@@ -11,6 +11,8 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
+Route::middleware(['web', 'auth'])->get('/sms/balance', \App\Http\Controllers\Api\SmsBalanceController::class)->name('api.sms.balance');
+
 // ── Kenya Payment Gateways (Strict Rate Limiting & Safe Payload Logging) ──
 
 // 1. M-Pesa SMS Forwarder Webhook

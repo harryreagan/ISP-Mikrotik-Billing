@@ -1,45 +1,41 @@
 <div>
-    <div class="container-fluid py-4">
+    <div class="ui-page-wrap">
 
         {{-- Header --}}
-        <div class="d-flex align-items-center justify-content-between mb-4">
-            <div>
-                <h4 class="fw-bold mb-0" style="color:#1a1f36;">
-                    <i class="bi bi-shield-lock me-2 text-primary"></i>{{ __('User Authentication Logs') }}
-                </h4>
-                <p class="text-muted small mb-0">{{ __('Monitor and audit logins and logouts for both administrators and customers') }}</p>
-            </div>
-            <button wire:click="resetFilters" class="btn btn-outline-secondary rounded-3 px-3 fw-semibold shadow-sm">
-                <i class="bi bi-arrow-repeat me-1"></i> {{ __('Reset Filters') }}
-            </button>
-        </div>
+        <x-ui.page-header :title="__('User Authentication Logs')" :subtitle="__('Monitor and audit logins and logouts for both administrators and customers')">
+            <x-slot:actions>
+                <button wire:click="resetFilters" class="btn btn-sm btn-secondary">
+                    <i class="bi bi-arrow-repeat me-1"></i> {{ __('Reset Filters') }}
+                </button>
+            </x-slot:actions>
+        </x-ui.page-header>
 
         {{-- Filter Bar --}}
-        <div class="card border-0 shadow-sm rounded-4 mb-4">
+        <div class="card">
             <div class="card-body py-3">
                 <div class="row g-3 align-items-end">
                     <div class="col-md-6">
-                        <label class="form-label small fw-semibold text-muted mb-1">{{ __('Search Username/IP') }}</label>
+                        <label class="form-label mb-1">{{ __('Search Username/IP') }}</label>
                         <div class="input-group input-group-sm">
-                            <span class="input-group-text bg-white border-end-0 rounded-start-3 text-muted">
+                            <span class="input-group-text bg-white border-end-0 text-muted">
                                 <i class="bi bi-search"></i>
                             </span>
                             <input wire:model.live.debounce.400ms="search" type="text" 
                                 placeholder="{{ __('Search by username, IP address, user agent...') }}" 
-                                class="form-control form-control-sm rounded-end-3 border-start-0">
+                                class="form-control form-control-sm border-start-0">
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label small fw-semibold text-muted mb-1">{{ __('Action Type') }}</label>
-                        <select wire:model.live="action" class="form-select form-select-sm rounded-3">
+                        <label class="form-label mb-1">{{ __('Action Type') }}</label>
+                        <select wire:model.live="action" class="form-select form-select-sm">
                             <option value="all">{{ __('All Actions') }}</option>
                             <option value="login">{{ __('Login Only') }}</option>
                             <option value="logout">{{ __('Logout Only') }}</option>
                         </select>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label small fw-semibold text-muted mb-1">{{ __('User Type') }}</label>
-                        <select wire:model.live="userType" class="form-select form-select-sm rounded-3">
+                        <label class="form-label mb-1">{{ __('User Type') }}</label>
+                        <select wire:model.live="userType" class="form-select form-select-sm">
                             <option value="all">{{ __('All Users') }}</option>
                             <option value="admin">{{ __('Administrators') }}</option>
                             <option value="reseller">{{ __('Resellers') }}</option>
@@ -51,12 +47,12 @@
         </div>
 
         {{-- Log Table --}}
-        <div class="card border-0 shadow-sm rounded-4">
+        <div class="card">
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
-                        <thead style="background:#f8f9fc;">
-                            <tr class="small text-muted fw-semibold">
+                        <thead>
+                            <tr>
                                 <th class="ps-4 py-3">{{ __('Timestamp') }}</th>
                                 <th>{{ __('User (Username/Email)') }}</th>
                                 <th>{{ __('User Type') }}</th>
@@ -70,7 +66,7 @@
                             <tr wire:key="login-log-{{ $log->id }}">
                                 <td class="ps-4 small text-muted">
                                     {{ $log->created_at->format('d M Y, h:i A') }}
-                                    <div class="x-small text-muted" style="font-size:0.75rem;">({{ $log->created_at->diffForHumans() }})</div>
+                                    <div class="small text-muted">({{ $log->created_at->diffForHumans() }})</div>
                                 </td>
                                 <td>
                                     <div class="fw-semibold text-dark">{{ $log->username }}</div>
@@ -78,27 +74,27 @@
                                 <td>
                                     @if($log->authenticatable_type === \App\Models\User::class)
                                         @if($log->authenticatable?->reseller)
-                                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill small px-2">
+                                            <span class="badge bg-warning-subtle text-warning">
                                                 {{ __('Reseller') }}
                                             </span>
                                         @else
-                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill small px-2">
+                                            <span class="badge bg-danger-subtle text-danger">
                                                 {{ __('Admin') }}
                                             </span>
                                         @endif
                                     @else
-                                        <span class="badge bg-info-subtle text-info border border-info-subtle rounded-pill small px-2">
+                                        <span class="badge bg-info-subtle text-info">
                                             {{ __('Customer') }}
                                         </span>
                                     @endif
                                 </td>
                                 <td>
                                     @if($log->action === 'login')
-                                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill small px-2">
+                                        <span class="badge bg-success-subtle text-success">
                                             <i class="bi bi-box-arrow-in-right me-1"></i> {{ __('Login') }}
                                         </span>
                                     @else
-                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill small px-2">
+                                        <span class="badge bg-secondary-subtle text-secondary">
                                             <i class="bi bi-box-arrow-left me-1"></i> {{ __('Logout') }}
                                         </span>
                                     @endif
@@ -112,9 +108,8 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="6" class="text-center py-5 text-muted">
-                                    <i class="bi bi-shield-slash fs-2 d-block mb-2"></i>
-                                    {{ __('No authentication logs found.') }}
+                                <td colspan="6" class="p-0">
+                                    <x-ui.empty-state icon="bi-shield-lock" :title="__('No authentication logs found.')" :description="__('Adjust your search or user type filters.')" />
                                 </td>
                             </tr>
                             @endforelse
@@ -123,7 +118,7 @@
                 </div>
             </div>
             @if($logs->hasPages())
-                <div class="card-footer bg-white border-0 py-3 rounded-bottom-4">
+                <div class="card-footer border-0 py-3">
                     {{ $logs->links() }}
                 </div>
             @endif

@@ -86,13 +86,22 @@ Route::get('/', function () {
     if (request()->getHost() === 'billing.hsmart.co.ke') {
         return auth()->check() ? redirect()->route('dashboard') : redirect()->route('login');
     }
+    $requestedLang = request('lang');
+    if ($requestedLang && in_array($requestedLang, ['en', 'sw', 'fr'])) {
+        session()->put('main_site_locale', $requestedLang);
+    }
+    $locale = session('main_site_locale', 'en');
+    if (in_array($locale, ['en', 'sw', 'fr'])) {
+        app()->setLocale($locale);
+    }
     return view('landing');
 })->name('welcome');
 
 Route::get('/all-packages', [MainSiteController::class, 'allPackages'])->name('all-packages');
 Route::get('/lang/{locale}', function ($locale) {
-    if (in_array($locale, ['en', 'bn'])) {
+    if (in_array($locale, ['en', 'sw', 'fr', 'bn'])) {
         session()->put('main_site_locale', $locale);
+        app()->setLocale($locale);
     }
     return redirect()->back();
 })->name('welcome.lang');
@@ -181,6 +190,7 @@ Route::middleware([
         Route::get('/sms', fn() => redirect()->route('admin.sms-email'))->name('sms-setup');
         Route::get('/payment-gateways', fn() => redirect()->route('admin.payment-gateways'));
         Route::get('/admin/portal-customizer', \App\Livewire\Admin\CaptivePortalCustomizer::class)->name('admin.portal-customizer');
+        Route::get('/admin/captive-portal', fn() => redirect()->route('admin.portal-customizer'))->name('admin.captive-portal');
         Route::post('/captive-portal/preview', function(\Illuminate\Http\Request $request) {
             $template = $request->input('template', 'midnight');
             $settings = $request->input('settings', []);
@@ -268,8 +278,7 @@ Route::middleware([
             // Login Logs Viewer
             Route::get('login-logs', LoginLogViewer::class)->name('login-logs');
 
-            // Customer Reviews Management
-            Route::get('reviews', ManageReviews::class)->name('reviews');
+
 
             // Reseller Vouchers Audit
             Route::get('vouchers', AdminVoucherList::class)->name('vouchers');

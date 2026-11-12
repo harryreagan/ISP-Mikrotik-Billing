@@ -1,30 +1,34 @@
-<div class="py-2 pb-4">
-    <div class="container-fluid table-responsive">
-        <table id="returnTable" class="table table-striped table-hover display table-bordered">
-            <thead class="text-white text-center">
-                <tr>
-                    <th class="text-center">{{ __('SL') }}</th>
-                    <th class="text-center">{{ __('Client Type') }}</th>
-                    <th class="text-center">{{ __('Connection Type') }}</th>
-                    <th class="text-center">{{ __('Client Name') }}</th>
-                    <th class="text-center">{{ __('Bandwidth Distribution Point') }}</th>
-                    <th class="text-center">{{ __('Connectivity Type') }}</th>
-                    <th class="text-center">{{ __('Activation Date') }}</th>
-                    <th class="text-center">{{ __('Bandwidth Allocation') }}</th>
-                    <th class="text-center">{{ __('Allocated IP') }}</th>
-                    <th class="text-center">{{ __('Division') }}</th>
-                    <th class="text-center">{{ __('District') }}</th>
-                    <th class="text-center">{{ __('Thana') }}</th>
-                    <th class="text-center">{{ __('Address') }}</th>
-                    <th class="text-center">{{ __('Client Mobile') }}</th>
-                    <th class="text-center">{{ __('Unit Price') }}</th>
-                    <th class="text-center">{{ __('Clint Email') }}</th>
-                    <th class="text-center">{{ __('Selling Price Excluding VAT') }}</th>
-                </tr>
-            </thead>
-            <tbody class="text-center">
-            </tbody>
-        </table>
+<div class="ui-page-wrap">
+    <x-ui.page-header :title="__('DIS Summary Report')" :subtitle="__('Customer connectivity, bandwidth distribution, and location summary')" />
+
+    <div class="card">
+        <div class="card-body table-responsive">
+            <table id="returnTable" class="table table-hover display">
+                <thead class="text-center">
+                    <tr>
+                        <th class="text-center">{{ __('SL') }}</th>
+                        <th class="text-center">{{ __('Client Type') }}</th>
+                        <th class="text-center">{{ __('Connection Type') }}</th>
+                        <th class="text-center">{{ __('Client Name') }}</th>
+                        <th class="text-center">{{ __('Bandwidth Distribution Point') }}</th>
+                        <th class="text-center">{{ __('Connectivity Type') }}</th>
+                        <th class="text-center">{{ __('Activation Date') }}</th>
+                        <th class="text-center">{{ __('Bandwidth Allocation') }}</th>
+                        <th class="text-center">{{ __('Allocated IP') }}</th>
+                        <th class="text-center">{{ __('Division') }}</th>
+                        <th class="text-center">{{ __('District') }}</th>
+                        <th class="text-center">{{ __('Thana') }}</th>
+                        <th class="text-center">{{ __('Address') }}</th>
+                        <th class="text-center">{{ __('Client Mobile') }}</th>
+                        <th class="text-center">{{ __('Unit Price') }}</th>
+                        <th class="text-center">{{ __('Clint Email') }}</th>
+                        <th class="text-center">{{ __('Selling Price Excluding VAT') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="text-center">
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 

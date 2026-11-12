@@ -1,13 +1,13 @@
-<div class="zoom-in pb-5" x-data="{ 
+<div class="pb-5" x-data="{ 
     step: @entangle('step'),
     isLarge: window.innerWidth >= 992
 }" x-init="window.addEventListener('resize', () => isLarge = window.innerWidth >= 992)">
 
     <x-slot name="header">
-        <h2 class="h4 font-weight-bold text-dark mb-0">
-            <i class="bi bi-person-plus me-2 text-success"></i>{{ __('New Customer Registration') }}
-        </h2>
+        {{ __('New customer registration') }}
     </x-slot>
+
+    <x-ui.page-header :title="__('New customer registration')" :subtitle="__('Register a new PPPoE, static IP, or hotspot subscriber account.')" />
 
     <!-- Progress Steps Bar (Mobile Only - Horizontally Scrollable) -->
     <div class="card border-0 shadow-sm mb-4 d-lg-none" x-show="!isLarge" x-transition.opacity>

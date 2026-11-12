@@ -244,6 +244,120 @@ class DashboardController extends Controller
             $systemOverview = [];
         }
 
+        // Ensure all routers configured for this tenant (both online and offline) are listed with their telemetry
+        try {
+            if (Schema::hasTable('routers')) {
+                $dbRouters = \App\Models\Router::orderByRaw("CASE WHEN status = 'online' THEN 0 ELSE 1 END")
+                    ->orderBy('name')
+                    ->get();
+
+                foreach ($dbRouters as $r) {
+                    $rName = $r->name ?: ($r->router_name ?: ('Router #' . $r->id));
+                    $liveEntry = $systemOverview[$rName] ?? null;
+                    $hasLive = is_array($liveEntry) && ($liveEntry['status'] ?? false) === true;
+                    $liveInfo = $hasLive && is_array($liveEntry['data'] ?? null)
+                        ? ($liveEntry['data'][0] ?? $liveEntry['data'])
+                        : [];
+                    if (!is_array($liveInfo)) {
+                        $liveInfo = [];
+                    }
+
+                    $isOnline = $hasLive || ($r->status === 'online');
+                    $connType = $liveEntry['type'] ?? ($r->vpn_ip ? 'WireGuard' : 'API');
+
+                    $portRoles = is_array($r->port_roles) ? $r->port_roles : [];
+                    $activeHs = (int) ($portRoles['active_hs'] ?? 0);
+                    $activePpp = (int) ($portRoles['active_ppp'] ?? 0);
+                    $activeTotal = (int) ($portRoles['active_total'] ?? ($activeHs + $activePpp));
+
+                    $totalMem = (int) ($liveInfo['total-memory'] ?? ($r->total_memory ?? 0));
+                    $freeMem = (int) ($liveInfo['free-memory'] ?? ($r->free_memory ?? 0));
+                    $memLoad = (int) ($r->memory_load ?? ($totalMem > 0 ? round((($totalMem - $freeMem) / $totalMem) * 100) : 0));
+
+                    $systemOverview[$rName] = [
+                        'status'        => true,
+                        'is_online'     => $isOnline,
+                        'router_status' => $isOnline ? 'online' : ($r->status ?: 'offline'),
+                        'type'          => $connType,
+                        'ip'            => $r->vpn_ip ?: ($r->ip ?: $r->ip_address),
+                        'public_ip'     => $r->ip,
+                        'vpn_ip'        => $r->vpn_ip,
+                        'location'      => $r->location,
+                        'serial_number' => $r->serial_number,
+                        'last_seen_at'  => $r->last_seen_at ? $r->last_seen_at->diffForHumans() : null,
+                        'active_hs'     => $activeHs,
+                        'active_ppp'    => $activePpp,
+                        'active_total'  => $activeTotal,
+                        'memory_load'   => $memLoad,
+                        'data'          => [[
+                            'board-name'              => $liveInfo['board-name'] ?? ($r->model ?: ($r->board ?: $rName)),
+                            'platform'                => $liveInfo['platform'] ?? 'MikroTik',
+                            'architecture-name'       => $liveInfo['architecture-name'] ?? ($r->architecture ?: 'RouterOS'),
+                            'uptime'                  => $liveInfo['uptime'] ?? ($r->uptime ?: ($isOnline ? 'Active' : 'Offline')),
+                            'version'                 => $liveInfo['version'] ?? ($r->version ?: 'N/A'),
+                            'cpu'                     => $liveInfo['cpu'] ?? ($r->board ?: 'MikroTik CPU'),
+                            'cpu-count'               => $liveInfo['cpu-count'] ?? '1',
+                            'cpu-frequency'           => $liveInfo['cpu-frequency'] ?? '-',
+                            'cpu-load'                => $liveInfo['cpu-load'] ?? ($r->cpu_load ?? 0),
+                            'total-memory'            => $totalMem,
+                            'free-memory'             => $freeMem,
+                            'total-hdd-space'         => (int) ($liveInfo['total-hdd-space'] ?? 0),
+                            'free-hdd-space'          => (int) ($liveInfo['free-hdd-space'] ?? 0),
+                            'factory-software'        => $liveInfo['factory-software'] ?? ($r->version ?: 'N/A'),
+                            'build-time'              => $liveInfo['build-time'] ?? ($r->last_seen_at ? $r->last_seen_at->format('M d, Y H:i') : 'N/A'),
+                            'write-sect-total'        => $liveInfo['write-sect-total'] ?? '0',
+                            'write-sect-since-reboot' => $liveInfo['write-sect-since-reboot'] ?? '0',
+                        ]],
+                    ];
+                }
+            }
+
+            if (Schema::hasTable('router_lists')) {
+                $legacyRouters = \Illuminate\Support\Facades\DB::table('router_lists')->get();
+                foreach ($legacyRouters as $lr) {
+                    $lrName = $lr->router_name ?: ('Router #' . $lr->id);
+                    if (!isset($systemOverview[$lrName])) {
+                        $isOnline = ($lr->action === 'connected');
+                        $systemOverview[$lrName] = [
+                            'status'        => true,
+                            'is_online'     => $isOnline,
+                            'router_status' => $isOnline ? 'online' : 'offline',
+                            'type'          => 'API',
+                            'ip'            => $lr->ip_address,
+                            'public_ip'     => $lr->ip_address,
+                            'vpn_ip'        => null,
+                            'location'      => null,
+                            'serial_number' => null,
+                            'last_seen_at'  => null,
+                            'active_hs'     => 0,
+                            'active_ppp'    => 0,
+                            'active_total'  => 0,
+                            'memory_load'   => 0,
+                            'data'          => [[
+                                'board-name'              => $lrName,
+                                'platform'                => 'MikroTik',
+                                'architecture-name'       => 'RouterOS',
+                                'uptime'                  => $isOnline ? 'Active' : 'Offline',
+                                'version'                 => 'N/A',
+                                'cpu'                     => 'MikroTik CPU',
+                                'cpu-count'               => '1',
+                                'cpu-frequency'           => '-',
+                                'cpu-load'                => 0,
+                                'total-memory'            => 0,
+                                'free-memory'             => 0,
+                                'total-hdd-space'         => 0,
+                                'free-hdd-space'          => 0,
+                                'factory-software'        => 'N/A',
+                                'build-time'              => 'N/A',
+                                'write-sect-total'        => '0',
+                                'write-sect-since-reboot' => '0',
+                            ]],
+                        ];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
         return view('dashboard', compact('results', 'customersData', 'billInformationData', 'systemOverview', 'resellerData'));
     }
 }

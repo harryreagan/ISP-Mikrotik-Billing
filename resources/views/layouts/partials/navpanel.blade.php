@@ -256,10 +256,7 @@
                             href="{{ route('admin.system-logs') }}">
                             {{ __('System Logs') }}
                         </a>
-                        <a wire:navigate.hover wire:current="active" class="dropdown-item link-600 fw-medium"
-                            href="{{ route('admin.reviews') }}">
-                            {{ __('Customer Reviews') }}
-                        </a>
+
                         <a wire:navigate.hover wire:current="active" class="dropdown-item link-600 fw-medium"
                             href="{{ route('admin.vouchers') }}">
                             {{ __('Reseller Vouchers') }}
