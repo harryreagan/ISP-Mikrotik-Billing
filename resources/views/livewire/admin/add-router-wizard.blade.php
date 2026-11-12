@@ -278,7 +278,7 @@
                     foreach ($interfaces as $iface) {
                         $pName = $iface['name'];
                         $role = $port_roles[$pName] ?? 'none';
-                        $hasCable = $this->isCableConnected($iface);
+                        $hasCable = !empty($simulated_cables[$pName]) || !empty($iface['running']);
 
                         if ($role === 'wan') {
                             $wanPort = $pName;
@@ -314,8 +314,8 @@
                                 @foreach($interfaces as $index => $iface)
                                     @php
                                         $portName = $iface['name'];
-                                        $isWifi = $this->isWifiPort($portName);
-                                        $isLive = $this->isCableConnected($iface);
+                                        $isWifi = str_starts_with(strtolower($portName), 'wlan') || str_starts_with(strtolower($portName), 'wifi');
+                                        $isLive = !empty($simulated_cables[$portName]) || !empty($iface['running']);
                                         $currentRole = $port_roles[$portName] ?? 'none';
                                         $isLocked = ($currentRole === 'wan');
                                     @endphp
