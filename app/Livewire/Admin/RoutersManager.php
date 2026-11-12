@@ -743,7 +743,6 @@ class RoutersManager extends Component
         session()->flash('success', $msg);
         $this->dispatch('show-toast', ['type' => 'success', 'message' => $msg]);
     }
-    }
 
     public function render()
     {
