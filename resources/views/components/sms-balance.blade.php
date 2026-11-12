@@ -5,9 +5,9 @@
 <div
     wire:ignore
     x-data="{
-        status: 'none',
+        status: 'ok',
         provider: null,
-        balanceFormatted: null,
+        balanceFormatted: '0 SMS',
         loaded: false,
         timer: null,
         settingsUrl: @js($smsSettingsUrl),
@@ -33,51 +33,37 @@
                 });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
-                this.status = data.status || 'none';
-                this.provider = data.provider || null;
-                this.balanceFormatted = data.balance_formatted || null;
+                this.status = data.status || 'ok';
+                this.provider = data.provider || 'System SMS';
+                this.balanceFormatted = data.balance_formatted || ((data.balance !== null && data.balance !== undefined) ? parseInt(data.balance) + ' SMS' : '0 SMS');
                 this.loaded = true;
             } catch (e) {
-                this.status = 'error';
-                this.balanceFormatted = null;
+                this.status = 'empty';
+                this.balanceFormatted = '0 SMS';
                 this.loaded = true;
             }
         },
         get tooltipText() {
-            if (this.status === 'none') {
-                return this.provider
-                    ? 'SMS balance · ' + this.provider
-                    : 'No SMS provider activated · Click to configure SMS settings';
-            }
-            return 'SMS balance · ' + (this.provider || 'SMS Gateway');
-        },
-        get displayText() {
-            if (!this.loaded || this.status === 'error') return '—';
-            if (this.status === 'none') return 'No SMS';
-            return this.balanceFormatted || '—';
+            return (this.provider || 'SMS Gateway') + ' · ' + this.balanceFormatted;
         }
     }"
     x-init="init()"
     class="d-inline-flex align-items-center flex-shrink-0"
 >
     <a
-        :href="status === 'none' ? settingsUrl : 'javascript:void(0)'"
+        :href="settingsUrl"
         role="status"
         :title="tooltipText"
-        class="sms-balance-chip"
+        class="sms-balance-pill text-decoration-none"
         :class="{
-            'sms-chip-ok': loaded && status === 'ok',
-            'sms-chip-low': loaded && status === 'low',
-            'sms-chip-empty': loaded && status === 'empty',
-            'sms-chip-neutral': !loaded || status === 'none' || status === 'error',
-            'sms-chip-clickable': status === 'none'
+            'pill-empty': loaded && (status === 'empty' || status === 'none' || balanceFormatted === '0 SMS'),
+            'pill-low': loaded && status === 'low',
+            'pill-ok': loaded && status === 'ok' && balanceFormatted !== '0 SMS'
         }"
     >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="flex-shrink-0">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
         </svg>
-        <span x-show="status !== 'none'" class="d-none d-sm-inline">SMS</span>
-        <span class="sms-chip-val" x-text="displayText">—</span>
+        <span class="sms-val font-semibold" x-text="balanceFormatted">0 SMS</span>
     </a>
 </div>
-

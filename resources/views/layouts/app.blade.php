@@ -166,6 +166,10 @@
             justify-content: center !important;
         }
 
+        .navbar-vertical-collapsed .navbar-vertical .brand-text-block {
+            display: none !important;
+        }
+
         .navbar-vertical .navbar-vertical-label-wrapper,
         .navbar-vertical .row.navbar-vertical-label-wrapper {
             margin-left: 0 !important;
@@ -272,25 +276,138 @@
             gap: 0.75rem !important;
         }
 
-        .content {
+        /* Layout Shell: Professional docked sidebar with zero overlap */
+        .container,
+        .container-fluid,
+        [data-layout="container"] {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+        }
+
+        .content,
+        .main .content,
+        [data-layout="container"] .content {
             padding: 0 1.25rem 1.5rem 1.25rem !important;
             background-color: var(--bg-page) !important;
             flex: 1 1 0% !important;
             min-width: 0 !important;
+            box-sizing: border-box !important;
         }
 
         @media (min-width: 1200px) {
+            .navbar-vertical {
+                position: fixed !important;
+                top: 0 !important;
+                bottom: 0 !important;
+                left: 0 !important;
+                width: 16rem !important;
+                min-width: 16rem !important;
+                max-width: 16rem !important;
+                z-index: 1025 !important;
+                background: #ffffff !important;
+                border-right: 1px solid var(--border-ring) !important;
+            }
+
+            .content,
+            .main .content,
+            [data-layout="container"] .content,
             .navbar-vertical ~ .content {
                 margin-left: 16rem !important;
+                width: calc(100% - 16rem) !important;
+                max-width: calc(100% - 16rem) !important;
             }
+
+            .navbar-vertical-collapsed .navbar-vertical {
+                width: 72px !important;
+                min-width: 72px !important;
+                max-width: 72px !important;
+            }
+
+            .navbar-vertical-collapsed .content,
+            .navbar-vertical-collapsed .main .content,
+            .navbar-vertical-collapsed [data-layout="container"] .content,
             .navbar-vertical-collapsed .navbar-vertical ~ .content {
                 margin-left: 72px !important;
+                width: calc(100% - 72px) !important;
+                max-width: calc(100% - 72px) !important;
             }
         }
+
         @media (max-width: 1199.98px) {
-            .content {
-                margin-left: 0 !important;
+            .navbar-vertical {
+                position: fixed !important;
+                top: 0 !important;
+                bottom: 0 !important;
+                left: 0 !important;
+                width: 280px !important;
+                z-index: 1050 !important;
             }
+
+            .content,
+            .main .content,
+            [data-layout="container"] .content {
+                margin-left: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+        }
+
+        /* SMS Balance Pill in Top Bar */
+        .sms-balance-pill {
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            height: 36px !important;
+            padding: 0 12px !important;
+            border-radius: 9999px !important;
+            font-size: 12px !important;
+            font-weight: 600 !important;
+            line-height: 1 !important;
+            text-decoration: none !important;
+            white-space: nowrap !important;
+            transition: all 0.15s ease !important;
+            background: #ffffff !important;
+            color: #475569 !important;
+            border: 1px solid #e2e8f0 !important;
+            cursor: pointer !important;
+        }
+
+        .sms-balance-pill:hover {
+            background: #f8fafc !important;
+            color: #1e293b !important;
+            border-color: #cbd5e1 !important;
+        }
+
+        .sms-balance-pill.pill-ok {
+            background: #f0fdf4 !important;
+            color: #15803d !important;
+            border-color: #bbf7d0 !important;
+        }
+
+        .sms-balance-pill.pill-low {
+            background: #fffbeb !important;
+            color: #b45309 !important;
+            border-color: #fde68a !important;
+        }
+
+        .sms-balance-pill.pill-empty {
+            background: #f8fafc !important;
+            color: #64748b !important;
+            border-color: #e2e8f0 !important;
+        }
+
+        html.dark .sms-balance-pill {
+            background: #1e293b !important;
+            color: #94a3b8 !important;
+            border-color: #334155 !important;
+        }
+        html.dark .sms-balance-pill.pill-ok {
+            background: rgba(21, 128, 61, 0.15) !important;
+            color: #4ade80 !important;
+            border-color: rgba(74, 222, 128, 0.3) !important;
         }
 
         /* Toolbar Icon Buttons */
@@ -665,16 +782,15 @@
     <!--    Main Content-->
     <!-- ===============================================-->
     <main class="main" id="top">
-        <div class="container-fluid" data-layout="container">
+        <div class="container-fluid px-0" data-layout="container">
             <script>
-                var isFluid = JSON.parse(localStorage.getItem('isFluid'));
-                if (isFluid == null || isFluid == false) {
-                    var container = document.querySelector('[data-layout="container"]');
-                    if (container) {
-                        container.classList.remove('container-fluid');
-                        container.classList.add('container');
+                try {
+                    localStorage.setItem('isFluid', 'true');
+                    var storedPos = localStorage.getItem('navbarPosition');
+                    if (!storedPos || storedPos === 'combo') {
+                        localStorage.setItem('navbarPosition', 'vertical');
                     }
-                }
+                } catch (e) {}
             </script>
             @include('layouts.partials.sidenav')
             <div class="content">
@@ -684,42 +800,18 @@
                 @include('layouts.partials.topnav')
 
                 <script>
-                    var storedNavbarPosition = localStorage.getItem('navbarPosition');
                     var navVerticalEl = document.querySelector('.navbar-vertical');
                     var navTopVerticalEl = document.querySelector('.content .navbar-top');
                     var navTopEl = document.querySelector('[data-layout] .navbar-top:not([data-double-top-nav])');
                     var navDoubleTopEl = document.querySelector('[data-double-top-nav]');
                     var navTopComboEl = document.querySelector('.content [data-navbar-top="combo"]');
 
-                    if (localStorage.getItem('navbarPosition') === 'double-top') {
-                        document.documentElement.classList.toggle('double-top-nav-layout');
-                    }
+                    if (navTopComboEl) navTopComboEl.remove();
+                    if (navTopEl) navTopEl.remove();
+                    if (navDoubleTopEl) navDoubleTopEl.remove();
 
-                    if (storedNavbarPosition === 'top') {
-                        if (navTopEl) navTopEl.removeAttribute('style');
-                        if (navTopVerticalEl) navTopVerticalEl.remove();
-                        if (navVerticalEl) navVerticalEl.remove();
-                        if (navTopComboEl) navTopComboEl.remove();
-                        if (navDoubleTopEl) navDoubleTopEl.remove();
-                    } else if (storedNavbarPosition === 'combo') {
-                        if (navVerticalEl) navVerticalEl.removeAttribute('style');
-                        if (navTopComboEl) navTopComboEl.removeAttribute('style');
-                        if (navTopEl) navTopEl.remove();
-                        if (navTopVerticalEl) navTopVerticalEl.remove();
-                        if (navDoubleTopEl) navDoubleTopEl.remove();
-                    } else if (storedNavbarPosition === 'double-top') {
-                        if (navDoubleTopEl) navDoubleTopEl.removeAttribute('style');
-                        if (navTopVerticalEl) navTopVerticalEl.remove();
-                        if (navVerticalEl) navVerticalEl.remove();
-                        if (navTopEl) navTopEl.remove();
-                        if (navTopComboEl) navTopComboEl.remove();
-                    } else {
-                        if (navVerticalEl) navVerticalEl.removeAttribute('style');
-                        if (navTopVerticalEl) navTopVerticalEl.removeAttribute('style');
-                        if (navTopEl) navTopEl.remove();
-                        if (navDoubleTopEl) navDoubleTopEl.remove();
-                        if (navTopComboEl) navTopComboEl.remove();
-                    }
+                    if (navVerticalEl) navVerticalEl.removeAttribute('style');
+                    if (navTopVerticalEl) navTopVerticalEl.removeAttribute('style');
                 </script>
                 {{ $slot }}
                 <footer class="footer">

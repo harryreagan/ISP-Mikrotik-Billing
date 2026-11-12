@@ -46,7 +46,15 @@ class SmsBalanceService
             ->first();
 
         if (! $gateway) {
-            return self::nonePayload();
+            $tenant = DB::table('tenants')->where('id', $tenantId)->first();
+            $smsBal = (float) ($tenant->sms_balance ?? 0.0);
+            return [
+                'status'            => $smsBal > 0 ? ($smsBal < 100 ? 'low' : 'ok') : 'empty',
+                'provider'          => 'Platform Shared Pool',
+                'balance'           => round($smsBal, 0),
+                'balance_formatted' => number_format($smsBal, 0) . ' SMS',
+                'updated_at'        => now()->toIso8601String(),
+            ];
         }
 
         $type = strtolower(trim((string) $gateway->gateway_type));
@@ -62,19 +70,7 @@ class SmsBalanceService
                 default          => self::fetchFallbackOrUnsupported($gateway),
             };
 
-            if (($result['unsupported'] ?? false) === true) {
-                return [
-                    'status'            => 'none',
-                    'provider'          => $providerLabel,
-                    'balance'           => null,
-                    'balance_formatted' => null,
-                    'unit'              => 'credits',
-                    'updated_at'        => now()->toIso8601String(),
-                ];
-            }
-
             $amount = (float) ($result['amount'] ?? 0.0);
-            $unit = (string) ($result['unit'] ?? 'credits');
             $threshold = (float) ($gateway->low_balance_threshold ?? 100.0);
 
             $status = 'ok';
@@ -87,18 +83,18 @@ class SmsBalanceService
             return [
                 'status'            => $status,
                 'provider'          => $providerLabel,
-                'balance'           => round($amount, 2),
-                'balance_formatted' => self::formatBalance($amount, $unit),
+                'balance'           => round($amount, 0),
+                'balance_formatted' => self::formatBalance($amount, 'SMS'),
                 'updated_at'        => now()->toIso8601String(),
             ];
         } catch (Throwable $e) {
             report($e);
 
             return [
-                'status'            => 'error',
+                'status'            => 'empty',
                 'provider'          => $providerLabel,
-                'balance'           => null,
-                'balance_formatted' => null,
+                'balance'           => 0,
+                'balance_formatted' => '0 SMS',
                 'updated_at'        => now()->toIso8601String(),
             ];
         }
@@ -259,19 +255,19 @@ class SmsBalanceService
     {
         $wallet = DB::table('sms_wallets')->where('tenant_id', $tenantId)->first();
         if ($wallet && isset($wallet->balance)) {
-            return ['amount' => (float) $wallet->balance, 'unit' => 'credits'];
+            return ['amount' => (float) $wallet->balance, 'unit' => 'SMS'];
         }
 
         $tenant = DB::table('tenants')->where('id', $tenantId)->first();
         if ($tenant && isset($tenant->sms_balance)) {
-            return ['amount' => (float) $tenant->sms_balance, 'unit' => 'credits'];
+            return ['amount' => (float) $tenant->sms_balance, 'unit' => 'SMS'];
         }
 
         if ($gateway->balance !== null) {
-            return ['amount' => (float) $gateway->balance, 'unit' => 'credits'];
+            return ['amount' => (float) $gateway->balance, 'unit' => 'SMS'];
         }
 
-        return ['amount' => 0.0, 'unit' => 'credits'];
+        return ['amount' => 0.0, 'unit' => 'SMS'];
     }
 
     /**
@@ -282,21 +278,16 @@ class SmsBalanceService
         if ($gateway->balance !== null) {
             return [
                 'amount' => (float) $gateway->balance,
-                'unit'   => 'credits',
+                'unit'   => 'SMS',
             ];
         }
 
-        return ['unsupported' => true, 'unit' => 'credits'];
+        return ['amount' => 0.0, 'unit' => 'SMS'];
     }
 
     protected static function formatBalance(float $amount, string $unit): string
     {
-        if (strtolower($unit) === 'credits') {
-            return number_format($amount, 0) . ' credits';
-        }
-
-        $decimals = (abs($amount - round($amount)) < 0.005) ? 0 : 2;
-        return strtoupper($unit) . ' ' . number_format($amount, $decimals);
+        return number_format(max(0, $amount), 0) . ' SMS';
     }
 
     protected static function providerLabel(string $type): string
@@ -307,7 +298,7 @@ class SmsBalanceService
             'textsms'        => 'TextSMS',
             'advanta'        => 'Advanta SMS',
             'blessed', 'blessedtexts' => 'Blessed Texts',
-            'system'         => 'System Pool',
+            'system'         => 'Platform Shared Pool',
             default          => ucfirst($type ?: 'SMS'),
         };
     }
@@ -315,10 +306,10 @@ class SmsBalanceService
     protected static function nonePayload(): array
     {
         return [
-            'status'            => 'none',
-            'provider'          => null,
-            'balance'           => null,
-            'balance_formatted' => null,
+            'status'            => 'empty',
+            'provider'          => 'Platform Shared Pool',
+            'balance'           => 0,
+            'balance_formatted' => '0 SMS',
             'updated_at'        => now()->toIso8601String(),
         ];
     }

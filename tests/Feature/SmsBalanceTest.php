@@ -29,8 +29,8 @@ class SmsBalanceTest extends TestCase
         $response = $this->getJson('/api/sms/balance');
         $response->assertStatus(200);
         $response->assertJson([
-            'status' => 'none',
-            'provider' => 'None',
+            'status' => 'empty',
+            'provider' => 'Platform Shared Pool',
             'balance' => 0,
         ]);
     }
