@@ -120,3 +120,4 @@ class SmsBalanceTest extends TestCase
         $this->assertEquals(0.00, $res['balance']);
     }
 }
+

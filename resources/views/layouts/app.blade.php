@@ -166,17 +166,27 @@
             justify-content: center !important;
         }
 
-        .navbar-vertical .navbar-vertical-label-wrapper {
+        .navbar-vertical .navbar-vertical-label-wrapper,
+        .navbar-vertical .row.navbar-vertical-label-wrapper {
             margin-left: 0 !important;
             margin-right: 0 !important;
-            padding-left: 1rem !important;
-            padding-right: 0.75rem !important;
+            padding-left: 1.25rem !important;
+            padding-right: 1rem !important;
             margin-top: 1rem !important;
             margin-bottom: 0.25rem !important;
             width: 100% !important;
+            display: flex !important;
         }
 
-        .navbar-vertical-label {
+        .navbar-vertical .navbar-vertical-label-wrapper > .col-auto {
+            padding-left: 0 !important;
+            margin-left: 0 !important;
+            flex: 0 0 auto !important;
+            width: auto !important;
+        }
+
+        .navbar-vertical-label,
+        .navbar-vertical .navbar-vertical-label {
             font-size: 11px !important;
             font-weight: 700 !important;
             text-transform: uppercase !important;
@@ -185,8 +195,7 @@
             padding-left: 0 !important;
             margin-left: 0 !important;
             white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
+            overflow: visible !important;
         }
 
         .navbar-vertical-collapsed .navbar-vertical .navbar-vertical-label-wrapper {
@@ -264,11 +273,24 @@
         }
 
         .content {
-            margin: 0 !important;
             padding: 0 1.25rem 1.5rem 1.25rem !important;
             background-color: var(--bg-page) !important;
             flex: 1 1 0% !important;
             min-width: 0 !important;
+        }
+
+        @media (min-width: 1200px) {
+            .navbar-vertical ~ .content {
+                margin-left: 16rem !important;
+            }
+            .navbar-vertical-collapsed .navbar-vertical ~ .content {
+                margin-left: 72px !important;
+            }
+        }
+        @media (max-width: 1199.98px) {
+            .content {
+                margin-left: 0 !important;
+            }
         }
 
         /* Toolbar Icon Buttons */

@@ -78,18 +78,16 @@
         <!-- Two-line text block with min-w-0 -->
         <div class="brand-text-block" style="display: flex; flex-direction: column; justify-content: center; min-width: 0; max-width: 180px; line-height: 1.15;">
             <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
-                <span class="text-truncate" title="{{ $displayName }}" style="font-family: 'Jost', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 15px; font-weight: 800; color: {{ $textColor }}; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                    {{ $displayName }}
+                <span style="font-family: 'Jost', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 16px; font-weight: 800; color: {{ $textColor }}; letter-spacing: -0.02em; white-space: nowrap;">
+                    HSmart
                 </span>
-                <span style="font-family: 'Jost', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 10px; font-weight: 700; color: #FFFFFF; background-color: #6D3FE0; padding: 2px 5px; border-radius: 6px; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.2; flex-shrink: 0;">
+                <span style="font-family: 'Jost', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 10px; font-weight: 700; color: #FFFFFF; background-color: #6D3FE0; padding: 2px 6px; border-radius: 6px; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.2; flex-shrink: 0;">
                     ISP
                 </span>
             </div>
-            @if($subtitleText)
-                <span class="brand-network-name text-truncate" title="{{ $subtitleText }}" style="font-family: 'Jost', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 11px; font-weight: 500; color: {{ $subtitleColor }}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
-                    {{ $subtitleText }}
-                </span>
-            @endif
+            <span class="brand-network-name text-truncate" title="{{ $displayName }}" style="font-family: 'Jost', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 11px; font-weight: 500; color: {{ $subtitleColor }}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
+                {{ $displayName }}
+            </span>
         </div>
     @endif
 </div>

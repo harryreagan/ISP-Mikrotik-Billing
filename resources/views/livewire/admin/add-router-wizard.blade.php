@@ -224,124 +224,244 @@
     @endif
 
     {{-- ============================================================== --}}
-    {{-- STEP 3 - PORTS CONFIGURATION                                   --}}
+    {{-- STEP 3 - PORTS CONFIGURATION (Assign Ports)                     --}}
     {{-- ============================================================== --}}
     @if($step === 3)
-        <div class="card shadow-sm border-0">
-            <div class="card-body p-4 p-md-5">
-                <div class="text-center mb-4">
-                    <div class="d-inline-flex align-items-center justify-content-center bg-success bg-opacity-10 text-success rounded-circle mb-3" style="width: 64px; height: 64px;">
-                        <i class="bi bi-ethernet fs-2"></i>
+        <div class="space-y-4" wire:poll.10s="pollPortStatus">
+            <header class="mb-4">
+                <p class="text-xs text-muted mb-1">Add router · Step 3 of 4</p>
+                <h1 class="text-xl font-semibold tracking-tight text-dark mb-1">Assign ports</h1>
+                <p class="text-xs text-muted mb-0">Choose what each port does. You can set a port up even if no cable is plugged in yet; it goes live the moment one is connected.</p>
+            </header>
+
+            @if($port_validation_error)
+                <div class="alert alert-danger mb-4 text-start" role="alert">
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-exclamation-triangle-fill fs-5 me-2 mt-0.5"></i>
+                        <div>
+                            <div class="fw-bold mb-1">Port Configuration Notice</div>
+                            <div>{{ $port_validation_error }}</div>
+                        </div>
                     </div>
-                    <h4 class="fw-bold text-dark">Assign Port Roles</h4>
-                    <p class="text-muted small">Choose how each physical cable port on <strong>{{ $router_name }}</strong> will be used.</p>
                 </div>
+            @endif
 
-                @if($port_validation_error)
-                    <div class="alert alert-danger mb-4 text-start" role="alert">
-                        <div class="d-flex align-items-start">
-                            <i class="bi bi-exclamation-triangle-fill fs-5 me-2 mt-1"></i>
-                            <div>
-                                <div class="fw-bold mb-1">Port Detection Notice</div>
-                                <div>{{ $port_validation_error }}</div>
+            @if($is_loading_interfaces)
+                <div class="card p-5 text-center shadow-sm border-0">
+                    <div class="spinner-border text-primary mb-2" role="status"></div>
+                    <p class="text-muted small mb-0">Reading network interfaces live from router...</p>
+                </div>
+            @elseif(empty($interfaces))
+                {{-- Honest error state --}}
+                <div class="card p-5 text-center shadow-sm border-0 mb-4">
+                    <i class="bi bi-hdd-network text-warning fs-1 mb-2 d-inline-block"></i>
+                    <h5 class="fw-bold text-dark mb-2">No Hardware Interfaces Found</h5>
+                    <p class="text-muted small mb-4 mx-auto" style="max-width: 500px;">
+                        We could not read ports from your router via RouterOS API. Please make sure the setup script ran completely in Winbox Terminal, the WireGuard tunnel is active, and the router has internet access.
+                    </p>
+                    <div class="d-flex justify-content-center gap-2">
+                        <button type="button" wire:click="fetchInterfaces" class="btn btn-primary btn-sm px-3 py-2 fw-semibold">
+                            <i class="bi bi-arrow-clockwise me-1"></i>Retry Reading Ports
+                        </button>
+                        <button type="button" wire:click="goBackToStep2" class="btn btn-outline-secondary btn-sm px-3 py-2">
+                            <i class="bi bi-arrow-left me-1"></i>Back to Script (Step 2)
+                        </button>
+                    </div>
+                </div>
+            @else
+                @php
+                    $wanPort = null;
+                    $pppoeList = [];
+                    $hotspotList = [];
+                    $pendingCableCount = 0;
+
+                    foreach ($interfaces as $iface) {
+                        $pName = $iface['name'];
+                        $role = $port_roles[$pName] ?? 'none';
+                        $hasCable = $this->isCableConnected($iface);
+
+                        if ($role === 'wan') {
+                            $wanPort = $pName;
+                        } elseif ($role === 'pppoe') {
+                            $pppoeList[] = $pName;
+                        } elseif ($role === 'hotspot') {
+                            $hotspotList[] = $pName;
+                        }
+
+                        if (!$hasCable && in_array($role, ['pppoe', 'hotspot'])) {
+                            $pendingCableCount++;
+                        }
+                    }
+                @endphp
+
+                <div class="row g-4 align-items-start">
+                    {{-- Left column: Router ports list --}}
+                    <div class="col-12 col-lg-8">
+                        <div class="card shadow-sm border-0 overflow-hidden mb-3">
+                            <div class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom">
+                                <h6 class="fw-bold mb-0 text-dark">Router ports</h6>
+                                @if(isset($interfaces[2]['name']))
+                                    @php $simPort = $interfaces[2]['name']; @endphp
+                                    <button type="button" 
+                                            wire:click="toggleSimulateCable('{{ $simPort }}')" 
+                                            class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 11px;">
+                                        {{ !empty($simulated_cables[$simPort]) ? "Disconnect simulated {$simPort}" : "Simulate cable on {$simPort}" }}
+                                    </button>
+                                @endif
                             </div>
-                        </div>
-                    </div>
-                @endif
 
-                @if($is_loading_interfaces)
-                    <div class="text-center py-5">
-                        <div class="spinner-border text-primary mb-2"></div>
-                        <p class="text-muted small">Querying network interfaces directly from router...</p>
-                    </div>
-                @elseif(empty($interfaces))
-                    {{-- Honest error state: No fake ports! --}}
-                    <div class="card bg-light border-0 p-4 text-center mb-4">
-                        <i class="bi bi-hdd-network text-warning fs-1 mb-2"></i>
-                        <h5 class="fw-bold text-dark">No Hardware Interfaces Found</h5>
-                        <p class="text-muted small mb-4" style="max-width: 500px; margin: 0 auto;">
-                            We could not read ports from your router via RouterOS API. Please make sure the setup script ran completely in Winbox Terminal, the WireGuard tunnel is active, and the router has internet access.
-                        </p>
-                        <div class="d-flex justify-content-center gap-2">
-                            <button type="button" wire:click="fetchInterfaces" class="btn btn-primary">
-                                <i class="bi bi-arrow-clockwise me-1"></i>Retry Reading Ports
-                            </button>
-                            <button type="button" wire:click="goBackToStep2" class="btn btn-outline-secondary">
-                                <i class="bi bi-arrow-left me-1"></i>Back to Script (Step 2)
-                            </button>
-                        </div>
-                    </div>
-                @else
-                    <div class="table-responsive mb-4">
-                        <table class="table table-hover align-middle border">
-                            <thead class="table-light">
-                                <tr>
-                                    <th style="width: 25%;">Port Name</th>
-                                    <th style="width: 30%;">Cable Status</th>
-                                    <th style="width: 45%;">Role Assignment</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($interfaces as $iface)
-                                    @php $portName = $iface['name']; @endphp
-                                    <tr>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <i class="bi bi-hdd-network text-primary fs-5 me-2"></i>
+                            <ul class="list-group list-group-flush mb-0">
+                                @foreach($interfaces as $index => $iface)
+                                    @php
+                                        $portName = $iface['name'];
+                                        $isWifi = $this->isWifiPort($portName);
+                                        $isLive = $this->isCableConnected($iface);
+                                        $currentRole = $port_roles[$portName] ?? 'none';
+                                        $isLocked = ($currentRole === 'wan');
+                                    @endphp
+                                    <li class="list-group-item px-4 py-3">
+                                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                                            <div class="d-flex align-items-center gap-3">
+                                                <div class="rounded-3 bg-light d-flex align-items-center justify-content-center text-secondary shrink-0" style="width: 36px; height: 36px;">
+                                                    @if($isWifi)
+                                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6">
+                                                            <path d="M5 12a10 10 0 0 1 14 0M8 15a6 6 0 0 1 8 0M12 19h.01"/>
+                                                        </svg>
+                                                    @else
+                                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6">
+                                                            <rect x="4" y="6" width="16" height="9" rx="2"/>
+                                                            <path d="M8 18v-3m4 3v-3m4 3v-3"/>
+                                                        </svg>
+                                                    @endif
+                                                </div>
                                                 <div>
-                                                    <div class="fw-bold text-dark">{{ $portName }}</div>
-                                                    <small class="text-muted">{{ $iface['mac'] ?? '' }}</small>
+                                                    <div class="fw-semibold text-dark mb-0" style="font-size: 14px;">{{ $portName }}</div>
+                                                    <div class="text-muted font-monospace" style="font-size: 11px;">{{ $iface['mac'] ?? '—' }}</div>
                                                 </div>
                                             </div>
-                                        </td>
-                                        <td>
-                                            @if($iface['running'])
-                                                <span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-25 py-2 px-3">
-                                                    <i class="bi bi-check-circle-fill me-1"></i>Cable plugged in
-                                                </span>
-                                            @else
-                                                <span class="badge bg-light text-muted border py-2 px-3">
-                                                    <i class="bi bi-dash-circle me-1"></i>No cable
-                                                </span>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            <select wire:model.live="port_roles.{{ $portName }}" class="form-select form-select-lg">
-                                                <option value="wan">🌐 Internet (WAN)</option>
-                                                <option value="hotspot">📶 Hotspot</option>
-                                                <option value="pppoe">🔌 PPPoE</option>
-                                                <option value="none">⚪ Not used</option>
-                                            </select>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
 
-                    <div class="card bg-light border-0 p-3 mb-4">
-                        <div class="d-flex align-items-center small text-muted">
-                            <i class="bi bi-info-circle text-primary me-2 fs-5"></i>
-                            <div>
-                                <strong>Tip:</strong> Plug your main internet cable from your provider into <strong>{{ array_search('wan', $port_roles) ?: 'ether1' }}</strong>. Your customers or Access Points plug into the Hotspot/PPPoE ports.
-                            </div>
+                                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                                {{-- Cable status badge --}}
+                                                <span class="badge {{ $isLive ? 'bg-success bg-opacity-10 text-success' : 'bg-light text-muted border' }} rounded-pill px-2.5 py-1" style="font-size: 11px;">
+                                                    <i class="bi bi-circle-fill me-1" style="font-size: 7px; color: {{ $isLive ? '#10b981' : '#94a3b8' }};"></i>
+                                                    {{ $isLive ? 'Cable plugged in' : 'No cable' }}
+                                                </span>
+
+                                                {{-- Segmented role switcher or locked WAN --}}
+                                                @if($isLocked)
+                                                    <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-2.5 py-1.5 fw-semibold" style="font-size: 11px;">
+                                                        WAN · protected
+                                                    </span>
+                                                @else
+                                                    <div class="btn-group p-0.5 bg-light rounded-2" role="group">
+                                                        <button type="button" 
+                                                                wire:click="setPortRole('{{ $portName }}', 'none')"
+                                                                class="btn btn-sm py-1 px-2 border-0 {{ $currentRole === 'none' ? 'btn-white bg-white text-dark shadow-sm fw-bold' : 'text-muted' }}" style="font-size: 11px;">
+                                                            Unused
+                                                        </button>
+                                                        @if(!$isWifi)
+                                                            <button type="button" 
+                                                                    wire:click="setPortRole('{{ $portName }}', 'pppoe')"
+                                                                    class="btn btn-sm py-1 px-2 border-0 {{ $currentRole === 'pppoe' ? 'btn-white bg-white text-primary shadow-sm fw-bold' : 'text-muted' }}" style="font-size: 11px;">
+                                                                PPPoE
+                                                            </button>
+                                                        @endif
+                                                        <button type="button" 
+                                                                wire:click="setPortRole('{{ $portName }}', 'hotspot')"
+                                                                class="btn btn-sm py-1 px-2 border-0 {{ $currentRole === 'hotspot' ? 'btn-white bg-white text-warning shadow-sm fw-bold' : 'text-muted' }}" style="font-size: 11px;">
+                                                            Hotspot
+                                                        </button>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
+
+                                        @if($isLocked)
+                                            <p class="text-muted mt-2 mb-0" style="padding-left: 48px; font-size: 11px;">This port is how the system reaches the router, so it stays as WAN to avoid locking you out.</p>
+                                        @elseif(!$isLive && $currentRole !== 'none')
+                                            <p class="text-warning mt-2 mb-0" style="padding-left: 48px; font-size: 11px;">
+                                                <i class="bi bi-info-circle me-1"></i>No cable yet. {{ $currentRole === 'pppoe' ? 'PPPoE' : 'Hotspot' }} will start working as soon as a cable is plugged in.
+                                            </p>
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ul>
                         </div>
                     </div>
 
-                    <div class="d-flex justify-content-between align-items-center">
-                        <button type="button" wire:click="goBackToStep2" class="btn btn-outline-secondary">
-                            <i class="bi bi-arrow-left me-1"></i>Back to Script
-                        </button>
-                        <button type="button" 
-                                wire:click="applyConfiguration" 
-                                class="btn btn-primary btn-lg px-4 py-3 fw-bold"
-                                @if($port_validation_error || empty($interfaces)) disabled @endif>
-                            <span>Apply &amp; Configure Router</span>
-                            <i class="bi bi-arrow-right ms-2"></i>
-                        </button>
+                    {{-- Right column: What will be set up summary & action --}}
+                    <div class="col-12 col-lg-4">
+                        {{-- What will be set up card --}}
+                        <div class="card shadow-sm border-0 p-4 mb-3">
+                            <h6 class="fw-bold text-dark mb-3">What will be set up</h6>
+                            <ul class="list-unstyled mb-0 d-flex flex-column gap-3" style="font-size: 12px;">
+                                <li class="d-flex gap-2.5">
+                                    <i class="bi bi-circle-fill text-info mt-1" style="font-size: 8px;"></i>
+                                    <div>
+                                        <div class="fw-semibold text-dark">WAN</div>
+                                        <div class="text-muted" style="font-size: 11px;">{{ $wanPort ?: 'None' }}</div>
+                                    </div>
+                                </li>
+                                <li class="d-flex gap-2.5">
+                                    <i class="bi bi-circle-fill text-primary mt-1" style="font-size: 8px;"></i>
+                                    <div>
+                                        <div class="fw-semibold text-dark">PPPoE server</div>
+                                        <div class="text-muted" style="font-size: 11px;">
+                                            {{ !empty($pppoeList) ? 'Bridge-pppoe with ' . implode(', ', $pppoeList) : 'No ports' }}
+                                        </div>
+                                    </div>
+                                </li>
+                                <li class="d-flex gap-2.5">
+                                    <i class="bi bi-circle-fill text-warning mt-1" style="font-size: 8px;"></i>
+                                    <div>
+                                        <div class="fw-semibold text-dark">Hotspot server</div>
+                                        <div class="text-muted" style="font-size: 11px;">
+                                            {{ !empty($hotspotList) ? 'Bridge-hotspot with ' . implode(', ', $hotspotList) : 'No ports' }}
+                                        </div>
+                                    </div>
+                                </li>
+                                <li class="d-flex gap-2.5">
+                                    <i class="bi bi-circle-fill mt-1 {{ $pendingCableCount > 0 ? 'text-warning' : 'text-success' }}" style="font-size: 8px;"></i>
+                                    <div>
+                                        <div class="fw-semibold text-dark">Waiting for cable</div>
+                                        <div class="text-muted" style="font-size: 11px;">
+                                            {{ $pendingCableCount > 0 ? $pendingCableCount . ' port' . ($pendingCableCount > 1 ? 's' : '') . ' will activate when connected' : 'All assigned ports are live' }}
+                                        </div>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+
+                        {{-- Good to know card --}}
+                        <div class="card shadow-sm border-0 p-4 mb-3 bg-light">
+                            <h6 class="fw-bold text-dark mb-2">Good to know</h6>
+                            <p class="text-muted mb-0" style="font-size: 11px; line-height: 1.6;">
+                                Cable status is only information. The configuration is saved on the router, so a port without a cable is not blocked. Ports that currently have no link show a soft notice instead.
+                            </p>
+                        </div>
+
+                        {{-- Action Buttons --}}
+                        <div class="d-flex flex-column gap-2">
+                            <button type="button" 
+                                    wire:click="applyConfiguration" 
+                                    class="btn btn-primary btn-lg w-100 fw-bold py-2.5 shadow-sm d-flex align-items-center justify-content-center gap-2"
+                                    @if($port_validation_error || empty($interfaces) || $is_applying) disabled @endif>
+                                @if($is_applying)
+                                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                                    <span>Applying to router...</span>
+                                @else
+                                    <span>Apply to router</span>
+                                    <i class="bi bi-arrow-right"></i>
+                                @endif
+                            </button>
+
+                            <button type="button" wire:click="goBackToStep2" class="btn btn-link text-decoration-none text-muted py-1" style="font-size: 12px;">
+                                ← Back to Script (Step 2)
+                            </button>
+                        </div>
                     </div>
-                @endif
-            </div>
+                </div>
+            @endif
         </div>
     @endif
 

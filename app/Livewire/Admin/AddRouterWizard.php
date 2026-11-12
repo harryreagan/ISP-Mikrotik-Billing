@@ -37,6 +37,7 @@ class AddRouterWizard extends Component
     // STEP 3 - Ports
     public array $interfaces = [];
     public array $port_roles = []; // e.g. ['ether1' => 'wan', 'ether2' => 'hotspot', 'ether3' => 'none']
+    public array $simulated_cables = [];
     public ?string $port_validation_error = null;
     public bool $is_loading_interfaces = false;
 
@@ -373,6 +374,86 @@ ROUTERSCRIPT;
         $this->validatePortRoles();
     }
 
+    public function toggleSimulateCable(string $portName)
+    {
+        if (!empty($this->simulated_cables[$portName])) {
+            unset($this->simulated_cables[$portName]);
+        } else {
+            $this->simulated_cables[$portName] = true;
+        }
+    }
+
+    public function setPortRole(string $port, string $role)
+    {
+        if (($this->port_roles[$port] ?? '') === 'wan') {
+            return;
+        }
+
+        if ($this->isWifiPort($port) && $role === 'pppoe') {
+            return;
+        }
+
+        if (in_array($role, ['none', 'hotspot', 'pppoe'])) {
+            $this->port_roles[$port] = $role;
+            $this->validatePortRoles();
+        }
+    }
+
+    public function isWifiPort(string $name): bool
+    {
+        $lower = strtolower($name);
+        return str_starts_with($lower, 'wlan') || str_starts_with($lower, 'wifi') || str_contains($lower, 'wireless');
+    }
+
+    public function isCableConnected(array $iface): bool
+    {
+        $name = $iface['name'] ?? '';
+        if (!empty($this->simulated_cables[$name])) {
+            return true;
+        }
+        return (bool) ($iface['running'] ?? false);
+    }
+
+    public function pollPortStatus()
+    {
+        if ($this->step !== 3 || !$this->created_router_id || empty($this->interfaces)) {
+            return;
+        }
+
+        $router = Router::find($this->created_router_id);
+        if (!$router) return;
+
+        $apiHost = $router->vpn_ip ?: $router->ip;
+        $apiPort = (int) ($router->api_port ?: 8728);
+        $apiUser = $router->api_user ?: $router->username;
+        $apiPass = '';
+        try {
+            $apiPass = Crypt::decryptString($router->api_password ?: $router->password);
+        } catch (\Throwable $e) {
+            $apiPass = $router->api_password ?: $router->password;
+        }
+
+        try {
+            $api = new MikrotikApiService($apiHost, $apiPort, $apiUser, $apiPass, 3);
+            $rawInterfaces = $api->executeCommand('/interface/print');
+            if (is_array($rawInterfaces)) {
+                $statusMap = [];
+                foreach ($rawInterfaces as $item) {
+                    if (isset($item['name'])) {
+                        $statusMap[$item['name']] = ($item['running'] ?? 'false') === 'true';
+                    }
+                }
+                foreach ($this->interfaces as &$iface) {
+                    if (isset($statusMap[$iface['name']])) {
+                        $iface['running'] = $statusMap[$iface['name']];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Silently ignore polling errors
+        }
+    }
+
     /**
      * Validate interface assignments:
      * - Must have real interfaces loaded.
@@ -531,26 +612,32 @@ ROUTERSCRIPT;
         }
 
         // 3. Hotspot Configuration (if hotspot ports assigned)
+        $hsBridgeName = 'bridge-hotspot';
         try {
             if (!empty($hotspotPorts)) {
-                // Create Bridge if not present
-                $existingBridge = $api->executeCommand('/interface/bridge/print', [], ['name' => 'hs-bridge']);
+                // Check if bridge-hotspot exists or legacy hs-bridge
+                $existingBridge = $api->executeCommand('/interface/bridge/print', [], ['name' => $hsBridgeName]);
                 if (empty($existingBridge) || !is_array($existingBridge)) {
-                    $api->executeCommand('/interface/bridge/add', ['name' => 'hs-bridge', 'comment' => 'HSmart Hotspot Bridge']);
+                    $existingBridgeLegacy = $api->executeCommand('/interface/bridge/print', [], ['name' => 'hs-bridge']);
+                    if (!empty($existingBridgeLegacy) && is_array($existingBridgeLegacy)) {
+                        $hsBridgeName = 'hs-bridge';
+                    } else {
+                        $api->executeCommand('/interface/bridge/add', ['name' => $hsBridgeName, 'comment' => 'HSmart Hotspot Bridge']);
+                    }
                 }
 
                 // Add ports to bridge
                 foreach ($hotspotPorts as $hPort) {
-                    $existingPort = $api->executeCommand('/interface/bridge/port/print', [], ['bridge' => 'hs-bridge', 'interface' => $hPort]);
+                    $existingPort = $api->executeCommand('/interface/bridge/port/print', [], ['bridge' => $hsBridgeName, 'interface' => $hPort]);
                     if (empty($existingPort) || !is_array($existingPort)) {
-                        $api->executeCommand('/interface/bridge/port/add', ['bridge' => 'hs-bridge', 'interface' => $hPort]);
+                        $api->executeCommand('/interface/bridge/port/add', ['bridge' => $hsBridgeName, 'interface' => $hPort]);
                     }
                 }
 
                 // IP Address on Bridge
-                $existingIp = $api->executeCommand('/ip/address/print', [], ['interface' => 'hs-bridge']);
+                $existingIp = $api->executeCommand('/ip/address/print', [], ['interface' => $hsBridgeName]);
                 if (empty($existingIp) || !is_array($existingIp)) {
-                    $api->executeCommand('/ip/address/add', ['address' => '10.10.0.1/22', 'network' => '10.10.0.0', 'interface' => 'hs-bridge', 'comment' => 'HSmart Hotspot Subnet']);
+                    $api->executeCommand('/ip/address/add', ['address' => '10.10.0.1/22', 'network' => '10.10.0.0', 'interface' => $hsBridgeName, 'comment' => 'HSmart Hotspot Subnet']);
                 }
 
                 // IP Pool
@@ -562,7 +649,7 @@ ROUTERSCRIPT;
                 // DHCP Server & Network
                 $existingDhcpSrv = $api->executeCommand('/ip/dhcp-server/print', [], ['name' => 'hs-dhcp']);
                 if (empty($existingDhcpSrv) || !is_array($existingDhcpSrv)) {
-                    $api->executeCommand('/ip/dhcp-server/add', ['name' => 'hs-dhcp', 'interface' => 'hs-bridge', 'address-pool' => 'hs-pool', 'disabled' => 'no']);
+                    $api->executeCommand('/ip/dhcp-server/add', ['name' => 'hs-dhcp', 'interface' => $hsBridgeName, 'address-pool' => 'hs-pool', 'disabled' => 'no']);
                 }
 
                 $existingNet = $api->executeCommand('/ip/dhcp-server/network/print', [], ['address' => '10.10.0.0/22']);
@@ -578,7 +665,7 @@ ROUTERSCRIPT;
 
                 $existingHsSrv = $api->executeCommand('/ip/hotspot/print', [], ['name' => 'hs-server']);
                 if (empty($existingHsSrv) || !is_array($existingHsSrv)) {
-                    $api->executeCommand('/ip/hotspot/add', ['name' => 'hs-server', 'interface' => 'hs-bridge', 'profile' => 'hsmart-profile', 'address-pool' => 'hs-pool', 'disabled' => 'no']);
+                    $api->executeCommand('/ip/hotspot/add', ['name' => 'hs-server', 'interface' => $hsBridgeName, 'profile' => 'hsmart-profile', 'address-pool' => 'hs-pool', 'disabled' => 'no']);
                 }
 
                 $this->checklist['hotspot']['status'] = 'done';
@@ -595,9 +682,23 @@ ROUTERSCRIPT;
             return;
         }
 
-        // 4. PPPoE Configuration (if PPPoE ports assigned)
+        // 4. PPPoE Configuration (if PPPoE ports assigned via bridge-pppoe)
+        $pppBridgeName = 'bridge-pppoe';
         try {
             if (!empty($pppoePorts)) {
+                $existingBridge = $api->executeCommand('/interface/bridge/print', [], ['name' => $pppBridgeName]);
+                if (empty($existingBridge) || !is_array($existingBridge)) {
+                    $api->executeCommand('/interface/bridge/add', ['name' => $pppBridgeName, 'comment' => 'HSmart PPPoE Bridge']);
+                }
+
+                // Add ports to bridge-pppoe
+                foreach ($pppoePorts as $pPort) {
+                    $existingPort = $api->executeCommand('/interface/bridge/port/print', [], ['bridge' => $pppBridgeName, 'interface' => $pPort]);
+                    if (empty($existingPort) || !is_array($existingPort)) {
+                        $api->executeCommand('/interface/bridge/port/add', ['bridge' => $pppBridgeName, 'interface' => $pPort]);
+                    }
+                }
+
                 // IP Pool for PPPoE
                 $existingPppPool = $api->executeCommand('/ip/pool/print', [], ['name' => 'pppoe-pool']);
                 if (empty($existingPppPool) || !is_array($existingPppPool)) {
@@ -610,19 +711,16 @@ ROUTERSCRIPT;
                     $api->executeCommand('/ppp/profile/add', ['name' => 'hs-pppoe-profile', 'local-address' => '10.0.0.1', 'remote-address' => 'pppoe-pool', 'dns-server' => '8.8.8.8']);
                 }
 
-                // PPPoE Server on each selected port
-                foreach ($pppoePorts as $pPort) {
-                    $srvName = 'pppoe-' . $pPort;
-                    $existingPppSrv = $api->executeCommand('/interface/pppoe-server/server/print', [], ['service-name' => $srvName]);
-                    if (empty($existingPppSrv) || !is_array($existingPppSrv)) {
-                        $api->executeCommand('/interface/pppoe-server/server/add', [
-                            'service-name'   => $srvName,
-                            'interface'      => $pPort,
-                            'default-profile'=> 'hs-pppoe-profile',
-                            'one-session-per-host' => 'yes',
-                            'disabled'       => 'no',
-                        ]);
-                    }
+                // Single PPPoE Server bound to bridge-pppoe
+                $existingPppSrv = $api->executeCommand('/interface/pppoe-server/server/print', [], ['service-name' => 'pppoe-srv']);
+                if (empty($existingPppSrv) || !is_array($existingPppSrv)) {
+                    $api->executeCommand('/interface/pppoe-server/server/add', [
+                        'service-name'   => 'pppoe-srv',
+                        'interface'      => $pppBridgeName,
+                        'default-profile'=> 'hs-pppoe-profile',
+                        'one-session-per-host' => 'yes',
+                        'disabled'       => 'no',
+                    ]);
                 }
 
                 $this->checklist['pppoe']['status'] = 'done';
@@ -640,10 +738,17 @@ ROUTERSCRIPT;
         }
 
         // All steps successfully verified and executed on live router!
+        $primaryLan = 'ether2';
+        if (!empty($hotspotPorts)) {
+            $primaryLan = $hsBridgeName;
+        } elseif (!empty($pppoePorts)) {
+            $primaryLan = $pppBridgeName;
+        }
+
         $router->update([
             'status'         => 'ready',
             'wan_interface'  => $wanPort ?: 'ether1',
-            'lan_interface'  => !empty($hotspotPorts) ? 'hs-bridge' : ($pppoePorts[0] ?? 'ether2'),
+            'lan_interface'  => $primaryLan,
             'port_roles'     => $this->port_roles,
             'hotspot_status' => !empty($hotspotPorts) ? 'configured' : 'not_configured',
             'pppoe_status'   => !empty($pppoePorts) ? 'configured' : 'not_configured',
@@ -665,6 +770,29 @@ ROUTERSCRIPT;
 
     public function render()
     {
-        return view('livewire.admin.add-router-wizard')->layout('layouts.app');
+        return view('livewire.admin.add-router-wizard', [
+            'step'                     => $this->step,
+            'router_name'              => $this->router_name,
+            'location'                 => $this->location,
+            'created_router_id'        => $this->created_router_id,
+            'setup_token'              => $this->setup_token,
+            'api_user'                 => $this->api_user,
+            'api_password_plain'       => $this->api_password_plain,
+            'tunnel_ip'                => $this->tunnel_ip,
+            'script'                   => $this->script,
+            'one_line_command'         => $this->one_line_command,
+            'is_online'                => $this->is_online,
+            'peer_registration_status' => $this->peer_registration_status,
+            'check_message'            => $this->check_message,
+            'interfaces'               => $this->interfaces,
+            'port_roles'               => $this->port_roles,
+            'simulated_cables'         => $this->simulated_cables,
+            'port_validation_error'    => $this->port_validation_error,
+            'is_loading_interfaces'    => $this->is_loading_interfaces,
+            'is_applying'              => $this->is_applying,
+            'is_configured'            => $this->is_configured,
+            'checklist'                => $this->checklist,
+            'apply_error'              => $this->apply_error,
+        ])->layout('layouts.app');
     }
 }
