@@ -48,10 +48,13 @@
             document.querySelector('.navbar-vertical').classList.add(`navbar-${navbarStyle}`);
         }
     </script>
-    <div class="d-flex align-items-center px-3 border-bottom border-200" style="height: 64px;">
+    <div class="d-flex align-items-center justify-content-between px-3 border-bottom border-200" style="height: 64px;">
         <a class="navbar-brand m-0 p-0 text-decoration-none d-flex align-items-center" href="{{ route('dashboard') }}" style="text-decoration: none;">
             <x-hsmart-logo color="dark" height="40px" />
         </a>
+        <button type="button" class="btn btn-sm btn-link text-secondary p-1 d-xl-none text-decoration-none" id="closeMobileSidebarBtn" aria-label="Close menu" style="font-size: 1.25rem;">
+            <i class="bi bi-x-lg"></i>
+        </button>
     </div>
     <div class="collapse navbar-collapse" id="navbarVerticalCollapse">
         <div class="navbar-vertical-content scrollbar">

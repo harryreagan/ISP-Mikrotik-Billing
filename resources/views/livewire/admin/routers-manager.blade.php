@@ -406,17 +406,19 @@
                                                         <div class="fw-semibold font-monospace text-light small">{{ $iName }}</div>
                                                     </div>
 
-                                                    {{-- Assigned Role Badge --}}
+                                                    {{-- Assigned Role Badge & Quick Switcher --}}
                                                     <div class="mt-1">
-                                                        @if($isWan)
-                                                            <span class="badge bg-primary w-100" style="font-size: 10px;">WAN / uplink</span>
-                                                        @elseif($isHs)
-                                                            <span class="badge bg-warning text-dark w-100" style="font-size: 10px;">Hotspot</span>
-                                                        @elseif($isPpp)
-                                                            <span class="badge bg-info text-white w-100" style="font-size: 10px;">PPPoE</span>
-                                                        @else
-                                                            <span class="badge bg-secondary text-white w-100" style="font-size: 10px;">LAN / spare</span>
-                                                        @endif
+                                                        <select class="form-select form-select-sm text-center py-0 px-1 border-0 fw-bold"
+                                                            style="font-size: 10px; height: 26px; border-radius: 6px; cursor: pointer;
+                                                            {{ $isWan ? 'background-color: #2563eb; color: #fff;' : ($isHs ? 'background-color: #f59e0b; color: #111;' : ($isPpp ? 'background-color: #06b6d4; color: #fff;' : 'background-color: #475569; color: #fff;')) }}"
+                                                            wire:change="setPortRole('{{ $iName }}', $event.target.value)"
+                                                            title="Change role for {{ $iName }}"
+                                                        >
+                                                            <option value="wan" {{ $isWan ? 'selected' : '' }} style="background-color: #fff; color: #000;">WAN (Uplink)</option>
+                                                            <option value="hotspot" {{ $isHs ? 'selected' : '' }} style="background-color: #fff; color: #000;">Hotspot</option>
+                                                            <option value="pppoe" {{ $isPpp ? 'selected' : '' }} style="background-color: #fff; color: #000;">PPPoE</option>
+                                                            <option value="lan" {{ (!$isWan && !$isHs && !$isPpp) ? 'selected' : '' }} style="background-color: #fff; color: #000;">LAN (Spare)</option>
+                                                        </select>
                                                     </div>
                                                 </div>
                                             </div>
@@ -435,7 +437,7 @@
                                         <label class="form-label">
                                             <i class="bi bi-globe me-1"></i>WAN (internet uplink) port <span class="text-danger">*</span>
                                         </label>
-                                        <select wire:model="portRoleWan" class="form-select" required>
+                                        <select wire:model.live="portRoleWan" class="form-select" required>
                                             @foreach($portInterfaces as $iface)
                                                 <option value="{{ $iface['name'] }}">
                                                     {{ $iface['name'] }} {{ $iface['running'] ? '(Active link)' : '(Unplugged)' }}
@@ -450,7 +452,7 @@
                                         <label class="form-label">
                                             <i class="bi bi-wifi me-1"></i>Hotspot port <span class="text-danger">*</span>
                                         </label>
-                                        <select wire:model="portRoleHotspot" class="form-select" required>
+                                        <select wire:model.live="portRoleHotspot" class="form-select" required>
                                             @foreach($portInterfaces as $iface)
                                                 <option value="{{ $iface['name'] }}">
                                                     {{ $iface['name'] }} {{ $iface['running'] ? '(Active link)' : '(Unplugged)' }}
@@ -465,7 +467,7 @@
                                         <label class="form-label">
                                             <i class="bi bi-router me-1"></i>PPPoE server port <span class="text-danger">*</span>
                                         </label>
-                                        <select wire:model="portRolePppoe" class="form-select" required>
+                                        <select wire:model.live="portRolePppoe" class="form-select" required>
                                             @foreach($portInterfaces as $iface)
                                                 <option value="{{ $iface['name'] }}">
                                                     {{ $iface['name'] }} {{ $iface['running'] ? '(Active link)' : '(Unplugged)' }}

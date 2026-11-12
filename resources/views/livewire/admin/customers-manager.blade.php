@@ -332,9 +332,12 @@
                                 </div>
 
                                 <div class="col-12 col-md-4">
-                                    <label class="form-label">Internet package <span class="text-danger">*</span></label>
+                                    <label class="form-label d-flex justify-content-between align-items-center">
+                                        <span>Internet package ({{ strtoupper($new_type) }}) <span class="text-danger">*</span></span>
+                                        <span class="badge bg-secondary-subtle text-secondary" style="font-size: 10px;">{{ count($packages) }} available</span>
+                                    </label>
                                     <select wire:model="new_package_id" class="form-select @error('new_package_id') is-invalid @enderror" required>
-                                        <option value="">Select package</option>
+                                        <option value="">Select {{ strtoupper($new_type) }} package</option>
                                         @foreach($packages as $p)
                                             <option value="{{ $p->id }}">{{ $p->name }} (KES {{ number_format($p->price, 0) }})</option>
                                         @endforeach

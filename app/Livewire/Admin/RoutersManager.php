@@ -475,6 +475,30 @@ class RoutersManager extends Component
     }
 
     /**
+     * Interactive port role assignment from faceplate rack cards.
+     */
+    public function setPortRole(string $portName, string $role): void
+    {
+        if ($role === 'wan') {
+            $this->portRoleWan = $portName;
+            if ($this->portRoleHotspot === $portName) $this->portRoleHotspot = '';
+            if ($this->portRolePppoe === $portName) $this->portRolePppoe = '';
+        } elseif ($role === 'hotspot') {
+            $this->portRoleHotspot = $portName;
+            if ($this->portRoleWan === $portName) $this->portRoleWan = '';
+            if ($this->portRolePppoe === $portName) $this->portRolePppoe = '';
+        } elseif ($role === 'pppoe') {
+            $this->portRolePppoe = $portName;
+            if ($this->portRoleWan === $portName) $this->portRoleWan = '';
+            if ($this->portRoleHotspot === $portName) $this->portRoleHotspot = '';
+        } else {
+            if ($this->portRoleWan === $portName) $this->portRoleWan = '';
+            if ($this->portRoleHotspot === $portName) $this->portRoleHotspot = '';
+            if ($this->portRolePppoe === $portName) $this->portRolePppoe = '';
+        }
+    }
+
+    /**
      * Apply and reconfigure physical port roles live on the MikroTik router.
      */
     public function applyPortConfiguration(): void
@@ -492,6 +516,9 @@ class RoutersManager extends Component
             'portHotspotSubnet' => 'required|string|max:32',
             'portPppoePool'     => 'required|string|max:32',
         ]);
+
+        $prevHotspot = $router->lan_interface ?: ($router->port_roles['hotspot'] ?? null);
+        $prevPppoe = $router->port_roles['pppoe'] ?? null;
 
         $host = $router->vpn_ip ?: $router->ip;
         $port = (int) ($router->api_port ?: 8728);
@@ -523,7 +550,8 @@ class RoutersManager extends Component
                 $foundHsIp = false;
                 if (is_array($addrs)) {
                     foreach ($addrs as $addr) {
-                        if (str_contains($addr['address'] ?? '', '10.5.50.') || ($addr['comment'] ?? '') === 'hsmart-hotspot') {
+                        $addrIf = $addr['interface'] ?? '';
+                        if (str_contains($addr['address'] ?? '', '10.5.50.') || ($addr['comment'] ?? '') === 'hsmart-hotspot' || ($prevHotspot && $addrIf === $prevHotspot)) {
                             $api->executeCommand('/ip/address/set', ['interface' => $this->portRoleHotspot, 'address' => $hsIp], ['.id' => $addr['.id']]);
                             $foundHsIp = true;
                             break;
@@ -578,7 +606,8 @@ class RoutersManager extends Component
                 $foundHsDhcp = false;
                 if (is_array($dhcps)) {
                     foreach ($dhcps as $d) {
-                        if (($d['name'] ?? '') === 'hs-dhcp-10' || ($d['interface'] ?? '') === $this->portRoleHotspot) {
+                        $dIf = $d['interface'] ?? '';
+                        if (($d['name'] ?? '') === 'hs-dhcp-10' || $dIf === $this->portRoleHotspot || ($prevHotspot && $dIf === $prevHotspot) || ($d['address-pool'] ?? '') === 'hs-pool-10') {
                             $api->executeCommand('/ip/dhcp-server/set', ['interface' => $this->portRoleHotspot, 'address-pool' => 'hs-pool-10', 'disabled' => 'no', 'lease-time' => '1h'], ['.id' => $d['.id']]);
                             $foundHsDhcp = true;
                             break;
@@ -635,9 +664,18 @@ class RoutersManager extends Component
                 }
 
                 $hsServers = $api->executeCommand('/ip/hotspot/print');
-                if (is_array($hsServers) && !empty($hsServers[0]['.id'])) {
-                    $api->executeCommand('/ip/hotspot/set', ['interface' => $this->portRoleHotspot, 'address-pool' => 'hs-pool-10', 'profile' => $hsprofName, 'disabled' => 'no'], ['.id' => $hsServers[0]['.id']]);
-                } else {
+                $foundHsServer = false;
+                if (is_array($hsServers) && !empty($hsServers)) {
+                    foreach ($hsServers as $hs) {
+                        $hsIf = $hs['interface'] ?? '';
+                        if ($hsIf === $this->portRoleHotspot || ($prevHotspot && $hsIf === $prevHotspot) || ($hs['profile'] ?? '') === $hsprofName || ($hs['address-pool'] ?? '') === 'hs-pool-10') {
+                            $api->executeCommand('/ip/hotspot/set', ['interface' => $this->portRoleHotspot, 'address-pool' => 'hs-pool-10', 'profile' => $hsprofName, 'disabled' => 'no'], ['.id' => $hs['.id']]);
+                            $foundHsServer = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$foundHsServer) {
                     $api->executeCommand('/ip/hotspot/add', ['name' => 'hsmart-hotspot', 'interface' => $this->portRoleHotspot, 'address-pool' => 'hs-pool-10', 'profile' => $hsprofName, 'disabled' => 'no']);
                 }
             } catch (\Throwable $e) {}
@@ -645,9 +683,18 @@ class RoutersManager extends Component
             // 2. PPPoE Server binding
             try {
                 $pppServers = $api->executeCommand('/interface/pppoe-server/server/print');
-                if (is_array($pppServers) && !empty($pppServers[0]['.id'])) {
-                    $api->executeCommand('/interface/pppoe-server/server/set', ['interface' => $this->portRolePppoe, 'disabled' => 'no'], ['.id' => $pppServers[0]['.id']]);
-                } else {
+                $foundPpp = false;
+                if (is_array($pppServers) && !empty($pppServers)) {
+                    foreach ($pppServers as $ps) {
+                        $psIf = $ps['interface'] ?? '';
+                        if ($psIf === $this->portRolePppoe || ($prevPppoe && $psIf === $prevPppoe) || ($ps['service-name'] ?? '') === 'hsmart-pppoe') {
+                            $api->executeCommand('/interface/pppoe-server/server/set', ['interface' => $this->portRolePppoe, 'disabled' => 'no'], ['.id' => $ps['.id']]);
+                            $foundPpp = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$foundPpp) {
                     $api->executeCommand('/interface/pppoe-server/server/add', ['service-name' => 'hsmart-pppoe', 'interface' => $this->portRolePppoe, 'disabled' => 'no', 'one-session-per-host' => 'yes']);
                 }
             } catch (\Throwable $e) {}
@@ -692,11 +739,10 @@ class RoutersManager extends Component
 
         $this->showPortsModal = false;
 
-        if ($appliedOnRouter) {
-            session()->flash('success', "Ports successfully reconfigured on {$router->name}! WAN: '{$this->portRoleWan}', Hotspot: '{$this->portRoleHotspot}', PPPoE: '{$this->portRolePppoe}'.");
-        } else {
-            session()->flash('warning', "Port roles saved in system. Router will sync upon next online contact.");
-        }
+        $msg = "Ports successfully reconfigured on {$router->name}! WAN: '{$this->portRoleWan}', Hotspot: '{$this->portRoleHotspot}', PPPoE: '{$this->portRolePppoe}'.";
+        session()->flash('success', $msg);
+        $this->dispatch('show-toast', ['type' => 'success', 'message' => $msg]);
+    }
     }
 
     public function render()

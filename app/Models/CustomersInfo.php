@@ -12,6 +12,7 @@ class CustomersInfo extends Model
     use HasFactory, SoftDeletes, BelongsToTenant;
 
     protected $fillable = [
+        'tenant_id',
         'customer_unique_id',
         'customer_name',
         'contact_person',
@@ -28,12 +29,10 @@ class CustomersInfo extends Model
         'ppp_user_id',
         'connection_date',
         'package_id',
+        'router_id',
+        'service_type',
         'status',
         'reseller_id',
-        // 'auto_disabled',
-        // 'expired_date',
-        // 'auto_disabled_month',
-        // 'extra_date',
     ];
 
     protected static function boot()

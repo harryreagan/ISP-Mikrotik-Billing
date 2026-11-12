@@ -354,30 +354,36 @@
         }
 
         @media (max-width: 1199.98px) {
-            /* Mobile drawer: hidden by default until toggled */
-            .navbar-vertical {
+            /* Mobile drawer: completely hidden and removed from layout when closed */
+            .navbar-vertical:not(.navbar-vertical-mobile-open) {
                 display: none !important;
+                visibility: hidden !important;
+                width: 0 !important;
+                min-width: 0 !important;
+                max-width: 0 !important;
+                position: fixed !important;
+                left: -9999px !important;
+                pointer-events: none !important;
+            }
+
+            .navbar-vertical.navbar-vertical-mobile-open {
+                display: flex !important;
+                visibility: visible !important;
+                flex-direction: column !important;
                 position: fixed !important;
                 top: 0 !important;
                 bottom: 0 !important;
                 left: 0 !important;
                 width: 280px !important;
+                min-width: 280px !important;
                 max-width: 85vw !important;
                 z-index: 1060 !important;
                 background: #ffffff !important;
-                box-shadow: 4px 0 24px rgba(15, 23, 42, 0.18) !important;
+                box-shadow: 4px 0 24px rgba(15, 23, 42, 0.25) !important;
                 border-right: 1px solid var(--border-ring) !important;
+                pointer-events: auto !important;
             }
 
-            .navbar-vertical.show,
-            .navbar-vertical:has(#navbarVerticalCollapse.show),
-            .navbar-vertical.navbar-vertical-mobile-open {
-                display: flex !important;
-                flex-direction: column !important;
-            }
-
-            .navbar-vertical.show #navbarVerticalCollapse,
-            .navbar-vertical:has(#navbarVerticalCollapse.show) #navbarVerticalCollapse,
             .navbar-vertical.navbar-vertical-mobile-open #navbarVerticalCollapse {
                 display: block !important;
                 flex: 1 1 auto !important;
@@ -913,13 +919,14 @@
         function setupMobileNavbar() {
             const collapseEl = document.getElementById('navbarVerticalCollapse');
             const navVertical = document.querySelector('.navbar-vertical');
-            if (!collapseEl || !navVertical) return;
+            if (!navVertical) return;
 
             let backdrop = document.querySelector('.navbar-vertical-backdrop');
 
             function showNav() {
                 if (window.innerWidth < 1200) {
                     navVertical.classList.add('navbar-vertical-mobile-open');
+                    if (collapseEl) collapseEl.classList.add('show');
                     if (!backdrop) {
                         backdrop = document.createElement('div');
                         backdrop.className = 'navbar-vertical-backdrop';
@@ -931,11 +938,10 @@
 
             function hideNav() {
                 navVertical.classList.remove('navbar-vertical-mobile-open');
-                if (typeof bootstrap !== 'undefined' && bootstrap.Collapse) {
+                if (collapseEl) collapseEl.classList.remove('show');
+                if (typeof bootstrap !== 'undefined' && bootstrap.Collapse && collapseEl) {
                     const bsCollapse = bootstrap.Collapse.getInstance(collapseEl);
                     if (bsCollapse) bsCollapse.hide();
-                } else {
-                    collapseEl.classList.remove('show');
                 }
                 if (backdrop) {
                     backdrop.remove();
@@ -943,18 +949,35 @@
                 }
             }
 
-            collapseEl.removeEventListener('show.bs.collapse', showNav);
-            collapseEl.removeEventListener('hide.bs.collapse', hideNav);
-            collapseEl.addEventListener('show.bs.collapse', showNav);
-            collapseEl.addEventListener('hide.bs.collapse', hideNav);
+            if (collapseEl) {
+                collapseEl.removeEventListener('show.bs.collapse', showNav);
+                collapseEl.removeEventListener('hide.bs.collapse', hideNav);
+                collapseEl.addEventListener('show.bs.collapse', showNav);
+                collapseEl.addEventListener('hide.bs.collapse', hideNav);
+            }
+
+            // Direct button listeners for 100% responsiveness
+            document.querySelectorAll('[data-bs-target="#navbarVerticalCollapse"]').forEach(btn => {
+                btn.onclick = (e) => {
+                    e.preventDefault();
+                    if (navVertical.classList.contains('navbar-vertical-mobile-open')) {
+                        hideNav();
+                    } else {
+                        showNav();
+                    }
+                };
+            });
+
+            const closeBtn = document.getElementById('closeMobileSidebarBtn');
+            if (closeBtn) closeBtn.onclick = (e) => { e.preventDefault(); hideNav(); };
 
             // Also close mobile menu if a nav item is clicked
             navVertical.querySelectorAll('.nav-link').forEach(link => {
-                link.addEventListener('click', () => {
+                link.onclick = () => {
                     if (window.innerWidth < 1200) {
                         hideNav();
                     }
-                });
+                };
             });
         }
 
