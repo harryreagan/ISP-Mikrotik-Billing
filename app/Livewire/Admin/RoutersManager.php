@@ -264,17 +264,38 @@ class RoutersManager extends Component
      */
     public function editRouter(int $routerId)
     {
-        $router = Router::where('id', $routerId)->firstOrFail();
+        $tenantId = $this->getTenantId();
+        $router = Router::where('tenant_id', $tenantId)->where('id', $routerId)->firstOrFail();
 
         $this->editingRouterId = $router->id;
-        $this->edit_name = $router->name ?: $router->router_name;
-        $this->edit_location = $router->location ?: '';
-        $this->edit_ip = $router->ip ?: ($router->ip_address ?: '');
+        $this->edit_name = (string) ($router->name ?: $router->router_name);
+        $this->edit_location = (string) ($router->location ?: '');
+        $this->edit_ip = (string) ($router->ip ?: ($router->ip_address ?: ''));
         $this->edit_api_port = (int) ($router->api_port ?: 8728);
-        $this->edit_username = $router->api_user ?: ($router->username ?: '');
+        $this->edit_username = (string) ($router->api_user ?: ($router->username ?: ''));
         $this->edit_password = ''; // Keep blank unless changing
 
+        $this->resetErrorBag();
         $this->showEditModal = true;
+    }
+
+    /**
+     * Close the Edit Router modal and reset input state.
+     */
+    public function closeEditModal(): void
+    {
+        $this->showEditModal = false;
+        $this->editingRouterId = null;
+        $this->reset(['edit_name', 'edit_location', 'edit_ip', 'edit_username', 'edit_password', 'editingRouterId']);
+        $this->resetErrorBag();
+    }
+
+    /**
+     * Form submission handler matching Blade wire:submit.prevent="updateRouter".
+     */
+    public function updateRouter(): void
+    {
+        $this->saveRouter();
     }
 
     /**
@@ -284,7 +305,8 @@ class RoutersManager extends Component
     {
         $this->validate();
 
-        $router = Router::where('id', $this->editingRouterId)->firstOrFail();
+        $tenantId = $this->getTenantId();
+        $router = Router::where('tenant_id', $tenantId)->where('id', $this->editingRouterId)->firstOrFail();
 
         $data = [
             'name'        => $this->edit_name,
@@ -302,10 +324,23 @@ class RoutersManager extends Component
             $data['password']     = Crypt::encryptString($this->edit_password);
         }
 
-        $router->update($data);
+        $router->updateQuietly($data);
 
         $this->showEditModal = false;
+        $this->reset(['edit_name', 'edit_location', 'edit_ip', 'edit_username', 'edit_password', 'editingRouterId']);
+        $this->resetErrorBag();
+
         session()->flash('success', "Router {$router->name} details updated.");
+    }
+
+    /**
+     * Close the Script View modal.
+     */
+    public function closeScriptModal(): void
+    {
+        $this->showScriptModal = false;
+        $this->modalScript = null;
+        $this->modalRouterName = null;
     }
 
     /**
@@ -726,11 +761,25 @@ class RoutersManager extends Component
             ->count();
 
         return view('livewire.admin.routers-manager', [
-            'routers'       => $routers,
-            'totalRouters'  => $totalRouters,
-            'onlineRouters' => $onlineRouters,
-            'avgCpu'        => $avgCpu,
-            'totalClients'  => $totalClients,
+            'routers'          => $routers,
+            'totalRouters'     => $totalRouters,
+            'onlineRouters'    => $onlineRouters,
+            'avgCpu'           => $avgCpu,
+            'totalClients'     => $totalClients,
+            'filterStatus'     => $this->filterStatus,
+            'search'           => $this->search,
+            'showEditModal'    => $this->showEditModal,
+            'showPortsModal'   => $this->showPortsModal,
+            'showScriptModal'  => $this->showScriptModal,
+            'modalScript'      => $this->modalScript,
+            'modalRouterName'  => $this->modalRouterName,
+            'edit_name'        => $this->edit_name,
+            'edit_location'    => $this->edit_location,
+            'edit_ip'          => $this->edit_ip,
+            'edit_api_port'    => $this->edit_api_port,
+            'edit_username'    => $this->edit_username,
+            'edit_password'    => $this->edit_password,
+            'editingRouterId'  => $this->editingRouterId,
         ])->layout('layouts.app');
     }
 }

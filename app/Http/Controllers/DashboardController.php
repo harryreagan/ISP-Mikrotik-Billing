@@ -236,34 +236,44 @@ class DashboardController extends Controller
         } catch (\Throwable $e) {}
 
         $systemOverview = [];
-        try {
-            if (class_exists(MikrotikController::class)) {
-                $systemOverview = app(MikrotikController::class)->systemOverview();
-            }
-        } catch (\Throwable $e) {
-            $systemOverview = [];
-        }
 
-        // Ensure all routers configured for this tenant (both online and offline) are listed with their telemetry
+        // Ensure all routers configured for THIS tenant (both online and offline) are listed with their telemetry
         try {
             if (Schema::hasTable('routers')) {
-                $dbRouters = \App\Models\Router::orderByRaw("CASE WHEN status = 'online' THEN 0 ELSE 1 END")
+                $tenantId = auth()->user()?->tenant_id ?: (session('tenant_id') ?: (session('impersonated_tenant_id') ?: 1));
+
+                $dbRouters = \App\Models\Router::where('tenant_id', $tenantId)
+                    ->whereNotIn('status', ['pending', 'onboarding'])
+                    ->orderByRaw("CASE WHEN status = 'online' THEN 0 ELSE 1 END")
                     ->orderBy('name')
                     ->get();
 
                 foreach ($dbRouters as $r) {
                     $rName = $r->name ?: ($r->router_name ?: ('Router #' . $r->id));
-                    $liveEntry = $systemOverview[$rName] ?? null;
-                    $hasLive = is_array($liveEntry) && ($liveEntry['status'] ?? false) === true;
-                    $liveInfo = $hasLive && is_array($liveEntry['data'] ?? null)
-                        ? ($liveEntry['data'][0] ?? $liveEntry['data'])
-                        : [];
+                    $liveInfo = [];
+                    $hasLive = false;
+
+                    // Query live telemetry only for this tenant's online/connected router
+                    if ($r->status === 'online' || $r->action === 'connected') {
+                        try {
+                            if (class_exists(MikrotikController::class)) {
+                                $liveRes = app(MikrotikController::class)->routerList($rName, '/system/resource/print', '/system resource print', [], false);
+                                if (isset($liveRes[$rName]) && is_array($liveRes[$rName]) && ($liveRes[$rName]['status'] ?? false)) {
+                                    $hasLive = true;
+                                    $liveInfo = is_array($liveRes[$rName]['data'] ?? null)
+                                        ? ($liveRes[$rName]['data'][0] ?? $liveRes[$rName]['data'])
+                                        : [];
+                                }
+                            }
+                        } catch (\Throwable $e) {}
+                    }
+
                     if (!is_array($liveInfo)) {
                         $liveInfo = [];
                     }
 
-                    $isOnline = $hasLive || ($r->status === 'online');
-                    $connType = $liveEntry['type'] ?? ($r->vpn_ip ? 'WireGuard' : 'API');
+                    $isOnline = $hasLive || ($r->status === 'online' && $r->last_seen_at && $r->last_seen_at->gt(now()->subMinutes(5)));
+                    $connType = $r->vpn_ip ? 'WireGuard' : 'API';
 
                     $portRoles = is_array($r->port_roles) ? $r->port_roles : [];
                     $activeHs = (int) ($portRoles['active_hs'] ?? 0);

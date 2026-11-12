@@ -250,9 +250,15 @@
 
                             <button type="button" 
                                     wire:click="editRouter({{ $router->id }})" 
+                                    wire:loading.attr="disabled"
                                     class="btn btn-outline-secondary btn-sm px-2" 
                                     title="Edit router">
-                                <i class="bi bi-pencil me-1"></i>Edit
+                                <span wire:loading.remove wire:target="editRouter({{ $router->id }})">
+                                    <i class="bi bi-pencil me-1"></i>Edit
+                                </span>
+                                <span wire:loading wire:target="editRouter({{ $router->id }})">
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>Loading...
+                                </span>
                             </button>
 
                             <button type="button" 
@@ -286,35 +292,35 @@
 
     {{-- EDIT ROUTER MODAL --}}
     @if($showEditModal)
-        <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(2px); z-index: 1055;">
+        <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.6); z-index: 1055;" wire:click.self="closeEditModal" wire:keydown.escape="closeEditModal">
             <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title"><i class="bi bi-pencil-square me-2 text-orange-500"></i>Edit router</h5>
-                        <button type="button" class="btn-close" wire:click="closeEditModal"></button>
+                <div class="modal-content shadow-lg border-0 rounded-3">
+                    <div class="modal-header border-bottom">
+                        <h5 class="modal-title font-semibold text-slate-800"><i class="bi bi-pencil-square me-2 text-orange-500"></i>Edit router</h5>
+                        <button type="button" class="btn-close" wire:click="closeEditModal" aria-label="Close"></button>
                     </div>
                     <form wire:submit.prevent="updateRouter">
                         <div class="modal-body p-4">
                             <div class="mb-3">
-                                <label class="form-label">Router name <span class="text-danger">*</span></label>
+                                <label class="form-label text-sm fw-medium text-slate-700">Router name <span class="text-danger">*</span></label>
                                 <input type="text" wire:model="edit_name" class="form-control @error('edit_name') is-invalid @enderror" required>
                                 @error('edit_name') <div class="invalid-feedback">{{ $message }}</div> @enderror
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label">Location / branch</label>
+                                <label class="form-label text-sm fw-medium text-slate-700">Location / branch</label>
                                 <input type="text" wire:model="edit_location" class="form-control @error('edit_location') is-invalid @enderror" placeholder="e.g. Westlands Mall or Tower 3">
                                 @error('edit_location') <div class="invalid-feedback">{{ $message }}</div> @enderror
                             </div>
 
                             <div class="row g-2 mb-3">
                                 <div class="col-8">
-                                    <label class="form-label">Management IP</label>
+                                    <label class="form-label text-sm fw-medium text-slate-700">Management IP</label>
                                     <input type="text" wire:model="edit_ip" class="form-control @error('edit_ip') is-invalid @enderror" placeholder="e.g. 10.10.0.50">
                                     @error('edit_ip') <div class="invalid-feedback">{{ $message }}</div> @enderror
                                 </div>
                                 <div class="col-4">
-                                    <label class="form-label">API port</label>
+                                    <label class="form-label text-sm fw-medium text-slate-700">API port</label>
                                     <input type="number" wire:model="edit_api_port" class="form-control @error('edit_api_port') is-invalid @enderror" required>
                                     @error('edit_api_port') <div class="invalid-feedback">{{ $message }}</div> @enderror
                                 </div>
@@ -322,20 +328,25 @@
 
                             <div class="row g-2 mb-2">
                                 <div class="col-6">
-                                    <label class="form-label">API username</label>
+                                    <label class="form-label text-sm fw-medium text-slate-700">API username</label>
                                     <input type="text" wire:model="edit_username" class="form-control @error('edit_username') is-invalid @enderror" required>
                                     @error('edit_username') <div class="invalid-feedback">{{ $message }}</div> @enderror
                                 </div>
                                 <div class="col-6">
-                                    <label class="form-label">Password (optional)</label>
+                                    <label class="form-label text-sm fw-medium text-slate-700">Password (optional)</label>
                                     <input type="password" wire:model="edit_password" class="form-control" placeholder="Leave blank to keep">
                                 </div>
                             </div>
                         </div>
 
-                        <div class="modal-footer">
-                            <x-ui.button variant="secondary" wire:click="closeEditModal">Cancel</x-ui.button>
-                            <x-ui.button type="submit" variant="primary">Save changes</x-ui.button>
+                        <div class="modal-footer border-top bg-light">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" wire:click="closeEditModal">Cancel</button>
+                            <button type="submit" class="btn btn-primary btn-sm px-3" wire:loading.attr="disabled">
+                                <span wire:loading.remove wire:target="updateRouter,saveRouter">Save changes</span>
+                                <span wire:loading wire:target="updateRouter,saveRouter">
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>Saving...
+                                </span>
+                            </button>
                         </div>
                     </form>
                 </div>
