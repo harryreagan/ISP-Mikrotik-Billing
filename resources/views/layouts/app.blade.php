@@ -127,6 +127,22 @@
             opacity: 0.35 !important;
         }
 
+        @media (max-width: 575.98px) {
+            .ui-stat-card, .stat-card {
+                padding: 0.85rem !important;
+                border-radius: 0.85rem !important;
+            }
+            .ui-stat-value, .stat-card .stat-value {
+                font-size: 1.2rem !important;
+            }
+            .ui-stat-label, .stat-card .stat-label {
+                font-size: 0.7rem !important;
+            }
+            .ui-stat-icon, .stat-card .stat-icon {
+                font-size: 1.1rem !important;
+            }
+        }
+
         /* Sidebar: Calm White Surface, Thin 1px Right Border, No Heavy Shadow */
         .navbar-vertical {
             background: var(--surface) !important;
@@ -930,7 +946,7 @@
                     if (!backdrop) {
                         backdrop = document.createElement('div');
                         backdrop.className = 'navbar-vertical-backdrop';
-                        backdrop.addEventListener('click', hideNav);
+                        backdrop.addEventListener('click', hideNav); 
                         document.body.appendChild(backdrop);
                     }
                 }

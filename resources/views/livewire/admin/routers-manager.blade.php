@@ -234,6 +234,26 @@
                             </button>
 
                             <button type="button" 
+                                    wire:click="openHotspotCheck({{ $router->id }})" 
+                                    wire:loading.attr="disabled"
+                                    class="btn btn-outline-primary btn-sm px-2" 
+                                    title="Run hotspot health check">
+                                <span wire:loading.remove wire:target="openHotspotCheck({{ $router->id }})">
+                                    <i class="bi bi-shield-check me-1"></i>Hotspot check
+                                </span>
+                                <span wire:loading wire:target="openHotspotCheck({{ $router->id }})">
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>Checking...
+                                </span>
+                            </button>
+
+                            <button type="button" 
+                                    wire:click="openPortalModal({{ $router->id }})" 
+                                    class="btn btn-outline-info btn-sm px-2" 
+                                    title="Captive portal & QR preview">
+                                <i class="bi bi-qr-code me-1"></i>Portal
+                            </button>
+
+                            <button type="button" 
                                     wire:click="openPortsModal({{ $router->id }})" 
                                     class="btn btn-outline-secondary btn-sm px-2" 
                                     title="Inspect & configure ports">
@@ -420,6 +440,12 @@
                                                             <option value="lan" {{ (!$isWan && !$isHs && !$isPpp) ? 'selected' : '' }} style="background-color: #fff; color: #000;">LAN (Spare)</option>
                                                         </select>
                                                     </div>
+
+                                                    @if(!$isLinkUp && ($isHs || $isPpp))
+                                                        <div class="text-warning text-center mt-1" style="font-size: 8.5px; line-height: 1.1;">
+                                                            <i class="bi bi-info-circle me-0.5"></i>Will activate when plugged in
+                                                        </div>
+                                                    @endif
                                                 </div>
                                             </div>
                                         @endforeach
@@ -506,6 +532,256 @@
                             </x-ui.button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- 1. HOTSPOT HEALTH CHECK MODAL --}}
+    @if($showHealthModal)
+        <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.6); z-index: 1055;" wire:click.self="closeHealthModal" wire:keydown.escape="closeHealthModal">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content shadow-lg border-0 rounded-3">
+                    <div class="modal-header border-bottom d-flex align-items-center justify-content-between">
+                        <div>
+                            <h5 class="modal-title font-semibold text-slate-800 d-flex align-items-center gap-2">
+                                <i class="bi bi-shield-check text-orange-500"></i>
+                                Hotspot health check &mdash; {{ $healthRouterName }}
+                            </h5>
+                            <div class="text-muted small">Diagnostic verification for captive portal &amp; client onboarding</div>
+                        </div>
+                        <button type="button" class="btn-close" wire:click="closeHealthModal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body p-4" style="max-height: 75vh; overflow-y: auto;">
+                        {{-- Top Metric Summary --}}
+                        <div class="row g-2 mb-4">
+                            <div class="col-6 col-sm-3">
+                                <div class="p-3 rounded-3 border bg-light text-center">
+                                    <div class="text-muted small fw-medium">Checks run</div>
+                                    <div class="fs-4 fw-bold text-dark">{{ count($healthChecks) }}</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-sm-3">
+                                <div class="p-3 rounded-3 border bg-success-subtle text-center">
+                                    <div class="text-success small fw-medium">Passed</div>
+                                    <div class="fs-4 fw-bold text-success">{{ $healthPassedCount }}</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-sm-3">
+                                <div class="p-3 rounded-3 border {{ $healthFailedCount > 0 ? 'bg-danger-subtle' : 'bg-light' }} text-center">
+                                    <div class="{{ $healthFailedCount > 0 ? 'text-danger' : 'text-muted' }} small fw-medium">Attention needed</div>
+                                    <div class="fs-4 fw-bold {{ $healthFailedCount > 0 ? 'text-danger' : 'text-dark' }}">{{ $healthFailedCount }}</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-sm-3">
+                                <div class="p-3 rounded-3 border bg-light text-center d-flex flex-column justify-content-center">
+                                    <button type="button" wire:click="runHotspotCheck" wire:loading.attr="disabled" class="btn btn-outline-secondary btn-sm">
+                                        <span wire:loading.remove wire:target="runHotspotCheck">
+                                            <i class="bi bi-arrow-clockwise me-1"></i>Re-run check
+                                        </span>
+                                        <span wire:loading wire:target="runHotspotCheck">
+                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>Checking...
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Tenda Router Mode Warning Callout Card --}}
+                        @if($tendaWarning)
+                            <div class="card border-warning mb-4 shadow-sm" style="border-left: 5px solid #f59e0b !important; background-color: #fffbeb;">
+                                <div class="card-body p-3">
+                                    <div class="d-flex align-items-start gap-3">
+                                        <div class="p-2 rounded-circle bg-warning text-white flex-shrink-0" style="width: 40px; height: 40px; display: grid; place-items: center;">
+                                            <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <h6 class="fw-bold text-warning-emphasis mb-1">
+                                                The Tenda is in router mode; set it to AP mode (use LAN port, disable DHCP)
+                                            </h6>
+                                            <p class="small text-secondary mb-2">
+                                                The Tenda router at <strong>{{ $tendaWarning['ip'] }}</strong> (MAC: <code>{{ $tendaWarning['mac'] }}</code>) is connected via its WAN port and acting as a second router. It is hiding connected phones behind its single IP, so phones never see the captive portal sign-in page!
+                                            </p>
+                                            <div class="p-2.5 rounded-2 bg-white border border-warning-subtle small">
+                                                <div class="fw-bold text-dark mb-1"><i class="bi bi-list-check me-1 text-warning"></i>Step-by-step instructions to switch Tenda into Access Point (AP) mode:</div>
+                                                <ol class="mb-0 ps-3 text-secondary" style="font-size: 12px; line-height: 1.6;">
+                                                    @foreach($tendaWarning['steps'] as $step)
+                                                        <li>{{ $step }}</li>
+                                                    @endforeach
+                                                </ol>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- Diagnostics List (Checks a to i) --}}
+                        <div class="vstack gap-2">
+                            @foreach($healthChecks as $key => $check)
+                                <div class="p-3 rounded-3 border d-flex align-items-start gap-3 {{ $check['passed'] ? 'bg-white' : 'bg-white border-danger-subtle' }}">
+                                    <div class="flex-shrink-0 mt-0.5">
+                                        @if($check['passed'])
+                                            <span class="badge bg-success rounded-circle p-1.5" style="width: 24px; height: 24px; display: inline-grid; place-items: center;">
+                                                <i class="bi bi-check-lg" style="font-size: 13px;"></i>
+                                            </span>
+                                        @else
+                                            <span class="badge bg-danger rounded-circle p-1.5" style="width: 24px; height: 24px; display: inline-grid; place-items: center;">
+                                                <i class="bi bi-x-lg" style="font-size: 13px;"></i>
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div class="flex-grow-1 min-w-0">
+                                        <div class="d-flex align-items-center justify-content-between mb-1">
+                                            <div class="fw-semibold text-slate-800 text-sm">
+                                                <span class="badge bg-secondary-subtle text-secondary me-1 font-monospace" style="font-size: 10px;">{{ strtoupper($key) }}</span>
+                                                {{ $check['title'] }}
+                                            </div>
+                                            <span class="badge {{ $check['passed'] ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger' }}">
+                                                {{ $check['passed'] ? 'Passed' : 'Action needed' }}
+                                            </span>
+                                        </div>
+                                        <div class="text-secondary small mb-1">{{ $check['detail'] }}</div>
+                                        @if(!$check['passed'] && !empty($check['fix']))
+                                            <div class="p-2 rounded bg-light border text-dark small" style="font-size: 11.5px;">
+                                                <strong class="text-orange-600"><i class="bi bi-tools me-1"></i>Fix:</strong> {{ $check['fix'] }}
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="modal-footer border-top d-flex justify-content-between">
+                        <x-ui.button variant="secondary" wire:click="closeHealthModal">Close</x-ui.button>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" wire:click="openPortalModal({{ $healthRouterId }})" class="btn btn-outline-info btn-sm">
+                                <i class="bi bi-qr-code me-1"></i>Preview portal &amp; QR
+                            </button>
+                            @if($healthFailedCount > 0)
+                                <button type="button" wire:click="openFixConfirmation" class="btn btn-warning btn-sm fw-bold">
+                                    <i class="bi bi-magic me-1"></i>Fix automatically
+                                </button>
+                            @else
+                                <span class="badge bg-success-subtle text-success py-2 px-3 fw-semibold">
+                                    <i class="bi bi-check-circle-fill me-1"></i>All checks passing
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- 2. FIX CONFIRMATION MODAL --}}
+    @if($showFixConfirmationModal)
+        <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.7); z-index: 1060;" wire:click.self="closeFixConfirmation" wire:keydown.escape="closeFixConfirmation">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content shadow-lg border-0 rounded-3">
+                    <div class="modal-header border-bottom">
+                        <h5 class="modal-title font-semibold text-slate-800 d-flex align-items-center gap-2">
+                            <i class="bi bi-shield-lock-fill text-orange-500"></i>
+                            Confirm automatic hotspot fix
+                        </h5>
+                        <button type="button" class="btn-close" wire:click="closeFixConfirmation" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="alert alert-info border-info-subtle small mb-3">
+                            <i class="bi bi-shield-check me-1 fw-bold"></i>
+                            <strong>Safety guarantee:</strong> Only Hotspot, DHCP, DNS, and Walled Garden rules on the Hotspot subnet will be updated. Your <strong>WAN port</strong> and <strong>WireGuard VPN connection</strong> are strictly protected and will not be touched.
+                        </div>
+
+                        <div class="fw-semibold text-dark text-sm mb-2">The following actions will be applied to {{ $healthRouterName }}:</div>
+                        <ul class="list-group list-group-flush border rounded-3 mb-3 small">
+                            @forelse($pendingFixes as $pf)
+                                <li class="list-group-item d-flex align-items-start gap-2 py-2">
+                                    <i class="bi bi-check2-circle text-success mt-0.5"></i>
+                                    <div>
+                                        <div class="fw-medium text-dark">{{ $pf['title'] }}</div>
+                                        <div class="text-secondary" style="font-size: 11px;">{{ $pf['action'] }}</div>
+                                    </div>
+                                </li>
+                            @empty
+                                <li class="list-group-item text-muted py-2">All software settings are already correct.</li>
+                            @endforelse
+                            <li class="list-group-item d-flex align-items-start gap-2 py-2">
+                                <i class="bi bi-file-earmark-code text-primary mt-0.5"></i>
+                                <div>
+                                    <div class="fw-medium text-dark">Upload branded captive portal (hotspot/login.html)</div>
+                                    <div class="text-secondary" style="font-size: 11px;">Upload responsive login page with voucher and M-Pesa options.</div>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer border-top">
+                        <x-ui.button variant="secondary" wire:click="closeFixConfirmation">Cancel</x-ui.button>
+                        <button type="button" wire:click="applyAutomaticFix" wire:loading.attr="disabled" class="btn btn-warning fw-bold">
+                            <span wire:loading.remove wire:target="applyAutomaticFix">
+                                <i class="bi bi-check2-circle me-1"></i>Apply safe fixes now
+                            </span>
+                            <span wire:loading wire:target="applyAutomaticFix">
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>Applying fixes...
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- 3. CAPTIVE PORTAL MODAL --}}
+    @if($showPortalModal)
+        <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.6); z-index: 1055;" wire:click.self="closePortalModal" wire:keydown.escape="closePortalModal">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content shadow-lg border-0 rounded-3">
+                    <div class="modal-header border-bottom">
+                        <div>
+                            <h5 class="modal-title font-semibold text-slate-800 d-flex align-items-center gap-2">
+                                <i class="bi bi-qr-code text-orange-500"></i>
+                                Captive portal &mdash; {{ $portalRouterName }}
+                            </h5>
+                            <div class="text-muted small">Live customer portal preview and RouterOS deployment</div>
+                        </div>
+                        <button type="button" class="btn-close" wire:click="closePortalModal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4 text-center">
+                        <div class="mb-3">
+                            <div class="p-3 bg-white border rounded-3 d-inline-block shadow-sm">
+                                <img src="{{ $portalQrUrl }}" alt="Portal QR Code" class="img-fluid" style="width: 200px; height: 200px;" />
+                            </div>
+                        </div>
+                        <div class="fw-semibold text-dark mb-1">Scan with phone camera to test</div>
+                        <div class="text-muted small mb-3">Scan this code directly from your smartphone to experience the exact customer checkout flow before going live.</div>
+
+                        <div class="d-flex justify-content-center gap-2 mb-4">
+                            <a href="{{ $portalPreviewUrl }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-box-arrow-up-right me-1"></i>Open preview in browser
+                            </a>
+                        </div>
+
+                        <div class="border-top pt-3 text-start">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="fw-semibold text-dark text-sm">Push login.html to router</div>
+                                    <div class="text-muted small">Uploads branded template directly to MikroTik storage.</div>
+                                </div>
+                                <button type="button" wire:click="pushCaptivePortal" wire:loading.attr="disabled" class="btn btn-primary btn-sm">
+                                    <span wire:loading.remove wire:target="pushCaptivePortal">
+                                        <i class="bi bi-upload me-1"></i>Push now
+                                    </span>
+                                    <span wire:loading wire:target="pushCaptivePortal">
+                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>Uploading...
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top">
+                        <x-ui.button variant="secondary" wire:click="closePortalModal">Close</x-ui.button>
+                    </div>
                 </div>
             </div>
         </div>

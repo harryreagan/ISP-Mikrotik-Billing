@@ -53,7 +53,7 @@
         $pricingPlans = [
             [
                 'name' => $t['pricing']['starter_name'] ?? 'Starter',
-                'price' => '350',
+                'price' => '$3',
                 'period' => $t['pricing']['per_month'] ?? '/month',
                 'features' => [
                     $t['pricing']['starter_f1'] ?? '2 routers',
@@ -69,7 +69,7 @@
             ],
             [
                 'name' => $t['pricing']['business_name'] ?? 'Business',
-                'price' => '1000',
+                'price' => '$8',
                 'period' => $t['pricing']['per_month'] ?? '/month',
                 'features' => [
                     $t['pricing']['business_f1'] ?? '5 routers',
@@ -1584,6 +1584,25 @@
                         // Extract numeric portion if available for currency conversion
                         $numericStr = preg_replace('/[^\d.]/', '', $rawPrice);
                         $hasNumericPrice = ($numericStr !== '' && is_numeric($numericStr) && floatval($numericStr) > 0);
+                        $baseCurrency = 'USD';
+                        $usdAmount = null;
+
+                        if ($hasNumericPrice) {
+                            $numVal = floatval($numericStr);
+                            if (stripos($rawPrice, 'kes') !== false || stripos($rawPrice, 'ksh') !== false) {
+                                $baseCurrency = 'KES';
+                                $usdAmount = $numVal * 0.0078;
+                            } elseif ($numVal > 50) {
+                                // Large unprefixed number (e.g. 350, 1000) -> assume KES
+                                $baseCurrency = 'KES';
+                                $usdAmount = $numVal * 0.0078;
+                            } else {
+                                // Clean USD amount (e.g. 3, 8, $3, $8, $15)
+                                $baseCurrency = 'USD';
+                                $usdAmount = $numVal;
+                            }
+                        }
+
                         $period = !empty($plan['period']) ? trim((string)$plan['period']) : null;
                         $isPopular = !empty($plan['highlighted']) || !empty($plan['badge']);
                         $badgeText = !empty($plan['badge']) ? $plan['badge'] : ($isPopular ? 'POPULAR' : null);
@@ -1598,7 +1617,7 @@
                         <h3>{{ $pName }}</h3>
                         <div class="p-price">
                             @if($hasNumericPrice)
-                                <span data-price-kes="{{ $numericStr }}">{{ $rawPrice }}</span>
+                                <span data-price-plan data-price-usd="{{ $usdAmount }}" data-price-base-curr="{{ $baseCurrency }}" data-price-raw="{{ $rawPrice }}">{{ $rawPrice }}</span>
                             @else
                                 <span>{{ $rawPrice ?: 'Custom' }}</span>
                             @endif
@@ -1760,11 +1779,33 @@
         return cfg.symbol + rounded.toLocaleString('en-US');
     }
 
+    function formatPlanPrice(usdAmount, currencyCode, rawText, baseCurrency) {
+        if (usdAmount === null || usdAmount === undefined || isNaN(usdAmount) || usdAmount <= 0) {
+            return rawText;
+        }
+        const code = currencyCode && CONFIG.CURRENCIES[currencyCode] ? currencyCode : CONFIG.DEFAULT_CURRENCY;
+        if (baseCurrency && code.toUpperCase() === baseCurrency.toUpperCase()) {
+            return rawText;
+        }
+        const cfg = CONFIG.CURRENCIES[code] || CONFIG.CURRENCIES.USD;
+        const usdRate = (CONFIG.CURRENCIES.USD && CONFIG.CURRENCIES.USD.rate_from_kes) ? CONFIG.CURRENCIES.USD.rate_from_kes : 0.0078;
+        const targetRate = cfg.rate_from_kes || 1;
+        const targetVal = (usdAmount / usdRate) * targetRate;
+        const rounded = targetVal >= 100 ? Math.round(targetVal) : Math.max(1, Math.round(targetVal));
+        return cfg.symbol + rounded.toLocaleString('en-US');
+    }
+
     function applyCurrency(currencyCode) {
         const code = CONFIG.CURRENCIES[currencyCode] ? currencyCode : CONFIG.DEFAULT_CURRENCY;
         document.querySelectorAll('[data-price-kes]').forEach(function (el) {
             const kes = parseFloat(el.getAttribute('data-price-kes') || '0');
             el.textContent = formatPrice(kes, code);
+        });
+        document.querySelectorAll('[data-price-plan]').forEach(function (el) {
+            const usd = parseFloat(el.getAttribute('data-price-usd') || '0');
+            const raw = el.getAttribute('data-price-raw') || '';
+            const baseCurr = el.getAttribute('data-price-base-curr') || 'USD';
+            el.textContent = formatPlanPrice(usd, code, raw, baseCurr);
         });
         const select = document.getElementById('currencySelect');
         if (select && select.value !== code) {

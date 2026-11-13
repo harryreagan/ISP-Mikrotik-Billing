@@ -323,7 +323,11 @@ class DashboardController extends Controller
             }
 
             if (Schema::hasTable('router_lists')) {
-                $legacyRouters = \Illuminate\Support\Facades\DB::table('router_lists')->get();
+                $rlQuery = \Illuminate\Support\Facades\DB::table('router_lists');
+                if (Schema::hasColumn('router_lists', 'tenant_id')) {
+                    $rlQuery->where('tenant_id', $tenantId);
+                }
+                $legacyRouters = $rlQuery->get();
                 foreach ($legacyRouters as $lr) {
                     $lrName = $lr->router_name ?: ('Router #' . $lr->id);
                     if (!isset($systemOverview[$lrName])) {

@@ -1,14 +1,24 @@
 @php
     $smsSettingsUrl = Route::has('admin.sms-gateways') ? route('admin.sms-gateways') : url('/admin/sms-email?tab=gateways');
+    $initialBalance = '0 SMS';
+    $initialStatus = 'ok';
+    $initialProvider = 'Platform Shared Pool';
+    try {
+        $tid = auth()->user()?->tenant_id ?: (session('tenant_id') ?: (session('impersonated_tenant_id') ?: 1));
+        $res = \App\Services\Sms\SmsBalanceService::forTenant($tid ? (int)$tid : 1);
+        $initialBalance = $res['balance_formatted'] ?? '0 SMS';
+        $initialStatus = $res['status'] ?? 'ok';
+        $initialProvider = $res['provider'] ?? 'Platform Shared Pool';
+    } catch (\Throwable $e) {}
 @endphp
 
 <div
     wire:ignore
     x-data="{
-        status: 'ok',
-        provider: null,
-        balanceFormatted: '0 SMS',
-        loaded: false,
+        status: @js($initialStatus),
+        provider: @js($initialProvider),
+        balanceFormatted: @js($initialBalance),
+        loaded: true,
         timer: null,
         settingsUrl: @js($smsSettingsUrl),
         init() {

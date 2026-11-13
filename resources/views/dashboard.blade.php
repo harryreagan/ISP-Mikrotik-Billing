@@ -103,13 +103,13 @@
     </x-ui.card>
     @endif
 
-    {{-- Modern Stat Cards Row --}}
-    <div class="row g-3 mb-4">
+    {{-- Modern Stat Cards Row (2 per row on mobile) --}}
+    <div class="row g-2 g-sm-3 mb-4">
         <!-- Card 1: Active Users -->
-        <div class="col-12 col-sm-6 col-xl-3">
+        <div class="col-6 col-xl-3">
             <x-ui.stat-card :label="__('Active PPPoE users')" :value="($customersData['active'] ?? 0) . ' / ' . ($customersData['total'] ?? 0)" color="purple">
                 <x-slot:icon><i class="bi bi-people-fill"></i></x-slot:icon>
-                <div class="d-flex justify-content-between align-items-center w-100">
+                <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
                     <span><i class="bi bi-person-plus-fill me-1"></i>{{ $customersData['recent'] ?? 0 }} {{ __('New this month') }}</span>
                     <span><i class="bi bi-x-circle me-1"></i>{{ __('Inactive') }}</span>
                 </div>
@@ -117,10 +117,10 @@
         </div>
 
         <!-- Card 2: Today PPPoE Collection -->
-        <div class="col-12 col-sm-6 col-xl-3">
+        <div class="col-6 col-xl-3">
             <x-ui.stat-card :label="__('Today\'s PPPoE sales')" :value="'KES ' . number_format($billInformationData['today_paid_amount'] ?? 0, 0)" color="blue">
                 <x-slot:icon><i class="bi bi-wallet2"></i></x-slot:icon>
-                <div class="d-flex justify-content-between align-items-center w-100">
+                <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
                     <span><i class="bi bi-calendar3 me-1"></i>{{ __('Total mo:') }} KES {{ number_format($billInformationData['paid_amount'] ?? 0, 0) }}</span>
                     <span><i class="bi bi-arrow-up-right me-1"></i>{{ __('PPPoE only') }}</span>
                 </div>
@@ -128,10 +128,10 @@
         </div>
 
         <!-- Card 3: Today Hotspot Sales -->
-        <div class="col-12 col-sm-6 col-xl-3">
+        <div class="col-6 col-xl-3">
             <x-ui.stat-card :label="__('Today\'s hotspot sales')" :value="'KES ' . number_format($billInformationData['hotspot_today'] ?? 0, 0)" color="orange">
                 <x-slot:icon><i class="bi bi-wifi"></i></x-slot:icon>
-                <div class="d-flex justify-content-between align-items-center w-100">
+                <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
                     <span><i class="bi bi-calendar3 me-1"></i>{{ __('Total mo:') }} KES {{ number_format($billInformationData['hotspot_total'] ?? 0, 0) }}</span>
                     <span><i class="bi bi-arrow-up-right me-1"></i>{{ __('Hotspot only') }}</span>
                 </div>
@@ -139,10 +139,10 @@
         </div>
 
         <!-- Card 4: Total Revenue YTD -->
-        <div class="col-12 col-sm-6 col-xl-3">
+        <div class="col-6 col-xl-3">
             <x-ui.stat-card :label="__('Total global revenue')" :value="'KES ' . number_format(($billInformationData['paid_amount'] ?? 0) + ($billInformationData['hotspot_total'] ?? 0), 0)" color="green">
                 <x-slot:icon><i class="bi bi-graph-up-arrow"></i></x-slot:icon>
-                <div class="d-flex justify-content-between align-items-center w-100">
+                <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
                     <span><i class="bi bi-exclamation-triangle-fill me-1"></i>{{ __('Pending due:') }} KES {{ number_format($billInformationData['due_amount'] ?? 0, 0) }}</span>
                     <span>{{ __('Total arrears') }}</span>
                 </div>
@@ -150,13 +150,13 @@
         </div>
     </div>
 
-    {{-- Reseller Overview Stat Cards Row --}}
-    <div class="row g-3 mb-4">
+    {{-- Reseller Overview Stat Cards Row (2 per row on mobile) --}}
+    <div class="row g-2 g-sm-3 mb-4">
         <!-- Card 1: Total Resellers -->
-        <div class="col-12 col-sm-6 col-xl-3">
+        <div class="col-6 col-xl-3">
             <x-ui.stat-card :label="__('Total resellers')" :value="$resellerData['total_resellers'] ?? 0" color="navy">
                 <x-slot:icon><i class="bi bi-people"></i></x-slot:icon>
-                <div class="d-flex justify-content-between align-items-center w-100">
+                <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
                     <span>{{ __('Active:') }} <strong>{{ $resellerData['active_resellers'] ?? 0 }}</strong></span>
                     <span>{{ __('Suspended:') }} <strong>{{ $resellerData['suspended_resellers'] ?? 0 }}</strong></span>
                 </div>
@@ -164,10 +164,10 @@
         </div>
 
         <!-- Card 2: Reseller Customers -->
-        <div class="col-12 col-sm-6 col-xl-3">
+        <div class="col-6 col-xl-3">
             <x-ui.stat-card :label="__('Reseller customers')" :value="$resellerData['total_customers'] ?? 0" color="purple">
                 <x-slot:icon><i class="bi bi-person-check"></i></x-slot:icon>
-                <div class="d-flex justify-content-between align-items-center w-100">
+                <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
                     <span>{{ __('Active:') }} <strong>{{ $resellerData['active_customers'] ?? 0 }}</strong></span>
                     <span>{{ __('Pending:') }} <strong>{{ $resellerData['pending_customers'] ?? 0 }}</strong></span>
                 </div>
@@ -175,14 +175,14 @@
         </div>
 
         <!-- Card 3: Total Reseller Balance -->
-        <div class="col-12 col-sm-6 col-xl-3">
+        <div class="col-6 col-xl-3">
             <x-ui.stat-card :label="__('Wallet balances')" :value="'KES ' . number_format($resellerData['total_balance'] ?? 0, 2)" :sub="__('Cumulative reseller wallet balance.')" color="blue">
                 <x-slot:icon><i class="bi bi-cash-stack"></i></x-slot:icon>
             </x-ui.stat-card>
         </div>
 
         <!-- Card 4: Total Reseller Commission -->
-        <div class="col-12 col-sm-6 col-xl-3">
+        <div class="col-6 col-xl-3">
             <x-ui.stat-card :label="__('Total commissions')" :value="'KES ' . number_format($resellerData['total_commission'] ?? 0, 2)" :sub="__('Total reseller commission awarded.')" color="pink">
                 <x-slot:icon><i class="bi bi-percent"></i></x-slot:icon>
             </x-ui.stat-card>
