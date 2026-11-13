@@ -23,66 +23,65 @@
         $topBrandName = reset($cands) ?: ($tName ?: ($u->name ?: 'HSmart'));
     }
 @endphp
-<nav class="navbar navbar-light navbar-glass navbar-top navbar-expand-lg" style="display: none;">
-    <button class="btn navbar-toggler-humburger-icon navbar-toggler me-1 me-sm-2 d-xl-none" type="button" data-bs-toggle="collapse" data-bs-target="#navbarVerticalCollapse" aria-controls="navbarVerticalCollapse" aria-expanded="false" aria-label="Toggle menu" style="width: 40px; height: 40px; display: inline-grid; place-items: center; border-radius: 8px; flex-shrink: 0;">
-        <span class="navbar-toggle-icon">
-            <span class="toggle-line"></span>
-        </span>
-    </button>
-    <!-- Breadcrumb on Left -->
-    <div class="d-none d-md-flex align-items-center me-3 text-truncate" style="max-width: 320px;">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb mb-0 py-0 align-items-center" style="font-size: 0.8125rem; font-weight: 500;">
-                <li class="breadcrumb-item d-flex align-items-center text-truncate">
-                    <a href="{{ route('dashboard') }}" class="text-secondary text-decoration-none d-flex align-items-center gap-1 text-truncate" style="color: #64748b;">
-                        <span class="bi bi-house-door-fill" style="color: #94a3b8; font-size: 13px;"></span>
-                        <span class="text-truncate">{{ $topBrandName }}</span>
-                    </a>
-                </li>
-                <li class="breadcrumb-item active text-dark fw-bold text-truncate" aria-current="page" style="color: #0f172a;">
-                    {{ $header ?? __('Dashboard') }}
-                </li>
-            </ol>
-        </nav>
-    </div>
-    <a class="navbar-brand me-1 me-sm-2 d-md-none text-truncate" href="{{ route('dashboard') }}">
-        <div class="d-flex align-items-center">
-            <span class="font-sans-serif fw-bold text-truncate" style="color: #F57C00;">{{ $topBrandName }}</span>
+
+<nav class="navbar navbar-light navbar-glass navbar-top navbar-expand-lg d-flex align-items-center justify-content-between gap-2 w-100 min-w-0" style="display: none;">
+    <div class="d-flex align-items-center gap-2 min-w-0">
+        <!-- Hamburger on Mobile / Tablet -->
+        <button class="btn navbar-toggler-humburger-icon navbar-toggler p-0 d-xl-none border-0" type="button" id="mobileMenuToggleBtn" aria-label="Toggle navigation" style="width: 38px; height: 38px; display: inline-grid; place-items: center; border-radius: 8px; flex-shrink: 0; background: transparent;">
+            <span class="navbar-toggle-icon">
+                <span class="toggle-line"></span>
+            </span>
+        </button>
+
+        <!-- Brand Title: Hidden on screens < md, small & truncated on md+ -->
+        <div class="d-none d-md-flex align-items-center text-truncate me-2" style="max-width: 220px;">
+            <a href="{{ route('dashboard') }}" class="text-decoration-none text-truncate d-flex align-items-center gap-1.5" style="max-width: 220px;">
+                <span class="fw-semibold text-truncate" style="font-size: 0.875rem; color: #0f172a; max-width: 220px;">{{ $topBrandName }}</span>
+            </a>
         </div>
-    </a>
-    <div class="collapse navbar-collapse scrollbar" id="navbarStandard">
-        @include('layouts.partials.searchbar')
+
+        <!-- Breadcrumb on md+ screens -->
+        <div class="d-none d-lg-flex align-items-center text-truncate" style="max-width: 280px;">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0 py-0 align-items-center" style="font-size: 0.8125rem; font-weight: 500;">
+                    <li class="breadcrumb-item d-flex align-items-center text-truncate">
+                        <a href="{{ route('dashboard') }}" class="text-secondary text-decoration-none d-flex align-items-center gap-1 text-truncate" style="color: #64748b;">
+                            <span class="bi bi-house-door-fill" style="color: #94a3b8; font-size: 13px;"></span>
+                        </a>
+                    </li>
+                    <li class="breadcrumb-item active text-dark fw-bold text-truncate" aria-current="page" style="color: #0f172a;">
+                        {{ $header ?? __('Dashboard') }}
+                    </li>
+                </ol>
+            </nav>
+        </div>
     </div>
-    @include('layouts.partials.userpanel')
+
+    <!-- Right Side Toolbar: Search & User Controls -->
+    <div class="d-flex align-items-center gap-1 ms-auto flex-shrink-0">
+        <div class="collapse navbar-collapse scrollbar d-none d-md-block" id="navbarStandard">
+            @include('layouts.partials.searchbar')
+        </div>
+        @include('layouts.partials.userpanel')
+    </div>
 </nav>
 
-<nav class="navbar navbar-light navbar-glass navbar-top navbar-expand-lg" style="display: none;" data-move-target="#navbarVerticalNav" data-navbar-top="combo">
-    <button class="btn navbar-toggler-humburger-icon navbar-toggler me-1 me-sm-2 d-xl-none" type="button" data-bs-toggle="collapse" data-bs-target="#navbarVerticalCollapse" aria-controls="navbarVerticalCollapse" aria-expanded="false" aria-label="Toggle menu" style="width: 40px; height: 40px; display: inline-grid; place-items: center; border-radius: 8px; flex-shrink: 0;">
-        <span class="navbar-toggle-icon">
-            <span class="toggle-line"></span>
-        </span>
-    </button>
-    <!-- Breadcrumb on Left -->
-    <div class="d-none d-md-flex align-items-center me-3 text-truncate" style="max-width: 320px;">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb mb-0 py-0 align-items-center" style="font-size: 0.8125rem; font-weight: 500;">
-                <li class="breadcrumb-item d-flex align-items-center text-truncate">
-                    <a href="{{ route('dashboard') }}" class="text-secondary text-decoration-none d-flex align-items-center gap-1 text-truncate" style="color: #64748b;">
-                        <span class="bi bi-house-door-fill" style="color: #94a3b8; font-size: 13px;"></span>
-                        <span class="text-truncate">{{ $topBrandName }}</span>
-                    </a>
-                </li>
-                <li class="breadcrumb-item active text-dark fw-bold text-truncate" aria-current="page" style="color: #0f172a;">
-                    {{ $header ?? __('Dashboard') }}
-                </li>
-            </ol>
-        </nav>
-    </div>
-    <a class="navbar-brand me-1 me-sm-2 d-md-none text-truncate" href="{{ route('dashboard') }}">
-        <div class="d-flex align-items-center">
-            <span class="font-sans-serif fw-bold text-truncate" style="color: #F57C00;">{{ $topBrandName }}</span>
+<nav class="navbar navbar-light navbar-glass navbar-top navbar-expand-lg d-flex align-items-center justify-content-between gap-2 w-100 min-w-0" style="display: none;" data-move-target="#navbarVerticalNav" data-navbar-top="combo">
+    <div class="d-flex align-items-center gap-2 min-w-0">
+        <button class="btn navbar-toggler-humburger-icon navbar-toggler p-0 d-xl-none border-0" type="button" id="mobileMenuToggleBtnCombo" aria-label="Toggle navigation" style="width: 38px; height: 38px; display: inline-grid; place-items: center; border-radius: 8px; flex-shrink: 0; background: transparent;">
+            <span class="navbar-toggle-icon">
+                <span class="toggle-line"></span>
+            </span>
+        </button>
+
+        <div class="d-none d-md-flex align-items-center text-truncate me-2" style="max-width: 220px;">
+            <a href="{{ route('dashboard') }}" class="text-decoration-none text-truncate d-flex align-items-center gap-1.5" style="max-width: 220px;">
+                <span class="fw-semibold text-truncate" style="font-size: 0.875rem; color: #0f172a; max-width: 220px;">{{ $topBrandName }}</span>
+            </a>
         </div>
-    </a>
-    @include('layouts.partials.navpanel')
-    @include('layouts.partials.userpanel')
+    </div>
+    <div class="d-flex align-items-center gap-1 ms-auto flex-shrink-0">
+        @include('layouts.partials.navpanel')
+        @include('layouts.partials.userpanel')
+    </div>
 </nav>

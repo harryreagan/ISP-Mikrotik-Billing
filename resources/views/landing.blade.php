@@ -9,9 +9,13 @@
     $whatsappNumber = $landingConfig['whatsapp_number'] ?? '254743606108';
     $whatsappPlaceholder = $landingConfig['whatsapp_display_placeholder'] ?? '[YOUR NUMBER]';
     $supportEmail = $landingConfig['support_email'] ?? 'support@hsmart.co.ke';
-    $defaultCurrency = $landingConfig['default_currency'] ?? 'USD';
-    $currencies = $landingConfig['currencies'] ?? [];
-    $plansBaseKes = $landingConfig['plans_base_kes'] ?? ['starter' => 350, 'business' => 1000, 'enterprise' => null];
+
+    // Currency Detection via Cloudflare CF-IPCountry, Accept-Language, or Cookie (Default: KES)
+    $detectedCurrency = \App\Services\Currency\CurrencyDetector::detect(request());
+    $currencies = \App\Services\Currency\CurrencyDetector::getRates();
+    $defaultCurrency = $detectedCurrency;
+
+    $plansBaseKes = $landingConfig['plans_base_kes'] ?? ['starter' => 400, 'business' => 1000, 'enterprise' => null];
     $previewBaseKes = $landingConfig['preview_base_kes'] ?? [
         'pppoe_today' => 12400,
         'hotspot_today' => 6850,
@@ -26,18 +30,32 @@
     $termsUrl = Route::has('terms.show') ? route('terms.show') : '#terms';
     $whatsAppUrl = 'https://wa.me/' . preg_replace('/\D/', '', $whatsappNumber) . '?text=' . urlencode("Hello {$brandName}, I would like to learn more.");
 
-    // Query pricing plans and faqs dynamically from main_site_data (Super Admin ISP Hub updates)
-    $pricingPlans = null;
+    // Query platform subscription plans from database (Plan model)
+    $pricingPlans = [];
     $landingFaqs = null;
     try {
-        if (\Illuminate\Support\Facades\Schema::hasTable('main_site_data')) {
-            $rawPlans = \Illuminate\Support\Facades\DB::table('main_site_data')->where('type', 'pricing_plans')->value('value');
-            if ($rawPlans) {
-                $decodedPlans = json_decode($rawPlans, true);
-                if (is_array($decodedPlans) && !empty($decodedPlans)) {
-                    $pricingPlans = $decodedPlans;
+        if (\Illuminate\Support\Facades\Schema::hasTable('platform_plans')) {
+            $pricingPlans = \App\Models\Plan::active()->get()->toArray();
+        }
+    } catch (\Throwable $e) {}
+
+    // Backwards-compatible fallback to main_site_data if platform_plans is empty
+    if (empty($pricingPlans)) {
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('main_site_data')) {
+                $rawPlans = \Illuminate\Support\Facades\DB::table('main_site_data')->where('type', 'pricing_plans')->value('value');
+                if ($rawPlans) {
+                    $decodedPlans = json_decode($rawPlans, true);
+                    if (is_array($decodedPlans) && !empty($decodedPlans)) {
+                        $pricingPlans = $decodedPlans;
+                    }
                 }
             }
+        } catch (\Throwable $e) {}
+    }
+
+    try {
+        if (\Illuminate\Support\Facades\Schema::hasTable('main_site_data')) {
             $rawFaqs = \Illuminate\Support\Facades\DB::table('main_site_data')->where('type', 'landing_faqs')->value('value');
             if ($rawFaqs) {
                 $decodedFaqs = json_decode($rawFaqs, true);
@@ -48,55 +66,62 @@
         }
     } catch (\Throwable $e) {}
 
-    // Sensible fallback if main_site_data has not been seeded yet
-    if (!$pricingPlans) {
+    // Sensible base fallback if database has not been seeded yet
+    if (empty($pricingPlans)) {
         $pricingPlans = [
             [
-                'name' => $t['pricing']['starter_name'] ?? 'Starter',
-                'price' => '$3',
-                'period' => $t['pricing']['per_month'] ?? '/month',
+                'slug' => 'starter',
+                'name' => 'Starter',
+                'base_price_kes' => 400,
+                'router_limit' => 2,
+                'customer_limit' => 150,
                 'features' => [
-                    $t['pricing']['starter_f1'] ?? '2 routers',
-                    $t['pricing']['starter_f2'] ?? '150 customers',
-                    $t['pricing']['starter_f3'] ?? 'Mobile money, cards & bank',
-                    $t['pricing']['starter_f4'] ?? 'SMS, WhatsApp & email alerts',
-                    $t['pricing']['starter_f5'] ?? 'Unlimited admin users',
+                    '2 routers',
+                    '150 customers',
+                    'Mobile money, cards & bank',
+                    'SMS, WhatsApp & email alerts',
+                    'Unlimited admin users',
                 ],
-                'button_text' => $t['pricing']['starter_cta'] ?? 'Choose Starter',
+                'is_popular' => false,
+                'badge' => null,
+                'button_text' => 'Choose Starter',
                 'button_url' => $registerUrl . '?plan=starter',
-                'highlighted' => false,
-                'badge' => null,
             ],
             [
-                'name' => $t['pricing']['business_name'] ?? 'Business',
-                'price' => '$8',
-                'period' => $t['pricing']['per_month'] ?? '/month',
+                'slug' => 'business',
+                'name' => 'Business',
+                'base_price_kes' => 1000,
+                'router_limit' => 5,
+                'customer_limit' => 500,
                 'features' => [
-                    $t['pricing']['business_f1'] ?? '5 routers',
-                    $t['pricing']['business_f2'] ?? '500 customers',
-                    $t['pricing']['business_f3'] ?? 'Resellers and vouchers',
-                    $t['pricing']['business_f4'] ?? 'SMS, WhatsApp & email alerts',
-                    $t['pricing']['business_f5'] ?? 'Unlimited admin users',
+                    '5 routers',
+                    '500 customers',
+                    'Resellers and vouchers',
+                    'SMS, WhatsApp & email alerts',
+                    'Unlimited admin users',
                 ],
-                'button_text' => $t['pricing']['business_cta'] ?? 'Choose Business',
+                'is_popular' => true,
+                'badge' => 'POPULAR',
+                'button_text' => 'Choose Business',
                 'button_url' => $registerUrl . '?plan=business',
-                'highlighted' => true,
-                'badge' => $t['pricing']['popular'] ?? 'POPULAR',
             ],
             [
-                'name' => $t['pricing']['enterprise_name'] ?? 'Enterprise',
-                'price' => $t['pricing']['custom'] ?? 'Custom',
-                'period' => null,
+                'slug' => 'enterprise',
+                'name' => 'Enterprise',
+                'base_price_kes' => null,
+                'router_limit' => null,
+                'customer_limit' => null,
                 'features' => [
-                    $t['pricing']['enterprise_f1'] ?? 'Unlimited routers',
-                    $t['pricing']['enterprise_f2'] ?? 'Custom branding',
-                    $t['pricing']['enterprise_f3'] ?? 'Priority support',
-                    $t['pricing']['enterprise_f4'] ?? 'Onboarding help',
+                    'Unlimited routers',
+                    'Unlimited customers',
+                    'Dedicated server / VPS',
+                    'Custom captive portal branding',
+                    '24/7 Priority SLA support',
                 ],
-                'button_text' => $t['pricing']['enterprise_cta'] ?? 'Talk to us',
-                'button_url' => $whatsAppUrl,
-                'highlighted' => false,
+                'is_popular' => false,
                 'badge' => null,
+                'button_text' => 'Talk to us',
+                'button_url' => $whatsAppUrl,
             ],
         ];
     }
@@ -1580,34 +1605,17 @@
                 @foreach($pricingPlans as $plan)
                     @php
                         $pName = $plan['name'] ?? 'Plan';
-                        $rawPrice = trim((string)($plan['price'] ?? ''));
-                        // Extract numeric portion if available for currency conversion
-                        $numericStr = preg_replace('/[^\d.]/', '', $rawPrice);
-                        $hasNumericPrice = ($numericStr !== '' && is_numeric($numericStr) && floatval($numericStr) > 0);
-                        $baseCurrency = 'USD';
-                        $usdAmount = null;
-
-                        if ($hasNumericPrice) {
-                            $numVal = floatval($numericStr);
-                            if (stripos($rawPrice, 'kes') !== false || stripos($rawPrice, 'ksh') !== false) {
-                                $baseCurrency = 'KES';
-                                $usdAmount = $numVal * 0.0078;
-                            } elseif ($numVal > 50) {
-                                // Large unprefixed number (e.g. 350, 1000) -> assume KES
-                                $baseCurrency = 'KES';
-                                $usdAmount = $numVal * 0.0078;
-                            } else {
-                                // Clean USD amount (e.g. 3, 8, $3, $8, $15)
-                                $baseCurrency = 'USD';
-                                $usdAmount = $numVal;
-                            }
+                        $basePriceKes = null;
+                        if (array_key_exists('base_price_kes', $plan) && $plan['base_price_kes'] !== null && $plan['base_price_kes'] !== '') {
+                            $basePriceKes = (int) $plan['base_price_kes'];
+                        } elseif (isset($plan['price']) && is_numeric($plan['price'])) {
+                            $basePriceKes = (int) $plan['price'];
                         }
-
-                        $period = !empty($plan['period']) ? trim((string)$plan['period']) : null;
-                        $isPopular = !empty($plan['highlighted']) || !empty($plan['badge']);
+                        $isCustom = ($basePriceKes === null);
+                        $isPopular = !empty($plan['is_popular']) || !empty($plan['highlighted']) || !empty($plan['badge']);
                         $badgeText = !empty($plan['badge']) ? $plan['badge'] : ($isPopular ? 'POPULAR' : null);
-                        $btnUrl = !empty($plan['button_url']) ? $plan['button_url'] : $registerUrl;
-                        $btnText = !empty($plan['button_text']) ? $plan['button_text'] : 'Get Started';
+                        $btnUrl = !empty($plan['button_url']) ? $plan['button_url'] : ($isCustom ? $whatsAppUrl : ($registerUrl . '?plan=' . ($plan['slug'] ?? 'starter')));
+                        $btnText = !empty($plan['button_text']) ? $plan['button_text'] : ($isCustom ? 'Talk to us' : 'Choose Plan');
                         $features = is_array($plan['features'] ?? null) ? $plan['features'] : [];
                     @endphp
                     <div class="p-card {{ $isPopular ? 'popular' : '' }}">
@@ -1616,13 +1624,11 @@
                         @endif
                         <h3>{{ $pName }}</h3>
                         <div class="p-price">
-                            @if($hasNumericPrice)
-                                <span data-price-plan data-price-usd="{{ $usdAmount }}" data-price-base-curr="{{ $baseCurrency }}" data-price-raw="{{ $rawPrice }}">{{ $rawPrice }}</span>
+                            @if(!$isCustom)
+                                <span data-price-plan data-price-kes="{{ $basePriceKes }}">KES {{ number_format($basePriceKes) }}</span>
+                                <small>/month</small>
                             @else
-                                <span>{{ $rawPrice ?: 'Custom' }}</span>
-                            @endif
-                            @if($period)
-                                <small>{{ $period }}</small>
+                                <span>Custom</span>
                             @endif
                         </div>
                         @if(!empty($features))
@@ -1645,6 +1651,10 @@
                     </div>
                 @endforeach
             </div>
+
+            <p id="approxBilledNote" class="text-center mt-3" style="display: {{ $defaultCurrency !== 'KES' ? 'block' : 'none' }}; font-size: 0.8125rem; color: #64748b; margin-top: 0.75rem; text-align: center;">
+                Approximate. You are billed in KES.
+            </p>
 
             <p class="pricing-note" data-i18n="pricing.note">{{ $t['pricing']['note'] }}</p>
         </section>
@@ -1772,46 +1782,62 @@
     };
 
     function formatPrice(amountInKes, currencyCode) {
-        const code = currencyCode && CONFIG.CURRENCIES[currencyCode] ? currencyCode : CONFIG.DEFAULT_CURRENCY;
-        const cfg = CONFIG.CURRENCIES[code];
-        const raw = Number(amountInKes) * Number(cfg.rate_from_kes || 1);
-        const rounded = raw >= 100 ? Math.round(raw) : Math.max(1, Math.round(raw));
-        return cfg.symbol + rounded.toLocaleString('en-US');
+        const code = (currencyCode && CONFIG.CURRENCIES[currencyCode]) ? currencyCode : CONFIG.DEFAULT_CURRENCY;
+        const cfg = CONFIG.CURRENCIES[code] || CONFIG.CURRENCIES.KES;
+        const rate = Number(cfg.rate_from_kes || 1);
+        const converted = Math.round(Number(amountInKes) * rate);
+        try {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: code,
+                maximumFractionDigits: 0
+            }).format(converted);
+        } catch (e) {
+            return code + ' ' + converted.toLocaleString('en-US');
+        }
     }
 
-    function formatPlanPrice(usdAmount, currencyCode, rawText, baseCurrency) {
-        if (usdAmount === null || usdAmount === undefined || isNaN(usdAmount) || usdAmount <= 0) {
-            return rawText;
+    function formatPlanPrice(kesAmount, currencyCode) {
+        if (kesAmount === null || kesAmount === undefined || isNaN(kesAmount) || kesAmount <= 0) {
+            return 'Custom';
         }
-        const code = currencyCode && CONFIG.CURRENCIES[currencyCode] ? currencyCode : CONFIG.DEFAULT_CURRENCY;
-        if (baseCurrency && code.toUpperCase() === baseCurrency.toUpperCase()) {
-            return rawText;
+        const code = (currencyCode && CONFIG.CURRENCIES[currencyCode]) ? currencyCode : CONFIG.DEFAULT_CURRENCY;
+        const cfg = CONFIG.CURRENCIES[code] || CONFIG.CURRENCIES.KES;
+        const rate = Number(cfg.rate_from_kes || 1);
+        const converted = Math.round(Number(kesAmount) * rate);
+        try {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: code,
+                maximumFractionDigits: 0
+            }).format(converted);
+        } catch (e) {
+            return code + ' ' + converted.toLocaleString('en-US');
         }
-        const cfg = CONFIG.CURRENCIES[code] || CONFIG.CURRENCIES.USD;
-        const usdRate = (CONFIG.CURRENCIES.USD && CONFIG.CURRENCIES.USD.rate_from_kes) ? CONFIG.CURRENCIES.USD.rate_from_kes : 0.0078;
-        const targetRate = cfg.rate_from_kes || 1;
-        const targetVal = (usdAmount / usdRate) * targetRate;
-        const rounded = targetVal >= 100 ? Math.round(targetVal) : Math.max(1, Math.round(targetVal));
-        return cfg.symbol + rounded.toLocaleString('en-US');
     }
 
     function applyCurrency(currencyCode) {
-        const code = CONFIG.CURRENCIES[currencyCode] ? currencyCode : CONFIG.DEFAULT_CURRENCY;
+        const code = (currencyCode && CONFIG.CURRENCIES[currencyCode]) ? currencyCode : CONFIG.DEFAULT_CURRENCY;
         document.querySelectorAll('[data-price-kes]').forEach(function (el) {
             const kes = parseFloat(el.getAttribute('data-price-kes') || '0');
             el.textContent = formatPrice(kes, code);
         });
         document.querySelectorAll('[data-price-plan]').forEach(function (el) {
-            const usd = parseFloat(el.getAttribute('data-price-usd') || '0');
-            const raw = el.getAttribute('data-price-raw') || '';
-            const baseCurr = el.getAttribute('data-price-base-curr') || 'USD';
-            el.textContent = formatPlanPrice(usd, code, raw, baseCurr);
+            const kes = parseFloat(el.getAttribute('data-price-kes') || '0');
+            el.textContent = formatPlanPrice(kes, code);
         });
+
+        const noteEl = document.getElementById('approxBilledNote');
+        if (noteEl) {
+            noteEl.style.display = (code !== 'KES') ? 'block' : 'none';
+        }
+
         const select = document.getElementById('currencySelect');
         if (select && select.value !== code) {
             select.value = code;
         }
         try {
+            document.cookie = "hsmart_currency=" + encodeURIComponent(code) + ";path=/;max-age=" + (30 * 86400) + ";SameSite=Lax";
             localStorage.setItem('hsmart_landing_currency', code);
         } catch (e) {}
     }
@@ -1884,11 +1910,13 @@
         });
     });
 
-    // Initialize saved preferences or defaults
+    // Initialize saved preferences or defaults (prioritize cookie)
     let initialCurrency = CONFIG.DEFAULT_CURRENCY;
     let initialLang = @json($locale);
     try {
-        const savedCurr = localStorage.getItem('hsmart_landing_currency');
+        const cookieMatch = document.cookie.match(/(?:^|; )hsmart_currency=([^;]*)/);
+        const cookieCurr = cookieMatch ? decodeURIComponent(cookieMatch[1]) : null;
+        const savedCurr = (cookieCurr && CONFIG.CURRENCIES[cookieCurr]) ? cookieCurr : localStorage.getItem('hsmart_landing_currency');
         if (savedCurr && CONFIG.CURRENCIES[savedCurr]) {
             initialCurrency = savedCurr;
         }

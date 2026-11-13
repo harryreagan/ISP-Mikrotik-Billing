@@ -16,12 +16,11 @@ return [
     'whatsapp_display_placeholder' => '[YOUR NUMBER]',
     'support_email' => env('LANDING_SUPPORT_EMAIL', 'support@hsmart.co.ke'),
 
-    'default_currency' => 'USD',
+    'default_currency' => 'KES',
 
-    // Base monthly plan prices in KES (existing numbers preserved: Starter = KES 350, Business = KES 1000)
-    // Converted cleanly via currency table below so existing numbers stay exact in KES and scale globally.
+    // Base monthly plan prices in KES: Starter = KES 400, Business = KES 1,000, Enterprise = null
     'plans_base_kes' => [
-        'starter' => 350,
+        'starter' => 400,
         'business' => 1000,
         'enterprise' => null, // Custom
     ],

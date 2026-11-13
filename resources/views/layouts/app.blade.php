@@ -370,40 +370,18 @@
         }
 
         @media (max-width: 1199.98px) {
-            /* Mobile drawer: completely hidden and removed from layout when closed */
-            .navbar-vertical:not(.navbar-vertical-mobile-open) {
+            /* Desktop sidebar is strictly hidden below 1200px so it never leaks layout width */
+            .navbar-vertical {
                 display: none !important;
                 visibility: hidden !important;
                 width: 0 !important;
                 min-width: 0 !important;
                 max-width: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
                 position: fixed !important;
                 left: -9999px !important;
                 pointer-events: none !important;
-            }
-
-            .navbar-vertical.navbar-vertical-mobile-open {
-                display: flex !important;
-                visibility: visible !important;
-                flex-direction: column !important;
-                position: fixed !important;
-                top: 0 !important;
-                bottom: 0 !important;
-                left: 0 !important;
-                width: 280px !important;
-                min-width: 280px !important;
-                max-width: 85vw !important;
-                z-index: 1060 !important;
-                background: #ffffff !important;
-                box-shadow: 4px 0 24px rgba(15, 23, 42, 0.25) !important;
-                border-right: 1px solid var(--border-ring) !important;
-                pointer-events: auto !important;
-            }
-
-            .navbar-vertical.navbar-vertical-mobile-open #navbarVerticalCollapse {
-                display: block !important;
-                flex: 1 1 auto !important;
-                overflow-y: auto !important;
             }
 
             .content,
@@ -414,16 +392,63 @@
                 max-width: 100vw !important;
                 overflow-x: hidden !important;
             }
+        }
 
-            .navbar-vertical-backdrop {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100vw;
-                height: 100vh;
-                background: rgba(15, 23, 42, 0.45);
-                backdrop-filter: blur(2px);
-                z-index: 1055;
+        /* Mobile Drawer & Backdrop (< 1200px) */
+        .mobile-drawer-backdrop {
+            position: fixed !important;
+            inset: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background-color: rgba(15, 23, 42, 0.4) !important; /* bg-slate-900/40 without heavy blur */
+            z-index: 1050 !important;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+            pointer-events: none;
+        }
+
+        .mobile-drawer-backdrop.is-active {
+            display: block !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+
+        .mobile-sidebar-drawer {
+            position: fixed !important;
+            top: 0 !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            width: 18rem !important; /* w-72 */
+            max-width: 85vw !important; /* max-w-[85vw] */
+            height: 100vh !important;
+            background-color: #ffffff !important;
+            z-index: 1055 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            transform: translateX(-100%) !important;
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease !important;
+            box-shadow: none !important;
+            border-right: 1px solid #e2e8f0 !important;
+        }
+
+        html.dark .mobile-sidebar-drawer,
+        html.dark .mobile-sidebar-drawer .mobile-drawer-header,
+        html.dark .mobile-sidebar-drawer .mobile-drawer-body {
+            background-color: #1e293b !important;
+            border-right-color: #334155 !important;
+        }
+
+        .mobile-sidebar-drawer.is-open {
+            display: flex !important;
+            transform: translateX(0) !important;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+        }
+
+        @media (min-width: 1200px) {
+            .mobile-drawer-backdrop,
+            .mobile-sidebar-drawer {
+                display: none !important;
+                pointer-events: none !important;
             }
         }
 
@@ -932,67 +957,72 @@
             }
         }
 
-        function setupMobileNavbar() {
-            const collapseEl = document.getElementById('navbarVerticalCollapse');
-            const navVertical = document.querySelector('.navbar-vertical');
-            if (!navVertical) return;
+        function initMobileDrawer() {
+            const drawer = document.getElementById('mobileSidebarDrawer');
+            const backdrop = document.getElementById('mobileDrawerBackdrop');
+            if (!drawer || !backdrop) return;
 
-            let backdrop = document.querySelector('.navbar-vertical-backdrop');
+            function openDrawer() {
+                if (window.innerWidth >= 1200) return;
+                backdrop.style.display = 'block';
+                drawer.style.display = 'flex';
+                void drawer.offsetHeight; // force reflow
+                backdrop.classList.add('is-active');
+                drawer.classList.add('is-open');
+                document.body.style.overflow = 'hidden';
+            }
 
-            function showNav() {
-                if (window.innerWidth < 1200) {
-                    navVertical.classList.add('navbar-vertical-mobile-open');
-                    if (collapseEl) collapseEl.classList.add('show');
-                    if (!backdrop) {
-                        backdrop = document.createElement('div');
-                        backdrop.className = 'navbar-vertical-backdrop';
-                        backdrop.addEventListener('click', hideNav); 
-                        document.body.appendChild(backdrop);
+            function closeDrawer() {
+                backdrop.classList.remove('is-active');
+                drawer.classList.remove('is-open');
+                document.body.style.overflow = '';
+                setTimeout(function () {
+                    if (!drawer.classList.contains('is-open')) {
+                        backdrop.style.display = 'none';
+                        drawer.style.display = 'none';
                     }
-                }
+                }, 260);
             }
 
-            function hideNav() {
-                navVertical.classList.remove('navbar-vertical-mobile-open');
-                if (collapseEl) collapseEl.classList.remove('show');
-                if (typeof bootstrap !== 'undefined' && bootstrap.Collapse && collapseEl) {
-                    const bsCollapse = bootstrap.Collapse.getInstance(collapseEl);
-                    if (bsCollapse) bsCollapse.hide();
-                }
-                if (backdrop) {
-                    backdrop.remove();
-                    backdrop = null;
-                }
-            }
-
-            if (collapseEl) {
-                collapseEl.removeEventListener('show.bs.collapse', showNav);
-                collapseEl.removeEventListener('hide.bs.collapse', hideNav);
-                collapseEl.addEventListener('show.bs.collapse', showNav);
-                collapseEl.addEventListener('hide.bs.collapse', hideNav);
-            }
-
-            // Direct button listeners for 100% responsiveness
-            document.querySelectorAll('[data-bs-target="#navbarVerticalCollapse"]').forEach(btn => {
-                btn.onclick = (e) => {
+            // Bind all hamburger buttons on page
+            document.querySelectorAll('#mobileMenuToggleBtn, #mobileMenuToggleBtnCombo, [data-bs-target="#navbarVerticalCollapse"], .navbar-toggler-humburger-icon').forEach(function (btn) {
+                btn.onclick = function (e) {
                     e.preventDefault();
-                    if (navVertical.classList.contains('navbar-vertical-mobile-open')) {
-                        hideNav();
+                    e.stopPropagation();
+                    if (drawer.classList.contains('is-open')) {
+                        closeDrawer();
                     } else {
-                        showNav();
+                        openDrawer();
                     }
                 };
             });
 
-            const closeBtn = document.getElementById('closeMobileSidebarBtn');
-            if (closeBtn) closeBtn.onclick = (e) => { e.preventDefault(); hideNav(); };
+            // Close button inside drawer
+            const closeBtn = document.getElementById('mobileDrawerCloseBtn') || document.getElementById('closeMobileSidebarBtn');
+            if (closeBtn) {
+                closeBtn.onclick = function (e) {
+                    e.preventDefault();
+                    closeDrawer();
+                };
+            }
 
-            // Also close mobile menu if a nav item is clicked
-            navVertical.querySelectorAll('.nav-link').forEach(link => {
-                link.onclick = () => {
-                    if (window.innerWidth < 1200) {
-                        hideNav();
-                    }
+            // Tapping backdrop closes drawer
+            backdrop.onclick = function (e) {
+                e.preventDefault();
+                closeDrawer();
+            };
+
+            // Pressing Escape closes drawer
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && drawer.classList.contains('is-open')) {
+                    closeDrawer();
+                }
+            });
+
+            // Tapping any nav-link inside drawer closes it
+            drawer.querySelectorAll('.nav-link').forEach(function (link) {
+                link.onclick = function () {
+                    closeDrawer();
                 };
             });
         }
@@ -1012,14 +1042,14 @@
             }
 
             handleNavbarHover();
-            setupMobileNavbar();
+            initMobileDrawer();
         });
 
 
         // Run on Livewire navigate
         document.addEventListener('livewire:navigated', () => {
             handleNavbarHover();
-            setupMobileNavbar();
+            initMobileDrawer();
         });
 
         // For Livewire SPA support to maintain sidebar state

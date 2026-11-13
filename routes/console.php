@@ -45,6 +45,8 @@ Schedule::call(function () {
     app(MikrotikController::class)->pruneOldLogs($days);
 })->name('prune-old-logs')->dailyAt('04:00')->timezone($timezone)->withoutOverlapping();
 
+Schedule::command('currency:update-rates')->dailyAt('03:00')->timezone($timezone)->withoutOverlapping();
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote')->daily();
