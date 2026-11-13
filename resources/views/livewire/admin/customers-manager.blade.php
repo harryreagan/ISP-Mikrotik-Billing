@@ -88,20 +88,21 @@
             </div>
 
             {{-- Filter Chips --}}
+            @php $currentFilterType = $filterType ?? $this->filterType ?? 'all'; @endphp
             <div class="col-12 col-md-auto d-flex flex-wrap align-items-center gap-1.5">
-                <button type="button" wire:click="$set('filterType', 'all')" class="btn btn-sm {{ $filterType === 'all' ? 'btn-primary' : 'btn-outline-secondary' }}">
+                <button type="button" wire:click="$set('filterType', 'all')" class="btn btn-sm {{ $currentFilterType === 'all' ? 'btn-primary' : 'btn-outline-secondary' }}">
                     All
                 </button>
-                <button type="button" wire:click="$set('filterType', 'pppoe')" class="btn btn-sm {{ $filterType === 'pppoe' ? 'btn-primary' : 'btn-outline-secondary' }}">
+                <button type="button" wire:click="$set('filterType', 'pppoe')" class="btn btn-sm {{ $currentFilterType === 'pppoe' ? 'btn-primary' : 'btn-outline-secondary' }}">
                     PPPoE
                 </button>
-                <button type="button" wire:click="$set('filterType', 'hotspot')" class="btn btn-sm {{ $filterType === 'hotspot' ? 'btn-primary' : 'btn-outline-secondary' }}">
+                <button type="button" wire:click="$set('filterType', 'hotspot')" class="btn btn-sm {{ $currentFilterType === 'hotspot' ? 'btn-primary' : 'btn-outline-secondary' }}">
                     Hotspot
                 </button>
-                <button type="button" wire:click="$set('filterType', 'active')" class="btn btn-sm {{ $filterType === 'active' ? 'btn-primary' : 'btn-outline-secondary' }}">
+                <button type="button" wire:click="$set('filterType', 'active')" class="btn btn-sm {{ $currentFilterType === 'active' ? 'btn-primary' : 'btn-outline-secondary' }}">
                     Active
                 </button>
-                <button type="button" wire:click="$set('filterType', 'suspended')" class="btn btn-sm {{ $filterType === 'suspended' ? 'btn-danger text-white' : 'btn-outline-secondary' }}">
+                <button type="button" wire:click="$set('filterType', 'suspended')" class="btn btn-sm {{ $currentFilterType === 'suspended' ? 'btn-danger text-white' : 'btn-outline-secondary' }}">
                     Suspended
                 </button>
             </div>
@@ -286,7 +287,7 @@
     </x-ui.card>
 
     {{-- CREATE CUSTOMER MODAL --}}
-    @if($showCreateModal)
+    @if($showCreateModal ?? $this->showCreateModal ?? false)
         <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(2px); z-index: 1055;">
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content">
@@ -334,19 +335,15 @@
                                 <div class="col-12 col-md-4">
                                     <label class="form-label d-flex justify-content-between align-items-center">
                                         <span>Internet package ({{ strtoupper($new_type) }}) <span class="text-danger">*</span></span>
-                                        <span class="badge bg-secondary-subtle text-secondary" style="font-size: 10px;">{{ count($createPackages ?? $packages) }} available</span>
+                                        <span class="badge bg-secondary-subtle text-secondary" style="font-size: 10px;">{{ count($packages) }} available</span>
                                     </label>
                                     <select wire:model="new_package_id" class="form-select @error('new_package_id') is-invalid @enderror" required>
                                         <option value="">Select {{ strtoupper($new_type) }} package</option>
-                                        @foreach(($createPackages ?? $packages) as $p)
+                                        @foreach($packages as $p)
                                             <option value="{{ $p->id }}">{{ $p->name }} (KES {{ number_format($p->price, 0) }})</option>
                                         @endforeach
                                     </select>
                                     @error('new_package_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                                    <div class="d-flex justify-content-between align-items-center mt-1">
-                                        <small class="text-muted" style="font-size: 11px;">Auto-filtered for {{ strtoupper($new_type) }}</small>
-                                        <a href="{{ route('admin.packages') }}" class="text-decoration-none small" style="font-size: 11px; color: #ea580c;">+ New package</a>
-                                    </div>
                                 </div>
                             </div>
 
@@ -382,7 +379,7 @@
     @endif
 
     {{-- EDIT CUSTOMER MODAL --}}
-    @if($showEditModal)
+    @if($showEditModal ?? $this->showEditModal ?? false)
         <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(2px); z-index: 1055;">
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content">
@@ -421,13 +418,10 @@
                                     </select>
                                 </div>
                                 <div class="col-12 col-md-4">
-                                    <label class="form-label d-flex justify-content-between align-items-center">
-                                        <span>Internet package ({{ strtoupper($edit_type) }})</span>
-                                        <span class="badge bg-secondary-subtle text-secondary" style="font-size: 10px;">{{ count($editPackages ?? $packages) }} available</span>
-                                    </label>
+                                    <label class="form-label">Internet package</label>
                                     <select wire:model="edit_package_id" class="form-select">
                                         <option value="">Select package</option>
-                                        @foreach(($editPackages ?? $packages) as $p)
+                                        @foreach($packages as $p)
                                             <option value="{{ $p->id }}">{{ $p->name }} (KES {{ number_format($p->price, 0) }})</option>
                                         @endforeach
                                     </select>

@@ -727,6 +727,11 @@ class CustomersManager extends Component
             'packages'           => $createPackages,
             'createPackages'     => $createPackages,
             'editPackages'       => $editPackages,
+            'filterType'         => $this->filterType,
+            'filterRouter'       => $this->filterRouter,
+            'search'             => $this->search,
+            'showCreateModal'    => $this->showCreateModal,
+            'showEditModal'      => $this->showEditModal,
         ])->layout('layouts.app');
     }
 }
