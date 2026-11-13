@@ -56,3 +56,4 @@ class Plan extends Model
         return $this->base_price_kes === null;
     }
 }
+

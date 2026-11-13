@@ -37,3 +37,4 @@ class CurrencyRate extends Model
                      ->orderBy('currency');
     }
 }
+

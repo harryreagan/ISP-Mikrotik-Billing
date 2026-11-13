@@ -365,46 +365,78 @@ class CustomersManager extends Component
         $router = Router::where('id', $this->new_router_id)->first();
         $package = PackageList::withoutGlobalScopes()->where('id', $this->new_package_id)->first();
 
-        // 1. Create PPP Secret
-        $secret = PPPSecrets::create([
-            'tenant_id'   => $tenantId,
-            'router_name' => $router?->name ?: 'Main Gateway',
-            'username'    => strtolower(trim($this->new_username)),
-            'password'    => $this->new_password,
-            'service'     => $this->new_type,
-            'profile'     => $package?->name ?: 'default',
-            'status'      => 'active',
-        ]);
+        // 0. Ensure router is in legacy router_lists as safety fallback
+        if ($router) {
+            try {
+                $rName = $router->name ?: ($router->router_name ?: 'Router-' . $router->id);
+                DB::table('router_lists')->updateOrInsert(
+                    ['router_name' => $rName],
+                    [
+                        'tenant_id'  => $tenantId,
+                        'ip_address' => $router->vpn_ip ?: ($router->ip_address ?: ($router->ip ?: '10.10.0.1')),
+                        'username'   => $router->api_user ?: ($router->username ?: 'admin'),
+                        'password'   => $router->api_password ?: ($router->password ?: ''),
+                        'api_port'   => $router->api_port ?: 8728,
+                        'action'     => 'connected',
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ]
+                );
+            } catch (\Throwable $e) {}
+        }
 
-        // 2. Create Customer Record
-        $customer = CustomersInfo::create([
-            'tenant_id'          => $tenantId,
-            'customer_unique_id' => $uniqueId,
-            'customer_name'      => $this->new_name,
-            'mobile'             => $normalizedPhone,
-            'service_type'       => $this->new_type,
-            'router_id'          => $this->new_router_id,
-            'package_id'         => $this->new_package_id,
-            'ppp_user_id'        => $secret->id,
-            'connection_date'    => now(),
-            'status'             => 'active',
-        ]);
+        try {
+            DB::beginTransaction();
 
-        // 3. Create Billing Info
-        $rent = (float) ($package?->price ?? 0);
-        BillingInfo::create([
-            'tenant_id'               => $tenantId,
-            'customer_bill_unique_id' => $uniqueId,
-            'billing_type'            => 'prepaid',
-            'monthly_rent'            => $rent,
-            'total_amount'            => $rent,
-            'due_amount'              => 0,
-            'previous_due'            => 0,
-            'paid_amount'             => $rent,
-            'paid_date'               => now(),
-            'auto_disable'            => true,
-            'auto_disable_date'       => now()->addDays($this->new_validity_days),
-        ]);
+            // 1. Create PPP Secret
+            $secret = PPPSecrets::create([
+                'tenant_id'   => $tenantId,
+                'router_id'   => $router?->id,
+                'router_name' => $router?->name ?: 'Main Gateway',
+                'username'    => strtolower(trim($this->new_username)),
+                'password'    => $this->new_password,
+                'service'     => $this->new_type,
+                'profile'     => $package?->name ?: 'default',
+                'status'      => 'active',
+            ]);
+
+            // 2. Create Customer Record
+            $customer = CustomersInfo::create([
+                'tenant_id'          => $tenantId,
+                'customer_unique_id' => $uniqueId,
+                'customer_name'      => $this->new_name,
+                'mobile'             => $normalizedPhone,
+                'service_type'       => $this->new_type,
+                'router_id'          => $this->new_router_id,
+                'package_id'         => $this->new_package_id,
+                'ppp_user_id'        => $secret->id,
+                'connection_date'    => now(),
+                'status'             => 'active',
+            ]);
+
+            // 3. Create Billing Info
+            $rent = (float) ($package?->price ?? 0);
+            BillingInfo::create([
+                'tenant_id'               => $tenantId,
+                'customer_bill_unique_id' => $uniqueId,
+                'billing_type'            => 'prepaid',
+                'monthly_rent'            => $rent,
+                'total_amount'            => $rent,
+                'due_amount'              => 0,
+                'previous_due'            => 0,
+                'paid_amount'             => $rent,
+                'paid_date'               => now(),
+                'auto_disable'            => true,
+                'auto_disable_date'       => now()->addDays($this->new_validity_days),
+            ]);
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error("[CustomersManager] Failed to store customer: " . $e->getMessage());
+            session()->flash('error', 'Failed to create customer: ' . $e->getMessage());
+            return;
+        }
 
         // 4. Provision to MikroTik router if online
         if ($router && $router->status === 'online') {
@@ -637,8 +669,8 @@ class CustomersManager extends Component
         // Routers and Packages for Modals and Filters (Scoped to tenant or global templates)
         $routers = Router::where('tenant_id', $tenantId)->get();
 
-        // Dynamically load packages matching current modal service type
-        $packages = PackageList::withoutGlobalScopes()
+        // 1. Packages specifically matching the Create modal's current service type (PPPoE vs Hotspot)
+        $createPackages = PackageList::withoutGlobalScopes()
             ->where(function ($q) use ($tenantId) {
                 $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
             })
@@ -654,12 +686,33 @@ class CustomersManager extends Component
             })
             ->get();
 
-        if ($packages->isEmpty()) {
-            $packages = PackageList::withoutGlobalScopes()
+        if ($createPackages->isEmpty()) {
+            $createPackages = PackageList::withoutGlobalScopes()
                 ->where(function ($q) use ($tenantId) {
                     $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
                 })
                 ->get();
+        }
+
+        // 2. Packages specifically matching the Edit modal's service type
+        $editPackages = PackageList::withoutGlobalScopes()
+            ->where(function ($q) use ($tenantId) {
+                $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
+            })
+            ->where(function ($q) {
+                if ($this->edit_type === 'hotspot') {
+                    $q->where('type', 'hotspot')->orWhere('package', 'like', '%hotspot%');
+                } else {
+                    $q->where('type', 'pppoe')
+                      ->orWhere('package', 'like', '%pppoe%')
+                      ->orWhere('package', 'like', '%fiber%')
+                      ->orWhereNull('type');
+                }
+            })
+            ->get();
+
+        if ($editPackages->isEmpty()) {
+            $editPackages = $createPackages;
         }
 
         return view('livewire.admin.customers-manager', [
@@ -671,7 +724,9 @@ class CustomersManager extends Component
             'monthlyRevenue'     => $monthlyRevenue,
             'outstandingBalance' => $outstandingBalance,
             'routers'            => $routers,
-            'packages'           => $packages,
+            'packages'           => $createPackages,
+            'createPackages'     => $createPackages,
+            'editPackages'       => $editPackages,
         ])->layout('layouts.app');
     }
 }

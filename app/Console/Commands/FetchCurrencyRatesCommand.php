@@ -96,3 +96,4 @@ class FetchCurrencyRatesCommand extends Command
         return self::SUCCESS;
     }
 }
+
