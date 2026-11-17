@@ -222,7 +222,11 @@ class PackagesManager extends Component
             $this->feedbackMessage = ucfirst($package->type) . " package '{$package->package}' saved successfully. " . $syncResults;
         } catch (\Throwable $e) {
             Log::error('[PackagesManager] savePackage error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-            $this->modalError = 'Failed to save package: ' . $e->getMessage();
+            if (str_contains($e->getMessage(), '1062') || str_contains($e->getMessage(), 'Duplicate entry')) {
+                $this->modalError = "A package named '{$this->name}' already exists. Please choose a different package name or edit the existing package.";
+            } else {
+                $this->modalError = 'Failed to save package: ' . $e->getMessage();
+            }
         }
     }
 

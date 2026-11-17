@@ -112,13 +112,34 @@ class CaptivePortalTemplates
         if (!empty($plans)) {
             foreach ($plans as $p) {
                 $obj = is_array($p) ? (object)$p : $p;
+                $rawName = $obj->package ?? ($obj->name ?? ($obj->package_name ?? 'WiFi Plan'));
+                $rawDuration = $obj->duration ?? ($obj->validity ?? null);
+                if (!$rawDuration) {
+                    $vVal = $obj->validity_value ?? ($obj->duration_value ?? null);
+                    $vUnit = $obj->validity_unit ?? ($obj->duration_unit ?? null);
+                    if ($vVal && $vUnit) {
+                        $unitLabel = ucfirst(strtolower((string)$vUnit));
+                        if ((int)$vVal === 1 && str_ends_with($unitLabel, 's')) {
+                            $unitLabel = substr($unitLabel, 0, -1);
+                        }
+                        $rawDuration = "{$vVal} {$unitLabel}";
+                    } else {
+                        $rawDuration = '24 Hours';
+                    }
+                }
+                $rawSpeed = $obj->speed ?? null;
+                if (!$rawSpeed && !empty($obj->speed_download)) {
+                    $rawSpeed = $obj->speed_download . ' ' . ($obj->speed_download_unit ?? 'Mbps');
+                }
+                $rawSpeed = $rawSpeed ?: ($obj->rate_limit ?? '10 Mbps');
+
                 $packagesList[] = [
                     'id'          => $obj->id ?? 1,
-                    'name'        => htmlspecialchars($obj->name ?? ($obj->package_name ?? 'WiFi Plan'), ENT_QUOTES, 'UTF-8'),
+                    'name'        => htmlspecialchars((string)$rawName, ENT_QUOTES, 'UTF-8'),
                     'price'       => number_format((float)($obj->price ?? ($obj->selling_price ?? 50)), 0),
-                    'duration'    => htmlspecialchars($obj->duration ?? ($obj->validity ?? '24 Hours'), ENT_QUOTES, 'UTF-8'),
-                    'speed'       => htmlspecialchars($obj->speed ?? ($obj->rate_limit ?? '10 Mbps'), ENT_QUOTES, 'UTF-8'),
-                    'description' => htmlspecialchars($obj->description ?? '', ENT_QUOTES, 'UTF-8'),
+                    'duration'    => htmlspecialchars((string)$rawDuration, ENT_QUOTES, 'UTF-8'),
+                    'speed'       => htmlspecialchars((string)$rawSpeed, ENT_QUOTES, 'UTF-8'),
+                    'description' => htmlspecialchars((string)($obj->description ?? ''), ENT_QUOTES, 'UTF-8'),
                 ];
             }
         }
@@ -1055,7 +1076,7 @@ CSS;
             if (\Illuminate\Support\Facades\Schema::hasTable('isp_portal_settings')) {
                 $saved = \Illuminate\Support\Facades\DB::table('isp_portal_settings')->where('tenant_id', $tenantId)->first();
                 if ($saved) {
-                    $template = $saved->selected_template ?? 'midnight';
+                    $template = $saved->template ?? ($saved->selected_template ?? 'midnight');
                     if (!empty($saved->brand_name)) $settings['brand_name'] = $saved->brand_name;
                     if (!empty($saved->headline)) $settings['headline'] = $saved->headline;
                     if (!empty($saved->subheadline)) $settings['subheadline'] = $saved->subheadline;
@@ -1066,6 +1087,7 @@ CSS;
                     if (!empty($saved->payment_instructions)) $settings['payment_instructions'] = $saved->payment_instructions;
                     if (!empty($saved->terms_text)) $settings['terms_text'] = $saved->terms_text;
                     if (!empty($saved->logo_url)) $settings['logo_url'] = $saved->logo_url;
+                    if (!empty($saved->background_url)) $settings['background_url'] = $saved->background_url;
                 }
             }
         } catch (\Throwable $e) {}
@@ -1230,15 +1252,29 @@ a { display: inline-block; background: #ff6600; color: #fff; text-decoration: no
 </html>
 HTML;
 
+        $floginHtml = <<<HTML
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>{$brandEsc} - Login</title>
+<meta http-equiv="refresh" content="0; url=$(link-login-only)?error=$(error-esc)&mac=$(mac-esc)&ip=$(ip)">
+</head>
+<body>
+<script>window.location.href = "$(link-login-only)?error=$(error-esc)&mac=$(mac-esc)&ip=$(ip)";</script>
+</body>
+</html>
+HTML;
+
         return [
             'login.html'    => $loginHtml,
-            'flogin.html'   => $loginHtml,
+            'flogin.html'   => $floginHtml,
             'rlogin.html'   => $rloginHtml,
             'redirect.html' => $redirectHtml,
             'alogin.html'   => $aloginHtml,
             'status.html'   => $statusHtml,
             'logout.html'   => $logoutHtml,
-            'error.html'    => $loginHtml,
+            'error.html'    => $floginHtml,
         ];
     }
 
@@ -1246,7 +1282,7 @@ HTML;
      * Push complete Hotspot network, built-in Wi-Fi bridge (for hAP models), Walled Garden (incl. ICMP for Tenda/APs),
      * and all Captive Portal templates onto a MikroTik router via API & /tool/fetch.
      */
-    public static function pushAllToRouter(\App\Models\Router $router): array
+    public static function pushAllToRouter(\App\Models\Router $router, array $extraWalledGarden = []): array
     {
         $host = $router->vpn_ip ?: $router->ip;
         $port = (int) ($router->api_port ?: 8728);
@@ -1650,6 +1686,30 @@ HTML;
                 'api.payhero.co.ke',
                 '*.safaricom.co.ke',
             ];
+            if (!empty($extraWalledGarden)) {
+                foreach ($extraWalledGarden as $dom) {
+                    $cleanDom = trim((string) $dom);
+                    if ($cleanDom !== '') {
+                        $wgHosts[] = str_contains($cleanDom, '*') ? $cleanDom : "*{$cleanDom}*";
+                    }
+                }
+            } else {
+                try {
+                    if (\Illuminate\Support\Facades\Schema::hasTable('isp_portal_settings')) {
+                        $psWg = \Illuminate\Support\Facades\DB::table('isp_portal_settings')->where('tenant_id', $tenantId)->value('walled_garden_domains');
+                        $decodedWg = is_string($psWg) ? json_decode($psWg, true) : (is_array($psWg) ? $psWg : []);
+                        if (is_array($decodedWg)) {
+                            foreach ($decodedWg as $dom) {
+                                $cleanDom = trim((string) $dom);
+                                if ($cleanDom !== '') {
+                                    $wgHosts[] = str_contains($cleanDom, '*') ? $cleanDom : "*{$cleanDom}*";
+                                }
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {}
+            }
+            $wgHosts = array_values(array_unique($wgHosts));
             $existingWg = $api->executeCommand('/ip/hotspot/walled-garden/print');
             $existingHosts = [];
             if (is_array($existingWg)) {
@@ -1755,9 +1815,10 @@ HTML;
             }
 
             // Full-size HTML templates (> 4KB) via /tool/fetch over HTTP
-            $fetchUrl = "http://isp.hsmart.co.ke/provision/hotspot-portal/{$router->id}/{$fileName}";
+            $cacheBust = time();
+            $fetchUrl = "http://isp.hsmart.co.ke/provision/hotspot-portal/{$router->id}/{$fileName}?v={$cacheBust}";
             try {
-                $fastApi = new \App\Services\MikrotikApiService($host, $port, $user, $pass, 3);
+                $fastApi = new \App\Services\MikrotikApiService($host, $port, $user, $pass, 4);
                 $fastApi->executeCommand('/tool/fetch', [
                     'url'      => $fetchUrl,
                     'dst-path' => "hotspot/{$fileName}",
@@ -1795,6 +1856,142 @@ HTML;
             'success'        => true,
             'interface'      => $targetHsInterface,
             'wlans_enabled'  => $wlanNames,
+            'files_uploaded' => $uploadedFiles,
+        ];
+    }
+
+    /**
+     * Fast live sync: push updated Captive Portal HTML templates, walled-garden domains,
+     * and clear unauthorized hotspot hosts so branding/design changes take effect immediately.
+     */
+    public static function pushPortalFilesOnly(\App\Models\Router $router, array $extraWalledGarden = []): array
+    {
+        $host = $router->vpn_ip ?: $router->ip;
+        $port = (int) ($router->api_port ?: 8728);
+        $user = $router->api_user ?: ($router->username ?: 'admin');
+        $pass = '';
+        try {
+            $pass = \Illuminate\Support\Facades\Crypt::decryptString($router->api_password ?: $router->password);
+        } catch (\Throwable $e) {
+            $pass = $router->api_password ?: $router->password;
+        }
+
+        if (!$host) {
+            throw new \RuntimeException("Router {$router->name} has no IP or VPN IP configured.");
+        }
+
+        $api = new \App\Services\MikrotikApiService($host, $port, $user, $pass, 5);
+        $portalFiles = self::generateRouterPortalFiles($router);
+        $uploadedFiles = [];
+        $hasFlash = false;
+
+        // Detect flash/hotspot directory and remove stale HTML files so RouterOS overwrites cleanly
+        try {
+            $existingFiles = $api->executeCommand('/file/print');
+            if (is_array($existingFiles)) {
+                foreach ($existingFiles as $ef) {
+                    $efName = $ef['name'] ?? '';
+                    if ($efName === 'flash/hotspot' && ($ef['type'] ?? '') === 'directory') {
+                        $hasFlash = true;
+                    }
+                }
+                foreach ($existingFiles as $ef) {
+                    $efName = $ef['name'] ?? '';
+                    foreach (array_keys($portalFiles) as $pfKey) {
+                        if ($efName === "hotspot/{$pfKey}" || $efName === "flash/hotspot/{$pfKey}") {
+                            try {
+                                $api->executeCommand('/file/remove', [], ['.id' => $ef['.id']]);
+                            } catch (\Throwable $re) {}
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        $cacheBust = time();
+        foreach ($portalFiles as $fileName => $fileContent) {
+            if (strlen($fileContent) < 3800) {
+                try {
+                    $api->executeCommand('/file/add', [
+                        'name'     => "hotspot/{$fileName}",
+                        'contents' => $fileContent,
+                    ]);
+                    $uploadedFiles[] = "hotspot/{$fileName}";
+                    if ($hasFlash) {
+                        $api->executeCommand('/file/add', [
+                            'name'     => "flash/hotspot/{$fileName}",
+                            'contents' => $fileContent,
+                        ]);
+                    }
+                    continue;
+                } catch (\Throwable $ae) {}
+            }
+
+            $fetchUrl = "http://isp.hsmart.co.ke/provision/hotspot-portal/{$router->id}/{$fileName}?v={$cacheBust}";
+            try {
+                $fastApi = new \App\Services\MikrotikApiService($host, $port, $user, $pass, 4);
+                $fastApi->executeCommand('/tool/fetch', [
+                    'url'      => $fetchUrl,
+                    'dst-path' => "hotspot/{$fileName}",
+                    'mode'     => 'http',
+                ]);
+                $uploadedFiles[] = "hotspot/{$fileName}";
+
+                if ($hasFlash) {
+                    $fastApi->executeCommand('/tool/fetch', [
+                        'url'      => $fetchUrl,
+                        'dst-path' => "flash/hotspot/{$fileName}",
+                        'mode'     => 'http',
+                    ]);
+                }
+            } catch (\Throwable $fe) {
+                \Illuminate\Support\Facades\Log::warning("Portal file {$fileName} fast-sync error on {$router->name}: " . $fe->getMessage());
+            }
+        }
+
+        // Sync any extra walled-garden domains
+        if (!empty($extraWalledGarden)) {
+            try {
+                $existingWg = $api->executeCommand('/ip/hotspot/walled-garden/print');
+                $existingHosts = [];
+                if (is_array($existingWg)) {
+                    foreach ($existingWg as $w) {
+                        if (!empty($w['dst-host'])) {
+                            $existingHosts[] = strtolower($w['dst-host']);
+                        }
+                    }
+                }
+                foreach ($extraWalledGarden as $dom) {
+                    $cleanDom = trim((string) $dom);
+                    if ($cleanDom === '') continue;
+                    $pattern = str_contains($cleanDom, '*') ? $cleanDom : "*{$cleanDom}*";
+                    if (!in_array(strtolower($pattern), $existingHosts)) {
+                        $api->executeCommand('/ip/hotspot/walled-garden/add', [
+                            'dst-host' => $pattern,
+                            'action'   => 'allow',
+                            'comment'  => 'HSmart Payment Gateway',
+                        ]);
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        // Clear unauthorized hotspot hosts so phones immediately reload the new Captive Portal design
+        try {
+            $hosts = $api->executeCommand('/ip/hotspot/host/print');
+            if (is_array($hosts)) {
+                foreach ($hosts as $h) {
+                    if (($h['authorized'] ?? 'false') === 'false') {
+                        try {
+                            $api->executeCommand('/ip/hotspot/host/remove', [], ['.id' => $h['.id']]);
+                        } catch (\Throwable $he) {}
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        return [
+            'success'        => true,
             'files_uploaded' => $uploadedFiles,
         ];
     }

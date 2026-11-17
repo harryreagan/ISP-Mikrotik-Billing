@@ -8,11 +8,38 @@
             <a href="{{ route('captive-portal.preview', ['template' => $template]) }}" target="_blank" class="btn btn-outline-primary me-2">
                 <i class="bi bi-box-arrow-up-right me-1"></i>Open Live Portal Preview
             </a>
-            <button type="button" wire:click="saveSettings" class="btn btn-primary">
-                <i class="bi bi-save me-1"></i>Save Portal Settings
+            <button type="button" wire:click="saveSettings" wire:loading.attr="disabled" wire:target="saveSettings" class="btn btn-primary">
+                <span wire:loading.remove wire:target="saveSettings">
+                    <i class="bi bi-save me-1"></i>Save &amp; Push Portal
+                </span>
+                <span wire:loading wire:target="saveSettings">
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>Saving &amp; Pushing...
+                </span>
             </button>
         </x-slot:actions>
     </x-ui.page-header>
+
+    {{-- Save Feedback Banner --}}
+    @if($save_status)
+        <div class="alert {{ $save_status['status'] === 'success' ? 'alert-success' : 'alert-danger' }} d-flex align-items-center justify-content-between mb-4" role="alert" style="border-radius: 12px;">
+            <div>
+                <i class="bi {{ $save_status['status'] === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill' }} me-2"></i>
+                <strong>{{ $save_status['message'] }}</strong>
+            </div>
+            <button type="button" class="btn-close" wire:click="$set('save_status', null)" aria-label="Close"></button>
+        </div>
+    @elseif(session('success'))
+        <div class="alert alert-success d-flex align-items-center mb-4" role="alert" style="border-radius: 12px;">
+            <i class="bi bi-check-circle-fill me-2"></i>
+            <strong>{{ session('success') }}</strong>
+        </div>
+    @endif
+
+    @if($errors->any())
+        <div class="alert alert-danger mb-4" role="alert" style="border-radius: 12px;">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ $errors->first() }}
+        </div>
+    @endif
 
     {{-- ============================================================== --}}
     {{-- CHOOSE A DESIGN GALLERY (ABOVE BRANDING)                      --}}
@@ -30,8 +57,8 @@
                 @foreach($templatesCatalog as $tKey => $meta)
                     @php $isActive = ($template === $tKey); @endphp
                     <div class="col-6 col-md-3">
-                        <div class="card h-100 text-start cursor-pointer position-relative transition-all {{ $isActive ? 'ring-2 ring-orange-500' : 'hover:bg-slate-50' }}"
-                             style="cursor: pointer; border-radius: 14px; overflow: hidden;"
+                        <div class="card h-100 text-start cursor-pointer position-relative transition-all"
+                             style="cursor: pointer; border-radius: 14px; overflow: hidden; {{ $isActive ? 'border: 2.5px solid #f97316 !important; box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.18);' : 'border: 1.5px solid #e2e8f0 !important;' }}"
                              wire:click="setTemplate('{{ $tKey }}')">
                             
                             {{-- Mini Visual Gradient Thumbnail --}}
@@ -155,14 +182,19 @@
                             </select>
                         </div>
                         <div class="col-md-5">
-                            <button type="button" wire:click="installToRouter" class="btn btn-primary w-100">
-                                <i class="bi bi-cloud-arrow-up-fill me-1"></i>Install to Router
+                            <button type="button" wire:click="installToRouter" wire:loading.attr="disabled" wire:target="installToRouter" class="btn btn-primary w-100">
+                                <span wire:loading.remove wire:target="installToRouter">
+                                    <i class="bi bi-cloud-arrow-up-fill me-1"></i>Install to Router
+                                </span>
+                                <span wire:loading wire:target="installToRouter">
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>Installing...
+                                </span>
                             </button>
                         </div>
                     </div>
 
                     @if($install_status)
-                        <div class="alert {{ $install_status['status'] === 'success' ? 'alert-success' : 'alert-info' }} mt-3 mb-0">
+                        <div class="alert {{ $install_status['status'] === 'success' ? 'alert-success' : ($install_status['status'] === 'error' ? 'alert-danger' : 'alert-info') }} mt-3 mb-0">
                             {{ $install_status['message'] }}
                         </div>
                     @endif
@@ -173,7 +205,7 @@
         {{-- Live Mockup Preview (Right Column - Dynamic Iframe) --}}
         <div class="col-lg-6">
             <div class="card sticky-top" style="top: 20px;">
-                <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <div>
                         <h5 class="ui-section-title mb-0"><i class="bi bi-eye text-orange-500 me-2"></i>Live Portal Mockup</h5>
                         <small class="text-muted">Design: <strong>{{ ucfirst($template) }}</strong> (Fully responsive)</small>
@@ -183,25 +215,27 @@
                             <i class="bi bi-box-arrow-up-right me-1"></i>Full Preview
                         </a>
                         <div class="btn-group btn-group-sm">
-                        <button type="button" 
-                                wire:click="$set('preview_device', 'mobile')" 
-                                class="btn {{ $preview_device === 'mobile' ? 'btn-primary' : 'btn-secondary' }}">
-                            <i class="bi bi-phone me-1"></i>Mobile (375px)
-                        </button>
-                        <button type="button" 
-                                wire:click="$set('preview_device', 'desktop')" 
-                                class="btn {{ $preview_device === 'desktop' ? 'btn-primary' : 'btn-secondary' }}">
-                            <i class="bi bi-display me-1"></i>Desktop
-                        </button>
+                            <button type="button"
+                                    wire:click="$set('preview_device', 'mobile')"
+                                    class="btn {{ $preview_device === 'mobile' ? 'btn-primary' : 'btn-secondary' }}">
+                                <i class="bi bi-phone me-1"></i>Mobile (375px)
+                            </button>
+                            <button type="button"
+                                    wire:click="$set('preview_device', 'desktop')"
+                                    class="btn {{ $preview_device === 'desktop' ? 'btn-primary' : 'btn-secondary' }}">
+                                <i class="bi bi-display me-1"></i>Desktop
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body p-3 bg-slate-50 d-flex justify-content-center align-items-center" style="min-height: 720px;">
                     {{-- Interactive Iframe with srcdoc --}}
-                    <div class="rounded-2xl ring-1 ring-slate-200/70 overflow-hidden bg-white d-flex justify-content-center transition-all" 
+                    <div wire:key="preview-frame-{{ $template }}-{{ md5($previewHtml) }}"
+                         class="rounded-2xl ring-1 ring-slate-200/70 overflow-hidden bg-white d-flex justify-content-center transition-all"
                          style="{{ $preview_device === 'mobile' ? 'width: 375px; height: 680px;' : 'width: 100%; height: 680px;' }}; transition: width 0.3s ease;">
                         <iframe id="portalPreviewIframe"
-                                srcdoc="{{ $previewHtml }}" 
-                                class="w-100 h-100 border-0" 
+                                srcdoc="{{ $previewHtml }}"
+                                class="w-100 h-100 border-0"
                                 sandbox="allow-scripts allow-forms allow-same-origin"
                                 title="Captive Portal Live Preview"></iframe>
                     </div>

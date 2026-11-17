@@ -35,6 +35,7 @@ class CaptivePortalCustomizer extends Component
     // Target router for 1-click install
     public $selected_router_id = null;
     public $install_status = null;
+    public $save_status = null;
     public $preview_device = 'mobile'; // 'mobile' (375px) or 'desktop'
 
     public function mount()
@@ -76,45 +77,91 @@ class CaptivePortalCustomizer extends Component
     {
         if (array_key_exists($templateKey, CaptivePortalTemplates::catalog())) {
             $this->template = $templateKey;
+            $this->save_status = null;
         }
     }
 
-    public function saveSettings()
+    public function saveSettings(bool $pushToRouters = true)
     {
-        $validKeys = array_keys(CaptivePortalTemplates::catalog());
-        $this->validate([
-            'template' => 'required|string|in:' . implode(',', $validKeys),
-        ]);
+        $this->save_status = null;
 
-        $user = auth()->user();
-        $tenantId = $user ? ($user->tenant_id ?: 1) : 1;
+        try {
+            $validKeys = array_keys(CaptivePortalTemplates::catalog());
+            $this->validate([
+                'template' => 'required|string|in:' . implode(',', $validKeys),
+            ]);
 
-        $domainsArray = array_values(array_filter(array_map('trim', explode(',', $this->walled_garden_domains))));
+            $user = auth()->user();
+            $tenantId = $user ? ($user->tenant_id ?: 1) : 1;
 
-        DB::table('isp_portal_settings')->updateOrInsert(
-            ['tenant_id' => $tenantId],
-            [
-                'template'              => $this->template,
-                'brand_name'            => $this->brand_name,
-                'brand_color'           => $this->brand_color,
-                'secondary_color'       => $this->secondary_color,
-                'logo_url'              => $this->logo_url,
-                'background_url'        => $this->background_url,
-                'headline'              => $this->headline,
-                'subheadline'           => $this->subheadline,
-                'terms_text'            => $this->terms_text,
-                'support_phone'         => $this->support_phone,
-                'support_whatsapp'      => $this->support_whatsapp,
-                'theme_layout'          => $this->theme_layout,
-                'free_trial_enabled'    => $this->free_trial_enabled,
-                'free_trial_duration'   => $this->free_trial_duration,
-                'payment_instructions'  => $this->payment_instructions,
-                'walled_garden_domains' => json_encode($domainsArray),
-                'updated_at'            => now(),
-            ]
-        );
+            $domainsArray = array_values(array_filter(array_map('trim', explode(',', (string) $this->walled_garden_domains))));
 
-        session()->flash('success', "Captive portal design '{$this->template}' and branding saved successfully!");
+            DB::table('isp_portal_settings')->updateOrInsert(
+                ['tenant_id' => $tenantId],
+                [
+                    'template'              => $this->template,
+                    'brand_name'            => $this->brand_name,
+                    'brand_color'           => $this->brand_color,
+                    'secondary_color'       => $this->secondary_color,
+                    'logo_url'              => $this->logo_url,
+                    'background_url'        => $this->background_url,
+                    'headline'              => $this->headline,
+                    'subheadline'           => $this->subheadline,
+                    'terms_text'            => $this->terms_text,
+                    'support_phone'         => $this->support_phone,
+                    'support_whatsapp'      => $this->support_whatsapp,
+                    'theme_layout'          => $this->theme_layout,
+                    'free_trial_enabled'    => (bool) $this->free_trial_enabled,
+                    'free_trial_duration'   => $this->free_trial_duration,
+                    'payment_instructions'  => $this->payment_instructions,
+                    'walled_garden_domains' => json_encode($domainsArray),
+                    'updated_at'            => now(),
+                ]
+            );
+
+            $pushedNames = [];
+            $failedNames = [];
+
+            if ($pushToRouters) {
+                $routers = Router::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->get();
+
+                foreach ($routers as $router) {
+                    if (empty($router->vpn_ip) && empty($router->ip)) {
+                        continue;
+                    }
+                    try {
+                        CaptivePortalTemplates::pushPortalFilesOnly($router, $domainsArray);
+                        $pushedNames[] = $router->name;
+                    } catch (\Throwable $re) {
+                        $failedNames[] = $router->name;
+                        Log::warning("[CaptivePortalCustomizer] Push to router {$router->name} failed: " . $re->getMessage());
+                    }
+                }
+            }
+
+            $tplLabel = ucfirst($this->template);
+            if (!empty($pushedNames)) {
+                $msg = "Captive portal design '{$tplLabel}' and branding saved & pushed live to " . count($pushedNames) . " router(s): " . implode(', ', $pushedNames) . ".";
+                if (!empty($failedNames)) {
+                    $msg .= " (Offline/standby: " . implode(', ', $failedNames) . ")";
+                }
+            } elseif (!empty($failedNames)) {
+                $msg = "Captive portal design '{$tplLabel}' saved! Router(s) currently unreachable (" . implode(', ', $failedNames) . ") — click 'Install to Router' once online.";
+            } else {
+                $msg = "Captive portal design '{$tplLabel}' and branding saved successfully!";
+            }
+
+            $this->save_status = ['status' => 'success', 'message' => $msg];
+            session()->flash('success', $msg);
+        } catch (\Throwable $e) {
+            Log::error('[CaptivePortalCustomizer] saveSettings error: ' . $e->getMessage());
+            $this->save_status = [
+                'status'  => 'error',
+                'message' => 'Could not save portal settings: ' . $e->getMessage(),
+            ];
+        }
     }
 
     protected function getHotspotPackagesForRouter($tenantId, $routerId = null)
@@ -145,54 +192,37 @@ class CaptivePortalCustomizer extends Component
             return;
         }
 
-        $router = Router::find($this->selected_router_id);
+        $user = auth()->user();
+        $tenantId = $user ? ($user->tenant_id ?: 1) : 1;
+
+        // Persist latest changes first before pushing to router
+        $this->saveSettings(false);
+
+        $router = Router::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->find($this->selected_router_id);
+
         if (!$router) {
-            $this->install_status = ['status' => 'error', 'message' => 'Selected router not found.'];
+            $this->install_status = ['status' => 'error', 'message' => 'Selected router not found for your account.'];
             return;
         }
 
-        $user = auth()->user();
-        $tenantId = $user ? ($user->tenant_id ?: 1) : 1;
-        $packages = $this->getHotspotPackagesForRouter($tenantId, $this->selected_router_id);
-
-        // 1. Generate standalone login.html using chosen template
-        $loginHtml = CaptivePortalTemplates::render($this->template, [
-            'brand_name'           => $this->brand_name,
-            'brand_color'          => $this->brand_color,
-            'secondary_color'      => $this->secondary_color,
-            'logo_url'             => $this->logo_url,
-            'background_url'       => $this->background_url,
-            'headline'             => $this->headline,
-            'subheadline'          => $this->subheadline,
-            'terms_text'           => $this->terms_text,
-            'support_phone'        => $this->support_phone,
-            'support_whatsapp'     => $this->support_whatsapp,
-            'payment_instructions' => $this->payment_instructions,
-        ], $packages);
-
-        // 2. Generate Walled Garden & Portal Setup commands
-        $domainsArray = array_values(array_filter(array_map('trim', explode(',', $this->walled_garden_domains))));
-        $commands = [];
-        foreach ($domainsArray as $domain) {
-            $commands[] = "/ip hotspot walled-garden add dst-host=\"*{$domain}*\" action=allow comment=\"HSmart Payment Gateway\"";
-        }
+        $domainsArray = array_values(array_filter(array_map('trim', explode(',', (string) $this->walled_garden_domains))));
 
         try {
-            $apiHost = $router->vpn_ip ?: $router->ip;
-            $api = new MikrotikApiService($apiHost, (int)($router->api_port ?: 8728), $router->username, $router->password, 4);
-
-            foreach ($commands as $cmd) {
-                $api->executeCommand($cmd);
-            }
+            $result = CaptivePortalTemplates::pushAllToRouter($router, $domainsArray);
+            $fileCount = count($result['files_uploaded'] ?? []);
+            $tplLabel = ucfirst($this->template);
 
             $this->install_status = [
-                'status' => 'success',
-                'message' => "Portal '{$this->template}' and walled-garden domains installed onto '{$router->name}'.",
+                'status'  => 'success',
+                'message' => "Portal '{$tplLabel}' ({$fileCount} files), Wi-Fi SSID & walled-garden rules installed live onto '{$router->name}'!",
             ];
         } catch (\Throwable $e) {
+            Log::warning("[CaptivePortalCustomizer] installToRouter failed for {$router->name}: " . $e->getMessage());
             $this->install_status = [
-                'status' => 'info',
-                'message' => "Portal design saved. Router connection standby via WireGuard tunnel; files will synchronize upon handshake.",
+                'status'  => 'error',
+                'message' => "Settings saved, but could not reach '{$router->name}' right now: " . $e->getMessage(),
             ];
         }
     }
