@@ -73,6 +73,67 @@
         </div>
     </div>
 
+    @php
+        $tenantId = auth()->user()?->tenant_id ?: (session('tenant_id') ?: (session('impersonated_tenant_id') ?: 1));
+        
+        $totalRoutersCount = 0;
+        $onlineRoutersCount = 0;
+        $hasActiveRouters = false;
+
+        // 1. Check live systemOverview from DashboardController
+        if (!empty($systemOverview) && is_array($systemOverview)) {
+            foreach ($systemOverview as $rData) {
+                if (is_array($rData) && ($rData['status'] ?? false)) {
+                    $hasActiveRouters = true;
+                    $totalRoutersCount++;
+                    if (!empty($rData['is_online'])) {
+                        $onlineRoutersCount++;
+                    }
+                }
+            }
+        }
+
+        // 2. Query Router model (identical to RoutersManager.php) to ensure 100% exact parity with /admin/routers
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('routers')) {
+                $allTenantRouters = \App\Models\Router::where('tenant_id', $tenantId)->get();
+                if ($allTenantRouters->isNotEmpty()) {
+                    $dbTotal = $allTenantRouters->count();
+                    $dbOnline = $allTenantRouters->filter(function ($r) {
+                        $st = strtolower($r->status ?? ($r->action ?? ''));
+                        $isOnline = in_array($st, ['online', 'connected', 'ready', 'active']);
+                        $seenRecently = empty($r->last_seen_at) || \Carbon\Carbon::parse($r->last_seen_at)->gt(now()->subMinutes(10));
+                        return $isOnline && $seenRecently;
+                    })->count();
+
+                    $totalRoutersCount = max($totalRoutersCount, $dbTotal);
+                    $onlineRoutersCount = max($onlineRoutersCount, $dbOnline);
+                    if ($totalRoutersCount > 0) {
+                        $hasActiveRouters = true;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        // 3. Fallback to router_lists if routers table had nothing
+        if ($totalRoutersCount === 0) {
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('router_lists')) {
+                    $rlQuery = \Illuminate\Support\Facades\DB::table('router_lists');
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('router_lists', 'tenant_id') && $tenantId) {
+                        $rlQuery->where('tenant_id', $tenantId);
+                    }
+                    $legacyRouters = $rlQuery->get();
+                    if ($legacyRouters->isNotEmpty()) {
+                        $totalRoutersCount = $legacyRouters->count();
+                        $onlineRoutersCount = $legacyRouters->where('action', 'connected')->count();
+                        $hasActiveRouters = true;
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
+    @endphp
+
     {{-- Reseller Overview Stat Cards Row (2 per row on mobile) --}}
     <div class="row g-2 g-sm-3 mb-4">
         <!-- Card 1: Total Resellers -->
@@ -104,32 +165,21 @@
             </x-ui.stat-card>
         </div>
 
-        <!-- Card 4: Total Reseller Commission -->
+        <!-- Card 4: Online Routers / Total -->
         <div class="col-6 col-xl-3">
-            <x-ui.stat-card :label="__('Total commissions')" :value="'KES ' . number_format($resellerData['total_commission'] ?? 0, 2)" :sub="__('Total reseller commission awarded.')" color="pink">
-                <x-slot:icon><i class="bi bi-percent"></i></x-slot:icon>
-            </x-ui.stat-card>
+            <a href="{{ route('admin.routers') }}" class="text-decoration-none d-block">
+                <x-ui.stat-card :label="__('Online routers')" :value="$onlineRoutersCount . ' / ' . $totalRoutersCount" :sub="__('Live heartbeat verified routers.')" color="pink">
+                    <x-slot:icon><i class="bi bi-router"></i></x-slot:icon>
+                    <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
+                        <span><i class="bi bi-broadcast me-1 text-success"></i>{{ __('Online:') }} <strong>{{ $onlineRoutersCount }}</strong></span>
+                        <span><i class="bi bi-hdd-network me-1 text-secondary"></i>{{ __('Total:') }} <strong>{{ $totalRoutersCount }}</strong></span>
+                    </div>
+                </x-ui.stat-card>
+            </a>
         </div>
     </div>
 
     <div class="row g-4 mb-4">
-        @php
-            $hasActiveRouters = false;
-            $totalRoutersCount = 0;
-            $onlineRoutersCount = 0;
-            if (is_array($systemOverview)) {
-                foreach ($systemOverview as $rData) {
-                    if (is_array($rData) && ($rData['status'] ?? false)) {
-                        $hasActiveRouters = true;
-                        $totalRoutersCount++;
-                        if ($rData['is_online'] ?? true) {
-                            $onlineRoutersCount++;
-                        }
-                    }
-                }
-            }
-        @endphp
-
         {{-- Routers Section Header with Quick Actions --}}
         <div class="col-12 mb-n2">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">

@@ -27,9 +27,9 @@
 <nav class="navbar navbar-light navbar-glass navbar-top navbar-expand-lg d-flex align-items-center justify-content-between gap-1 gap-sm-2 w-100 min-w-0 flex-nowrap" style="display: none;">
     <div class="d-flex align-items-center gap-1 gap-sm-2 min-w-0 flex-shrink-0">
         <!-- Hamburger on Mobile / Tablet -->
-        <button class="btn navbar-toggler-humburger-icon navbar-toggler p-0 d-xl-none border-0" type="button" id="mobileMenuToggleBtn" aria-label="Toggle navigation" style="width: 38px; height: 38px; display: inline-grid; place-items: center; border-radius: 8px; flex-shrink: 0; background: transparent;">
-            <span class="navbar-toggle-icon">
-                <span class="toggle-line"></span>
+        <button class="btn navbar-toggler-humburger-icon navbar-toggler p-0 d-xl-none border-0" type="button" id="mobileMenuToggleBtn" data-mobile-menu-toggle="true" onclick="window.toggleMobileDrawer && window.toggleMobileDrawer(event)" aria-label="Toggle navigation" style="width: 38px; height: 38px; display: inline-grid; place-items: center; border-radius: 8px; flex-shrink: 0; background: transparent; cursor: pointer;">
+            <span class="navbar-toggle-icon" style="pointer-events: none;">
+                <span class="toggle-line" style="pointer-events: none;"></span>
             </span>
         </button>
 
@@ -68,9 +68,9 @@
 
 <nav class="navbar navbar-light navbar-glass navbar-top navbar-expand-lg d-flex align-items-center justify-content-between gap-2 w-100 min-w-0" style="display: none;" data-move-target="#navbarVerticalNav" data-navbar-top="combo">
     <div class="d-flex align-items-center gap-2 min-w-0">
-        <button class="btn navbar-toggler-humburger-icon navbar-toggler p-0 d-xl-none border-0" type="button" id="mobileMenuToggleBtnCombo" aria-label="Toggle navigation" style="width: 38px; height: 38px; display: inline-grid; place-items: center; border-radius: 8px; flex-shrink: 0; background: transparent;">
-            <span class="navbar-toggle-icon">
-                <span class="toggle-line"></span>
+        <button class="btn navbar-toggler-humburger-icon navbar-toggler p-0 d-xl-none border-0" type="button" id="mobileMenuToggleBtnCombo" data-mobile-menu-toggle="true" onclick="window.toggleMobileDrawer && window.toggleMobileDrawer(event)" aria-label="Toggle navigation" style="width: 38px; height: 38px; display: inline-grid; place-items: center; border-radius: 8px; flex-shrink: 0; background: transparent; cursor: pointer;">
+            <span class="navbar-toggle-icon" style="pointer-events: none;">
+                <span class="toggle-line" style="pointer-events: none;"></span>
             </span>
         </button>
 

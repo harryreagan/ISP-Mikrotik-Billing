@@ -61,14 +61,14 @@
 </nav>
 
 {{-- Dedicated Mobile Sidebar Drawer & Backdrop (< 1200px) --}}
-<div id="mobileDrawerBackdrop" class="mobile-drawer-backdrop" aria-hidden="true" style="display: none;"></div>
+<div id="mobileDrawerBackdrop" class="mobile-drawer-backdrop" onclick="window.closeMobileDrawer && window.closeMobileDrawer(event)" aria-hidden="true" style="display: none;"></div>
 
-<div id="mobileSidebarDrawer" class="mobile-sidebar-drawer navbar-vertical" aria-label="Mobile Navigation" role="dialog" aria-modal="true" style="display: none;">
+<div id="mobileSidebarDrawer" class="mobile-sidebar-drawer" aria-label="Mobile Navigation" role="dialog" aria-modal="true" style="display: none;">
     <div class="mobile-drawer-header d-flex align-items-center justify-content-between px-3 border-bottom" style="height: 64px; flex-shrink: 0; background: #ffffff;">
         <a class="navbar-brand m-0 p-0 text-decoration-none d-flex align-items-center" href="{{ route('dashboard') }}">
             <x-hsmart-logo color="dark" height="36px" />
         </a>
-        <button type="button" class="btn btn-sm btn-link text-secondary p-1 text-decoration-none" id="mobileDrawerCloseBtn" aria-label="Close menu" style="font-size: 1.25rem; width: 36px; height: 36px; display: inline-grid; place-items: center; border-radius: 8px;">
+        <button type="button" class="btn btn-sm btn-link text-secondary p-1 text-decoration-none" id="mobileDrawerCloseBtn" onclick="window.closeMobileDrawer && window.closeMobileDrawer(event)" aria-label="Close menu" style="font-size: 1.25rem; width: 36px; height: 36px; display: inline-grid; place-items: center; border-radius: 8px;">
             <i class="bi bi-x-lg"></i>
         </button>
     </div>
