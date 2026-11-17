@@ -301,28 +301,82 @@ class PayHeroPaymentController extends Controller
                 Log::error('fulfillSuccessfulTransaction error: ' . $e->getMessage());
             }
         } else {
-            // Hotspot / guest voucher collection record scoped strictly to this tenant
-            $maxInvoice = CollectionSummary::withoutGlobalScopes()->max('invoice_no');
-            $invoiceNo = $maxInvoice ? ($maxInvoice + 1) : 100001;
-
+            // 1. Record into hotspot_sales (powers Dashboard "Today's hotspot sales", "Total global revenue", and Hotspot Manager)
             try {
-                \Illuminate\Support\Facades\DB::table('collection_summaries')->insert([
-                    'tenant_id'                     => $tenantId,
-                    'customer_collection_unique_id' => $stkTx->phone,
-                    'collection_date'               => now(),
-                    'collection_amount'             => $amount,
-                    'collected_by'                  => 'Online Payment (PAYHERO)',
-                    'payment_type'                  => 'online',
-                    'payment_method'                => 'payhero',
-                    'transaction_id'                => $receipt,
-                    'payment_status'                => 'paid',
-                    'invoice_no'                    => $invoiceNo,
-                    'bill_month'                    => now()->format('F Y'),
-                    'created_at'                    => now(),
-                    'updated_at'                    => now(),
-                ]);
+                if (\Illuminate\Support\Facades\Schema::hasTable('hotspot_sales')) {
+                    $existsHs = \Illuminate\Support\Facades\DB::table('hotspot_sales')
+                        ->where('voucher_code', $receipt)
+                        ->exists();
+
+                    if (!$existsHs) {
+                        $routerName = 'Hotspot';
+                        if (!empty($meta['router_id'])) {
+                            $rObj = \App\Models\Router::withoutGlobalScopes()->find((int) $meta['router_id']);
+                            if ($rObj && !empty($rObj->name)) {
+                                $routerName = $rObj->name;
+                            }
+                        }
+
+                        $profileName = 'Hotspot Plan';
+                        if (!empty($meta['package_id'])) {
+                            $pkg = PackageList::withoutGlobalScopes()->find((int) $meta['package_id']);
+                            if ($pkg) {
+                                $profileName = $pkg->package_name ?: ($pkg->name ?: 'Hotspot Plan');
+                            }
+                        }
+
+                        $hsRow = [
+                            'router_name'    => $routerName,
+                            'voucher_code'   => $receipt,
+                            'profile'        => $profileName,
+                            'username'       => $stkTx->phone ?: $receipt,
+                            'amount'         => $amount,
+                            'payment_method' => 'mpesa_payhero',
+                            'note'           => 'M-Pesa Captive Portal STK (' . $receipt . ')',
+                            'sale_date'      => now()->timezone('Africa/Nairobi')->toDateString(),
+                            'sold_by'        => null,
+                            'created_at'     => now(),
+                            'updated_at'     => now(),
+                        ];
+                        if (\Illuminate\Support\Facades\Schema::hasColumn('hotspot_sales', 'tenant_id')) {
+                            $hsRow['tenant_id'] = $tenantId;
+                        }
+
+                        \Illuminate\Support\Facades\DB::table('hotspot_sales')->insert($hsRow);
+                    }
+                }
+            } catch (\Throwable $hse) {
+                Log::warning('HotspotSale insert note: ' . $hse->getMessage());
+            }
+
+            // 2. Also record into collection_summaries (safe check for tenant_id column)
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('collection_summaries')) {
+                    $maxInvoice = CollectionSummary::withoutGlobalScopes()->max('invoice_no');
+                    $invoiceNo = $maxInvoice ? ($maxInvoice + 1) : 100001;
+
+                    $colRow = [
+                        'customer_collection_unique_id' => $stkTx->phone,
+                        'collection_date'               => now(),
+                        'collection_amount'             => $amount,
+                        'collected_by'                  => 'Hotspot M-Pesa (PAYHERO)',
+                        'payment_type'                  => 'hotspot',
+                        'payment_method'                => 'payhero',
+                        'transaction_id'                => $receipt,
+                        'payment_status'                => 'paid',
+                        'invoice_no'                    => $invoiceNo,
+                        'bill_month'                    => now()->format('F Y'),
+                        'created_at'                    => now(),
+                        'updated_at'                    => now(),
+                    ];
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('collection_summaries', 'tenant_id')) {
+                        $colRow['tenant_id'] = $tenantId;
+                    }
+
+                    \Illuminate\Support\Facades\DB::table('collection_summaries')->insert($colRow);
+                }
             } catch (\Throwable $ce) {
-                Log::warning('CollectionSummary insert fallback note: ' . $ce->getMessage());
+                Log::warning('CollectionSummary insert note: ' . $ce->getMessage());
             }
         }
     }

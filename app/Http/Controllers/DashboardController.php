@@ -142,12 +142,27 @@ class DashboardController extends Controller
                     ];
                 }
 
+                $tenantId = auth()->user()?->tenant_id ?: (session('tenant_id') ?: (session('impersonated_tenant_id') ?: 1));
+                $todayEat = Carbon::now('Africa/Nairobi')->toDateString();
+
                 $todayPaid = Schema::hasTable('collection_summaries')
-                    ? CollectionSummary::whereDate('collection_date', Carbon::today())->sum('collection_amount')
+                    ? CollectionSummary::whereDate('collection_date', $todayEat)
+                        ->where(function ($q) {
+                            $q->whereNull('payment_type')->orWhere('payment_type', '!=', 'hotspot');
+                        })
+                        ->sum('collection_amount')
                     : 0;
 
-                $hotspotTotal = Schema::hasTable('hotspot_sales') ? HotspotSale::sum('amount') : 0;
-                $hotspotToday = Schema::hasTable('hotspot_sales') ? HotspotSale::whereDate('sale_date', Carbon::today())->sum('amount') : 0;
+                $hotspotTotal = 0.0;
+                $hotspotToday = 0.0;
+                if (Schema::hasTable('hotspot_sales')) {
+                    $hsBase = DB::table('hotspot_sales');
+                    if (Schema::hasColumn('hotspot_sales', 'tenant_id') && $tenantId) {
+                        $hsBase->where('tenant_id', $tenantId);
+                    }
+                    $hotspotTotal = (float) (clone $hsBase)->sum('amount');
+                    $hotspotToday = (float) (clone $hsBase)->whereDate('sale_date', $todayEat)->sum('amount');
+                }
 
                 $billInformationData = [
                     'monthly_rent' => (float) ($billingStats->monthly_rent ?? 0),
@@ -155,8 +170,8 @@ class DashboardController extends Controller
                     'advance' => (float) ($billingStats->advance ?? 0),
                     'paid_amount' => (float) ($billingStats->paid_amount ?? 0),
                     'today_paid_amount' => (float) $todayPaid,
-                    'hotspot_total' => (float) $hotspotTotal,
-                    'hotspot_today' => (float) $hotspotToday,
+                    'hotspot_total' => $hotspotTotal,
+                    'hotspot_today' => $hotspotToday,
                     'due_amount' => -1 * (float) ($billingStats->due_amount_active ?? 0),
                     'by_status' => $billingByStatus,
                 ];

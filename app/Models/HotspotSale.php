@@ -10,7 +10,7 @@ class HotspotSale extends Model
 {
     use BelongsToTenant;
     protected $fillable = [
-        'router_name', 'voucher_code', 'profile', 'username',
+        'tenant_id', 'router_name', 'voucher_code', 'profile', 'username',
         'amount', 'payment_method', 'note', 'sale_date', 'sold_by',
     ];
 
