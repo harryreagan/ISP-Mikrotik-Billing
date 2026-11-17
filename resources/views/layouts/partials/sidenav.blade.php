@@ -76,3 +76,4 @@
         @include('layouts.partials.sidebarpanel')
     </div>
 </div>
+

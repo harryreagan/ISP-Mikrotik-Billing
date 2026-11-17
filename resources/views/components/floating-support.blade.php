@@ -1,5 +1,5 @@
 <!-- HSmart HQ Live Chat Desk (Identical to Retail Live Chat) -->
-<div id="hsmart-live-chat-root" class="print:hidden" style="position: fixed; bottom: 76px; right: 20px; z-index: 99999; font-family: 'Jost', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+<div id="hsmart-live-chat-root" class="print:hidden">
     <!-- Floating Trigger Button (Compact, Elegant, Pulsating) -->
     <button
         id="hsmart-chat-trigger"
@@ -190,6 +190,21 @@
 </div>
 
 <style>
+#hsmart-live-chat-root {
+    position: fixed !important;
+    right: 24px !important;
+    bottom: 24px !important;
+    z-index: 99999 !important;
+    font-family: 'Jost', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+@media (max-width: 767.98px) {
+    #hsmart-live-chat-root {
+        right: 14px !important;
+        bottom: 74px !important;
+    }
+}
+
 @keyframes ispPing {
     0% { transform: scale(1); opacity: 0.8; }
     75%, 100% { transform: scale(2.4); opacity: 0; }

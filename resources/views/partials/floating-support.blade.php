@@ -1,1 +1,1 @@
-@include('components.floating-support')
+<x-floating-support />

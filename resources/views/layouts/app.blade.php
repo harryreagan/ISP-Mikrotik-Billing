@@ -1396,7 +1396,7 @@
     <div id="codepagol-attribution" style="display:none" aria-hidden="true"
          data-credit="Powered by CodePagol | https://codepagol.com"></div>
 
-    @include('components.floating-support')
+    <x-floating-support />
 
 </body>
 </html>
