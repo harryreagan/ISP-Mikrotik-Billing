@@ -131,11 +131,20 @@ class RouterScriptGeneratorService
         $lines[] = "    :if ([:len [/interface bridge find name=hs-bridge]] = 0) do={";
         $lines[] = "        /interface bridge add name=hs-bridge comment=\"hsmart-hotspot-bridge\"";
         $lines[] = "    }";
-        $lines[] = "    :if ([:len [/interface find name=ether2]] > 0 && [:len [/interface bridge port find interface=ether2]] = 0) do={";
-        $lines[] = "        /interface bridge port add bridge=hs-bridge interface=ether2";
+        $lines[] = "    :do { :if ([:len [/interface list find name=LAN]] > 0 && [:len [/interface list member find list=LAN interface=hs-bridge]] = 0) do={ /interface list member add list=LAN interface=hs-bridge } } on-error={};";
+        $lines[] = "    :if ([:len [/interface find name=ether2]] > 0) do={";
+        $lines[] = "        :if ([:len [/interface bridge port find interface=ether2]] = 0) do={";
+        $lines[] = "            /interface bridge port add bridge=hs-bridge interface=ether2";
+        $lines[] = "        } else={";
+        $lines[] = "            /interface bridge port set [find interface=ether2] bridge=hs-bridge disabled=no";
+        $lines[] = "        }";
         $lines[] = "    }";
-        $lines[] = "    :if ([:len [/interface find name=ether4]] > 0 && [:len [/interface bridge port find interface=ether4]] = 0) do={";
-        $lines[] = "        /interface bridge port add bridge=hs-bridge interface=ether4";
+        $lines[] = "    :if ([:len [/interface find name=ether4]] > 0) do={";
+        $lines[] = "        :if ([:len [/interface bridge port find interface=ether4]] = 0) do={";
+        $lines[] = "            /interface bridge port add bridge=hs-bridge interface=ether4";
+        $lines[] = "        } else={";
+        $lines[] = "            /interface bridge port set [find interface=ether4] bridge=hs-bridge disabled=no";
+        $lines[] = "        }";
         $lines[] = "    }";
         $lines[] = "} on-error={};";
         $lines[] = "";
@@ -197,6 +206,7 @@ class RouterScriptGeneratorService
         $lines[] = "# --- Download Branded Captive Portal Templates ---";
         foreach (['login.html', 'rlogin.html', 'redirect.html', 'alogin.html', 'flogin.html', 'status.html', 'logout.html', 'error.html'] as $tplFile) {
             $lines[] = ":do { /tool fetch check-certificate=no mode=http url=\"{$portalBaseUrl}/{$tplFile}\" dst-path=\"hotspot/{$tplFile}\" } on-error={};";
+            $lines[] = ":do { :if ([:len [/file find name=flash]] > 0) do={ /tool fetch check-certificate=no mode=http url=\"{$portalBaseUrl}/{$tplFile}\" dst-path=\"flash/hotspot/{$tplFile}\" } } on-error={};";
         }
         $lines[] = "";
 

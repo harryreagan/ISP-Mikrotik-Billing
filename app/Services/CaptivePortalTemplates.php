@@ -1345,6 +1345,38 @@ HTML;
                 ]);
             }
 
+            // Ensure hs-bridge is a member of LAN interface-list so factory defconf firewall never blocks Hotspot clients
+            try {
+                $lists = $api->executeCommand('/interface/list/print');
+                $hasLanList = false;
+                if (is_array($lists)) {
+                    foreach ($lists as $l) {
+                        if (($l['name'] ?? '') === 'LAN') {
+                            $hasLanList = true;
+                            break;
+                        }
+                    }
+                }
+                if ($hasLanList) {
+                    $members = $api->executeCommand('/interface/list/member/print');
+                    $alreadyLan = false;
+                    if (is_array($members)) {
+                        foreach ($members as $m) {
+                            if (($m['list'] ?? '') === 'LAN' && ($m['interface'] ?? '') === 'hs-bridge') {
+                                $alreadyLan = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!$alreadyLan) {
+                        $api->executeCommand('/interface/list/member/add', [
+                            'list'      => 'LAN',
+                            'interface' => 'hs-bridge',
+                        ]);
+                    }
+                }
+            } catch (\Throwable $le) {}
+
             $bridgePorts = $api->executeCommand('/interface/bridge/port/print');
             $existingBridgeMap = [];
             if (is_array($bridgePorts)) {
