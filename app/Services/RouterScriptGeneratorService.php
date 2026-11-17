@@ -148,17 +148,49 @@ class RouterScriptGeneratorService
         $lines[] = "    }";
         $lines[] = "} on-error={};";
         $lines[] = "";
-        $lines[] = ":do {";
-        $lines[] = "    :if ([:len [/interface find name=wlan1]] > 0) do={";
-        $lines[] = "        :do { /interface wireless security-profiles set [find name=default] mode=none } on-error={};";
-        $lines[] = "        :do { /interface wireless set [find name=wlan1] mode=ap-bridge ssid=\"{$safeName} WiFi\" security-profile=default disabled=no } on-error={ :do { /interface wireless set [find name=wlan1] ssid=\"{$safeName} WiFi\" disabled=no } on-error={} };";
-        $lines[] = "        :if ([:len [/interface bridge port find interface=wlan1]] = 0) do={";
-        $lines[] = "            /interface bridge port add bridge=hs-bridge interface=wlan1";
-        $lines[] = "        } else={";
-        $lines[] = "            /interface bridge port set [find interface=wlan1] bridge=hs-bridge disabled=no";
-        $lines[] = "        }";
-        $lines[] = "    }";
-        $lines[] = "} on-error={};";
+        // Resolve Tenant Brand SSID for built-in MikroTik Wi-Fi (hAP lite, hAP ac2, hAP ax2, etc.)
+        $wifiSsid = "{$safeName} WiFi";
+        try {
+            $tId = (int) ($router->tenant_id ?: 1);
+            $brand = null;
+            if (\Illuminate\Support\Facades\Schema::hasTable('isp_portal_settings')) {
+                $brand = \Illuminate\Support\Facades\DB::table('isp_portal_settings')->where('tenant_id', $tId)->value('brand_name');
+            }
+            if (empty($brand)) {
+                $brand = \Illuminate\Support\Facades\DB::table('tenants')->where('id', $tId)->value('name');
+            }
+            if (!empty($brand)) {
+                $wifiSsid = self::escapeString(substr(trim($brand), 0, 28));
+            }
+        } catch (\Throwable $e) {}
+
+        // Auto-enable internal legacy wireless (wlan1 / wlan2 on hAP lite, hAP ac2, hAP ac3)
+        foreach (['wlan1' => $wifiSsid, 'wlan2' => substr($wifiSsid, 0, 25) . ' 5G'] as $wIf => $wSsid) {
+            $lines[] = ":do {";
+            $lines[] = "    :if ([:len [/interface find name={$wIf}]] > 0) do={";
+            $lines[] = "        :do { /interface wireless security-profiles set [find name=default] mode=none } on-error={};";
+            $lines[] = "        :do { /interface wireless set [find name={$wIf}] mode=ap-bridge ssid=\"{$wSsid}\" security-profile=default default-forwarding=yes disabled=no } on-error={ :do { /interface wireless set [find name={$wIf}] ssid=\"{$wSsid}\" disabled=no } on-error={} };";
+            $lines[] = "        :if ([:len [/interface bridge port find interface={$wIf}]] = 0) do={";
+            $lines[] = "            /interface bridge port add bridge=hs-bridge interface={$wIf}";
+            $lines[] = "        } else={";
+            $lines[] = "            /interface bridge port set [find interface={$wIf}] bridge=hs-bridge disabled=no";
+            $lines[] = "        }";
+            $lines[] = "    }";
+            $lines[] = "} on-error={};";
+        }
+        // Auto-enable RouterOS v7 wifi-qcom/wifiwave2 internal radios (wifi1 / wifi2 on hAP ax2, hAP ax3)
+        foreach (['wifi1' => $wifiSsid, 'wifi2' => substr($wifiSsid, 0, 25) . ' 5G'] as $wIf => $wSsid) {
+            $lines[] = ":do {";
+            $lines[] = "    :if ([:len [/interface find name={$wIf}]] > 0) do={";
+            $lines[] = "        :do { /interface wifi set [find name={$wIf}] configuration.mode=ap configuration.ssid=\"{$wSsid}\" security.authentication-types=\"\" disabled=no } on-error={ :do { /interface wifi set [find name={$wIf}] disabled=no } on-error={} };";
+            $lines[] = "        :if ([:len [/interface bridge port find interface={$wIf}]] = 0) do={";
+            $lines[] = "            /interface bridge port add bridge=hs-bridge interface={$wIf}";
+            $lines[] = "        } else={";
+            $lines[] = "            /interface bridge port set [find interface={$wIf}] bridge=hs-bridge disabled=no";
+            $lines[] = "        }";
+            $lines[] = "    }";
+            $lines[] = "} on-error={};";
+        }
         $lines[] = "";
         $lines[] = ":do {";
         $lines[] = "    :if ([:len [/ip address find comment=\"hsmart-hotspot\"]] = 0) do={";

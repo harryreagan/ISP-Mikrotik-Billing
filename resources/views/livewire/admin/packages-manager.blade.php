@@ -219,10 +219,10 @@
 
     {{-- Create / Edit Package Modal --}}
     @if($showModal)
-        <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.4); z-index: 1050;">
-            <div class="modal-dialog modal-dialog-centered modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
+        <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.5); z-index: 1055; overflow-y: auto;">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg" style="max-height: 92vh;">
+                <div class="modal-content" style="max-height: 92vh; display: flex; flex-direction: column;">
+                    <div class="modal-header" style="flex-shrink: 0;">
                         <div>
                             <h4 class="modal-title mb-0">
                                 {{ $editingId ? 'Edit Package' : 'Create Internet Package' }}
@@ -232,37 +232,88 @@
                         <button type="button" wire:click="$set('showModal', false)" class="btn-close" aria-label="Close"></button>
                     </div>
 
-                    <form wire:submit.prevent="savePackage">
-                        <div class="modal-body p-4">
-                            {{-- Package Type Selector --}}
+                    <form wire:submit.prevent="savePackage" style="display: flex; flex-direction: column; flex: 1 1 auto; overflow: hidden;">
+                        <div class="modal-body p-4" style="overflow-y: auto; flex: 1 1 auto;">
+                            @if($modalError)
+                                <div class="alert alert-danger py-2 px-3 small mb-3">
+                                    <i class="bi bi-exclamation-triangle-fill me-1"></i> {{ $modalError }}
+                                </div>
+                            @endif
+
+                            @if($errors->any())
+                                <div class="alert alert-danger py-2 px-3 small mb-3">
+                                    <strong>Please fix the following:</strong>
+                                    <ul class="mb-0 mt-1 ps-3">
+                                        @foreach($errors->all() as $err)
+                                            <li>{{ $err }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+
+                            {{-- Package Type Selector (Real Radio Inputs + Instant Visual State) --}}
                             <div class="mb-4">
-                                <label class="form-label">Package Type</label>
+                                <label class="form-label fw-semibold">Package Type <span class="text-danger">*</span></label>
                                 <div class="row g-3">
                                     <div class="col-6">
-                                        <div class="card p-3 border {{ $type === 'hotspot' ? 'border-warning bg-orange-50' : '' }}" 
-                                             style="cursor: pointer;"
-                                             wire:click="$set('type', 'hotspot')">
-                                            <div class="d-flex align-items-center">
-                                                <i class="bi bi-wifi fs-4 text-warning me-3"></i>
-                                                <div>
-                                                    <div class="fw-semibold text-dark">Hotspot WiFi</div>
-                                                    <div class="text-muted small">Captive portal, shared devices</div>
+                                        <label
+                                            for="pkgTypeHotspot"
+                                            wire:click="selectType('hotspot')"
+                                            class="d-block p-3 rounded-3 w-100 mb-0"
+                                            style="cursor: pointer; transition: all 0.15s ease; border: {{ $type === 'hotspot' ? '2px solid #f97316' : '1.5px solid #cbd5e1' }}; background: {{ $type === 'hotspot' ? '#fff7ed' : '#ffffff' }}; box-shadow: {{ $type === 'hotspot' ? '0 0 0 3px rgba(249,115,22,0.12)' : 'none' }};"
+                                        >
+                                            <div class="d-flex align-items-center justify-content-between">
+                                                <div class="d-flex align-items-center">
+                                                    <input
+                                                        type="radio"
+                                                        id="pkgTypeHotspot"
+                                                        name="package_type"
+                                                        value="hotspot"
+                                                        wire:model.live="type"
+                                                        class="form-check-input me-3 mt-0"
+                                                        style="width: 18px; height: 18px; accent-color: #f97316; cursor: pointer;"
+                                                    >
+                                                    <i class="bi bi-wifi fs-4 text-warning me-2"></i>
+                                                    <div>
+                                                        <div class="fw-bold text-dark">Hotspot WiFi</div>
+                                                        <div class="text-muted small">Captive portal, shared devices</div>
+                                                    </div>
                                                 </div>
+                                                @if($type === 'hotspot')
+                                                    <span class="badge rounded-pill" style="background: #f97316; color: #fff; font-size: 10px;">Selected</span>
+                                                @endif
                                             </div>
-                                        </div>
+                                        </label>
                                     </div>
                                     <div class="col-6">
-                                        <div class="card p-3 border {{ $type === 'pppoe' ? 'border-warning bg-orange-50' : '' }}" 
-                                             style="cursor: pointer;"
-                                             wire:click="$set('type', 'pppoe')">
-                                            <div class="d-flex align-items-center">
-                                                <i class="bi bi-hdd-network fs-4 text-info me-3"></i>
-                                                <div>
-                                                    <div class="fw-semibold text-dark">PPPoE Fiber</div>
-                                                    <div class="text-muted small">Dedicated home/business link</div>
+                                        <label
+                                            for="pkgTypePppoe"
+                                            wire:click="selectType('pppoe')"
+                                            class="d-block p-3 rounded-3 w-100 mb-0"
+                                            style="cursor: pointer; transition: all 0.15s ease; border: {{ $type === 'pppoe' ? '2px solid #0284c7' : '1.5px solid #cbd5e1' }}; background: {{ $type === 'pppoe' ? '#f0f9ff' : '#ffffff' }}; box-shadow: {{ $type === 'pppoe' ? '0 0 0 3px rgba(2,132,199,0.12)' : 'none' }};"
+                                        >
+                                            <div class="d-flex align-items-center justify-content-between">
+                                                <div class="d-flex align-items-center">
+                                                    <input
+                                                        type="radio"
+                                                        id="pkgTypePppoe"
+                                                        name="package_type"
+                                                        value="pppoe"
+                                                        wire:model.live="type"
+                                                        class="form-check-input me-3 mt-0"
+                                                        style="width: 18px; height: 18px; accent-color: #0284c7; cursor: pointer;"
+                                                    >
+                                                    <i class="bi bi-hdd-network fs-4 text-info me-2"></i>
+                                                    <div>
+                                                        <div class="fw-bold text-dark">PPPoE Fiber</div>
+                                                        <div class="text-muted small">Dedicated home/business link</div>
+                                                    </div>
                                                 </div>
+                                                @if($type === 'pppoe')
+                                                    <span class="badge rounded-pill" style="background: #0284c7; color: #fff; font-size: 10px;">Selected</span>
+                                                @endif
                                             </div>
-                                        </div>
+                                        </label>
                                     </div>
                                 </div>
                             </div>
@@ -409,10 +460,15 @@
                             </div>
                         </div>
 
-                        <div class="modal-footer">
+                        <div class="modal-footer" style="flex-shrink: 0; background: #ffffff; border-top: 1px solid #e2e8f0;">
                             <button type="button" wire:click="$set('showModal', false)" class="btn btn-secondary">Cancel</button>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-check2-circle me-1"></i> Save &amp; Sync to Routers
+                            <button type="submit" class="btn btn-primary" wire:loading.attr="disabled" wire:target="savePackage">
+                                <span wire:loading.remove wire:target="savePackage">
+                                    <i class="bi bi-check2-circle me-1"></i> Save &amp; Sync to Routers
+                                </span>
+                                <span wire:loading wire:target="savePackage">
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span> Saving...
+                                </span>
                             </button>
                         </div>
                     </form>

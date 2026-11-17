@@ -46,6 +46,7 @@ class PackagesManager extends Component
     // Feedback
     public ?string $feedbackMessage = null;
     public string $feedbackType = 'success';
+    public ?string $modalError = null;
 
     protected function rules(): array
     {
@@ -59,7 +60,7 @@ class PackagesManager extends Component
             'speed_upload_unit'   => 'required|in:Mbps,Kbps',
             'validity_value'      => 'required|integer|min:1',
             'validity_unit'       => 'required|in:minutes,hours,days,months',
-            'shared_users'        => 'required|integer|min:1|max:50',
+            'shared_users'        => $this->type === 'hotspot' ? 'required|integer|min:1|max:50' : 'nullable|integer|min:1|max:50',
             'sort_order'          => 'nullable|integer',
             'description'         => 'nullable|string|max:500',
         ];
@@ -72,6 +73,20 @@ class PackagesManager extends Component
         }
     }
 
+    public function selectType(string $type): void
+    {
+        $this->type = in_array($type, ['hotspot', 'pppoe'], true) ? $type : 'hotspot';
+        if (!$this->editingId) {
+            if ($this->type === 'pppoe' && $this->validity_unit === 'hours' && (int) $this->validity_value === 24) {
+                $this->validity_value = 30;
+                $this->validity_unit = 'days';
+            } elseif ($this->type === 'hotspot' && $this->validity_unit === 'days' && (int) $this->validity_value === 30) {
+                $this->validity_value = 24;
+                $this->validity_unit = 'hours';
+            }
+        }
+    }
+
     public function setTab(string $tab)
     {
         $this->tab = in_array($tab, ['all', 'hotspot', 'pppoe']) ? $tab : 'all';
@@ -81,17 +96,18 @@ class PackagesManager extends Component
     public function openCreateModal()
     {
         $this->resetValidation();
+        $this->modalError = null;
         $this->reset([
             'editingId', 'name', 'burst_speed', 'description'
         ]);
-        $this->type = 'hotspot';
-        $this->price = 50;
+        $this->type = $this->tab === 'pppoe' ? 'pppoe' : 'hotspot';
+        $this->price = $this->type === 'pppoe' ? 1500 : 50;
         $this->speed_download = 10;
         $this->speed_download_unit = 'Mbps';
         $this->speed_upload = 5;
         $this->speed_upload_unit = 'Mbps';
-        $this->validity_value = 24;
-        $this->validity_unit = 'hours';
+        $this->validity_value = $this->type === 'pppoe' ? 30 : 24;
+        $this->validity_unit = $this->type === 'pppoe' ? 'days' : 'hours';
         $this->unlimited_data = true;
         $this->data_limit_mb = null;
         $this->shared_users = 1;
@@ -147,65 +163,71 @@ class PackagesManager extends Component
 
     public function savePackage()
     {
+        $this->modalError = null;
         $this->validate();
 
         $tenantId = $this->resolveTenantId();
 
-        $rateLimit = "{$this->speed_upload}" . ($this->speed_upload_unit === 'Kbps' ? 'k' : 'M') . '/' .
-                     "{$this->speed_download}" . ($this->speed_download_unit === 'Kbps' ? 'k' : 'M');
+        try {
+            $rateLimit = "{$this->speed_upload}" . ($this->speed_upload_unit === 'Kbps' ? 'k' : 'M') . '/' .
+                         "{$this->speed_download}" . ($this->speed_download_unit === 'Kbps' ? 'k' : 'M');
 
-        $data = [
-            'tenant_id'           => $tenantId,
-            'package'             => $this->name,
-            'type'                => $this->type,
-            'price'               => $this->price,
-            'speed'               => "{$this->speed_download} {$this->speed_download_unit}",
-            'speed_download'      => $this->speed_download,
-            'speed_download_unit' => $this->speed_download_unit,
-            'speed_upload'        => $this->speed_upload,
-            'speed_upload_unit'   => $this->speed_upload_unit,
-            'burst_speed'         => $this->burst_speed ?: null,
-            'validity_value'      => $this->validity_value,
-            'validity_unit'       => $this->validity_unit,
-            'duration_value'      => $this->validity_value,
-            'duration_unit'       => $this->validity_unit,
-            'data_limit_mb'       => $this->unlimited_data ? null : $this->data_limit_mb,
-            'data_cap_mb'         => $this->unlimited_data ? null : $this->data_limit_mb,
-            'shared_users'        => $this->type === 'hotspot' ? $this->shared_users : 1,
-            'show_public'         => $this->show_public,
-            'show_on_site'        => $this->show_public,
-            'sort_order'          => $this->sort_order ?: 0,
-            'description'         => $this->description,
-            'is_active'           => $this->is_active,
-            'mikrotik_rate_limit' => $rateLimit,
-        ];
+            $data = [
+                'tenant_id'           => $tenantId,
+                'package'             => trim($this->name),
+                'type'                => in_array($this->type, ['hotspot', 'pppoe'], true) ? $this->type : 'hotspot',
+                'price'               => (float) $this->price,
+                'speed'               => "{$this->speed_download} {$this->speed_download_unit}",
+                'speed_download'      => (int) $this->speed_download,
+                'speed_download_unit' => $this->speed_download_unit,
+                'speed_upload'        => (int) $this->speed_upload,
+                'speed_upload_unit'   => $this->speed_upload_unit,
+                'burst_speed'         => $this->burst_speed ?: null,
+                'validity_value'      => (int) $this->validity_value,
+                'validity_unit'       => $this->validity_unit,
+                'duration_value'      => (int) $this->validity_value,
+                'duration_unit'       => $this->validity_unit,
+                'data_limit_mb'       => $this->unlimited_data ? null : ($this->data_limit_mb ?: null),
+                'data_cap_mb'         => $this->unlimited_data ? null : ($this->data_limit_mb ?: null),
+                'shared_users'        => $this->type === 'hotspot' ? max(1, (int) $this->shared_users) : 1,
+                'show_public'         => (bool) $this->show_public,
+                'show_on_site'        => (bool) $this->show_public,
+                'sort_order'          => (int) ($this->sort_order ?: 0),
+                'description'         => $this->description,
+                'is_active'           => (bool) $this->is_active,
+                'mikrotik_rate_limit' => $rateLimit,
+            ];
 
-        if ($this->editingId) {
-            $package = PackageList::forTenant($tenantId)->findOrFail($this->editingId);
-            $package->update($data);
-        } else {
-            $package = PackageList::create($data);
+            if ($this->editingId) {
+                $package = PackageList::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($this->editingId);
+                $package->update($data);
+            } else {
+                $package = PackageList::withoutGlobalScopes()->create($data);
+            }
+
+            // Attach Routers
+            $routerIds = [];
+            if (in_array('all', $this->selected_routers)) {
+                $routerIds = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->pluck('id')->toArray();
+            } else {
+                $routerIds = array_map('intval', array_filter($this->selected_routers, 'is_numeric'));
+            }
+            $package->routers()->sync($routerIds);
+
+            // Sync Profile to RouterOS (and refresh captive portal login.html if hotspot)
+            $syncResults = $this->syncPackageToRouters($package);
+
+            $this->showModal = false;
+            $this->feedbackType = 'success';
+            $this->feedbackMessage = ucfirst($package->type) . " package '{$package->package}' saved successfully. " . $syncResults;
+        } catch (\Throwable $e) {
+            Log::error('[PackagesManager] savePackage error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            $this->modalError = 'Failed to save package: ' . $e->getMessage();
         }
-
-        // Attach Routers
-        $routerIds = [];
-        if (in_array('all', $this->selected_routers)) {
-            $routerIds = Router::forTenant($tenantId)->pluck('id')->toArray();
-        } else {
-            $routerIds = array_map('intval', array_filter($this->selected_routers, 'is_numeric'));
-        }
-        $package->routers()->sync($routerIds);
-
-        // Sync Profile to RouterOS
-        $syncResults = $this->syncPackageToRouters($package);
-
-        $this->showModal = false;
-        $this->feedbackType = 'success';
-        $this->feedbackMessage = "Package '{$package->package}' saved successfully. " . $syncResults;
     }
 
     /**
-     * Push package configuration profile to linked MikroTik routers.
+     * Push package configuration profile to linked MikroTik routers using proper RouterOS API slash syntax.
      */
     public function syncPackageToRouters(PackageList $package): string
     {
@@ -216,7 +238,8 @@ class PackagesManager extends Component
 
         $rateLimit = $package->getRateLimitString();
         $sessionTimeout = $package->getSessionTimeoutString();
-        $profileName = "hs_" . preg_replace('/[^a-zA-Z0-9_\-]/', '_', $package->package);
+        $prefix = $package->type === 'pppoe' ? 'ppp_' : 'hs_';
+        $profileName = $prefix . preg_replace('/[^a-zA-Z0-9_\-]/', '_', $package->package);
 
         $syncedCount = 0;
         $failedCount = 0;
@@ -224,39 +247,69 @@ class PackagesManager extends Component
         foreach ($routers as $router) {
             try {
                 $host = $router->vpn_ip ?: $router->ip;
-                if (empty($host) || empty($router->username)) {
+                $apiUser = $router->api_user ?: ($router->username ?: 'admin');
+                if (empty($host) || empty($apiUser)) {
                     throw new \Exception("Router IP or credentials not configured.");
                 }
 
                 $port = (int) ($router->api_port ?: 8728);
-                $password = $router->password;
-                if (!empty($router->api_password)) {
+                $rawPass = $router->api_password ?: $router->password;
+                $password = $rawPass;
+                if (!empty($rawPass)) {
                     try {
-                        $password = \Illuminate\Support\Facades\Crypt::decryptString($router->api_password);
-                    } catch (\Throwable $e) {}
+                        $password = \Illuminate\Support\Facades\Crypt::decryptString($rawPass);
+                    } catch (\Throwable $e) {
+                        $password = $rawPass;
+                    }
                 }
 
-                $api = new MikrotikApiService($host, $port, $router->username, $password, 3);
+                $api = new MikrotikApiService($host, $port, $apiUser, $password, 4);
 
                 if ($package->type === 'hotspot') {
-                    // Hotspot User Profile
-                    $checkCmd = "/ip hotspot user profile print where name=\"{$profileName}\"";
-                    $existing = $api->executeCommand($checkCmd);
+                    // Hotspot User Profile via proper RouterOS API slash commands
+                    $existing = $api->executeCommand('/ip/hotspot/user/profile/print', [], ['name' => $profileName]);
 
-                    if (!empty($existing) && is_array($existing) && count($existing) > 0) {
-                        $api->executeCommand("/ip hotspot user profile set [find name=\"{$profileName}\"] rate-limit=\"{$rateLimit}\" session-timeout=\"{$sessionTimeout}\" shared-users={$package->shared_users}");
+                    if (is_array($existing) && !empty($existing[0]['.id'])) {
+                        $api->executeCommand('/ip/hotspot/user/profile/set', [
+                            'rate-limit'      => $rateLimit,
+                            'session-timeout' => $sessionTimeout,
+                            'shared-users'    => (string) max(1, (int) $package->shared_users),
+                        ], ['.id' => $existing[0]['.id']]);
                     } else {
-                        $api->executeCommand("/ip hotspot user profile add name=\"{$profileName}\" rate-limit=\"{$rateLimit}\" session-timeout=\"{$sessionTimeout}\" shared-users={$package->shared_users} transparent-proxy=yes status-autorefresh=1m");
+                        $api->executeCommand('/ip/hotspot/user/profile/add', [
+                            'name'               => $profileName,
+                            'rate-limit'         => $rateLimit,
+                            'session-timeout'    => $sessionTimeout,
+                            'shared-users'       => (string) max(1, (int) $package->shared_users),
+                            'transparent-proxy'  => 'yes',
+                            'status-autorefresh' => '1m',
+                        ]);
                     }
-                } else {
-                    // PPPoE PPP Profile
-                    $checkCmd = "/ppp profile print where name=\"{$profileName}\"";
-                    $existing = $api->executeCommand($checkCmd);
 
-                    if (!empty($existing) && is_array($existing) && count($existing) > 0) {
-                        $api->executeCommand("/ppp profile set [find name=\"{$profileName}\"] rate-limit=\"{$rateLimit}\"");
+                    // Refresh captive portal login.html on router so new/edited Hotspot plan appears immediately
+                    try {
+                        $fetchUrl = "http://isp.hsmart.co.ke/provision/hotspot-portal/{$router->id}/login.html";
+                        $api->executeCommand('/tool/fetch', [
+                            'url'      => $fetchUrl,
+                            'dst-path' => 'hotspot/login.html',
+                            'mode'     => 'http',
+                        ]);
+                    } catch (\Throwable $fe) {}
+                } else {
+                    // PPPoE PPP Profile via proper RouterOS API slash commands
+                    $existing = $api->executeCommand('/ppp/profile/print', [], ['name' => $profileName]);
+
+                    if (is_array($existing) && !empty($existing[0]['.id'])) {
+                        $api->executeCommand('/ppp/profile/set', [
+                            'rate-limit' => $rateLimit,
+                        ], ['.id' => $existing[0]['.id']]);
                     } else {
-                        $api->executeCommand("/ppp profile add name=\"{$profileName}\" rate-limit=\"{$rateLimit}\" local-address=10.0.0.1 remote-address=pppoe-pool");
+                        $api->executeCommand('/ppp/profile/add', [
+                            'name'           => $profileName,
+                            'rate-limit'     => $rateLimit,
+                            'local-address'  => '10.0.0.1',
+                            'remote-address' => 'pppoe-pool',
+                        ]);
                     }
                 }
 
