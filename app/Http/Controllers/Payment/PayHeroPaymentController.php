@@ -67,7 +67,7 @@ class PayHeroPaymentController extends Controller
                 if ($checkoutId) {
                     MpesaStkTransaction::where('checkout_request_id', $checkoutId)->update([
                         'raw_callback' => [
-                            'package_id' => $request->package_id ?? null,
+                            'package_id' => $request->plan_id ?? $request->package_id ?? null,
                             'router_id'  => $request->router_id ?? null,
                             'mac'        => $request->mac ?? null,
                             'ip'         => $request->ip ?? null,
@@ -80,20 +80,20 @@ class PayHeroPaymentController extends Controller
                     'success'             => true,
                     'checkout_request_id' => $checkoutId,
                     'message'             => $result['message'] ?? 'STK push sent to your phone. Please enter your M-Pesa PIN.',
-                ]);
+                ])->header('Access-Control-Allow-Origin', '*');
             }
 
             return response()->json([
                 'success' => false,
                 'message' => $result['message'] ?? 'Failed to initiate STK push.',
-            ], 422);
+            ], 422)->header('Access-Control-Allow-Origin', '*');
 
         } catch (\Throwable $e) {
             Log::error('[PayHeroPaymentController] initiatePortalPayment error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Payment service error: ' . $e->getMessage(),
-            ], 500);
+            ], 500)->header('Access-Control-Allow-Origin', '*');
         }
     }
 
@@ -110,17 +110,21 @@ class PayHeroPaymentController extends Controller
 
             // 1. If already completed in local DB
             if ($stkTx && $stkTx->status === 'completed') {
+                $code = strtoupper($stkTx->mpesa_receipt_number ?: $stkTx->checkout_request_id);
                 return response()->json([
                     'status'       => 'completed',
-                    'voucher_code' => $stkTx->mpesa_receipt_number ?: $stkTx->checkout_request_id,
-                    'password'     => substr(preg_replace('/[^0-9]/', '', $stkTx->phone), -4) ?: '1234',
-                ]);
+                    'voucher_code' => $code,
+                    'password'     => $code,
+                ])->header('Access-Control-Allow-Origin', '*');
             }
 
             // 2. If pending, query PayHero API reverse verification directly
             if ($stkTx && $stkTx->status === 'pending') {
                 try {
-                    $verifyResult = $this->payheroService->verifyStatus($checkoutId);
+                    $meta = is_array($stkTx->raw_callback) ? $stkTx->raw_callback : [];
+                    $tenantId = (int) ($meta['tenant_id'] ?? ($request->query('tenant_id') ?: 1));
+                    $service = PayHeroPaymentService::forTenant($tenantId);
+                    $verifyResult = $service->verifyStatus($checkoutId);
                     if (!empty($verifyResult['is_paid'])) {
                         $vData = $verifyResult['data'] ?? [];
                         $apiReceipt = strtoupper(trim((string) ($vData['mpesa_receipt_number'] ?? $vData['response']['mpesa_receipt_number'] ?? $checkoutId)));
@@ -131,14 +135,14 @@ class PayHeroPaymentController extends Controller
                             'mpesa_receipt_number' => $apiReceipt,
                         ]);
 
-                        // Fulfill subscriber or record collection
+                        // Fulfill subscriber or record collection & provision hotspot voucher
                         $this->fulfillSuccessfulTransaction($stkTx, $apiReceipt, $apiAmount);
 
                         return response()->json([
                             'status'       => 'completed',
                             'voucher_code' => $apiReceipt,
-                            'password'     => substr(preg_replace('/[^0-9]/', '', $stkTx->phone), -4) ?: '1234',
-                        ]);
+                            'password'     => $apiReceipt,
+                        ])->header('Access-Control-Allow-Origin', '*');
                     }
                 } catch (\Throwable $e) {
                     Log::warning('[PayHero checkPortalStatus] Verification poll exception: ' . $e->getMessage());
@@ -158,15 +162,16 @@ class PayHeroPaymentController extends Controller
                 ->first();
 
             if ($recent) {
+                $code = strtoupper($recent->transaction_id);
                 return response()->json([
                     'status'       => 'completed',
-                    'voucher_code' => $recent->transaction_id,
-                    'password'     => substr(preg_replace('/[^0-9]/', '', $phone), -4) ?: '1234',
-                ]);
+                    'voucher_code' => $code,
+                    'password'     => $code,
+                ])->header('Access-Control-Allow-Origin', '*');
             }
         }
 
-        return response()->json(['status' => 'pending']);
+        return response()->json(['status' => 'pending'])->header('Access-Control-Allow-Origin', '*');
     }
 
     /**
@@ -174,6 +179,15 @@ class PayHeroPaymentController extends Controller
      */
     protected function fulfillSuccessfulTransaction(MpesaStkTransaction $stkTx, string $receipt, float $amount): void
     {
+        $receipt = strtoupper(trim($receipt));
+
+        // Always provision Hotspot voucher on tenant's router(s) so M-Pesa receipt code & phone work immediately
+        try {
+            $this->provisionHotspotVoucherOnRouter($stkTx, $receipt);
+        } catch (\Throwable $he) {
+            Log::warning('[PayHero] Hotspot voucher router provisioning note: ' . $he->getMessage());
+        }
+
         // Check idempotency
         if (CollectionSummary::where('transaction_id', $receipt)->exists()) {
             return;
@@ -223,6 +237,70 @@ class PayHeroPaymentController extends Controller
                 'invoice_no'                    => $invoiceNo,
                 'bill_month'                    => now()->format('F Y'),
             ]);
+        }
+    }
+
+    /**
+     * Provision a paid Hotspot user on the MikroTik router so the receipt code and phone number can log in immediately.
+     */
+    protected function provisionHotspotVoucherOnRouter(MpesaStkTransaction $stkTx, string $receipt): void
+    {
+        $meta = is_array($stkTx->raw_callback) ? $stkTx->raw_callback : [];
+        $routerId = $meta['router_id'] ?? null;
+        $tenantId = (int) ($meta['tenant_id'] ?? 1);
+        $packageId = $meta['package_id'] ?? null;
+
+        $limitUptime = '1d';
+        if ($packageId) {
+            $pkg = PackageList::withoutGlobalScopes()->find($packageId);
+            if ($pkg && !empty($pkg->validity)) {
+                $v = strtolower(trim($pkg->validity));
+                if (str_contains($v, 'hour')) {
+                    $hrs = (int) filter_var($v, FILTER_SANITIZE_NUMBER_INT) ?: 1;
+                    $limitUptime = "{$hrs}h";
+                } elseif (str_contains($v, 'day')) {
+                    $days = (int) filter_var($v, FILTER_SANITIZE_NUMBER_INT) ?: 1;
+                    $limitUptime = "{$days}d";
+                } elseif (str_contains($v, 'week')) {
+                    $wks = (int) filter_var($v, FILTER_SANITIZE_NUMBER_INT) ?: 1;
+                    $limitUptime = ($wks * 7) . "d";
+                } elseif (str_contains($v, 'month')) {
+                    $limitUptime = '30d';
+                }
+            }
+        }
+
+        $routersQuery = \App\Models\Router::withoutGlobalScopes()->where('status', 'online');
+        if ($routerId) {
+            $routersQuery->where('id', $routerId);
+        } else {
+            $routersQuery->where('tenant_id', $tenantId);
+        }
+        $routers = $routersQuery->get();
+
+        foreach ($routers as $router) {
+            $host = $router->vpn_ip ?: $router->ip;
+            if (!$host) continue;
+            $port = (int) ($router->api_port ?: 8728);
+            $user = $router->api_user ?: ($router->username ?: 'admin');
+            try {
+                $pass = \Illuminate\Support\Facades\Crypt::decryptString($router->api_password ?: $router->password);
+            } catch (\Throwable $e) {
+                $pass = $router->api_password ?: $router->password;
+            }
+
+            try {
+                $api = new \App\Services\MikrotikApiService($host, $port, $user, $pass, 5);
+                $code = strtoupper(trim($receipt));
+                $api->executeCommand('/ip/hotspot/user/add', [
+                    'name'         => $code,
+                    'password'     => $code,
+                    'limit-uptime' => $limitUptime,
+                    'comment'      => 'M-Pesa ' . ($stkTx->phone ?: ''),
+                ]);
+            } catch (\Throwable $e) {
+                Log::debug("Hotspot user add note on {$router->name}: " . $e->getMessage());
+            }
         }
     }
 

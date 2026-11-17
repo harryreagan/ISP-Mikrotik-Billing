@@ -226,16 +226,31 @@ Route::match(['get', 'post'], '/captive-portal/preview', function(\Illuminate\Ht
     $html = \App\Services\CaptivePortalTemplates::render($template, $settings, $plans);
     return response($html)->header('Content-Type', 'text/html');
 })->name('captive-portal.preview');
-Route::get('/captive-portal', fn() => redirect()->route('captive-portal.preview'))->name('captive-portal.live');
-Route::get('/hotspot/preview', fn() => redirect()->route('captive-portal.preview'))->name('hotspot.preview');
+Route::get('/captive-portal', fn(\Illuminate\Http\Request $r) => redirect()->route('captive-portal.preview', $r->query()))->name('captive-portal.live');
+Route::get('/hotspot/preview', fn(\Illuminate\Http\Request $r) => redirect()->route('captive-portal.preview', $r->query()))->name('hotspot.preview');
 
-// MikroTik Automated Provisioning Endpoints (.rsc Bootstrap & Done Callback)
+// MikroTik Automated Provisioning Endpoints (.rsc Bootstrap, Done Callback & Hotspot Portal Template Fetch)
 Route::prefix('provision')->group(function () {
+    Route::get('/hotspot-portal/{router}/{file?}', function ($routerId, $file = 'login.html') {
+        $router = \App\Models\Router::withoutGlobalScopes()->find($routerId);
+        if (!$router) {
+            abort(404, 'Router not found');
+        }
+        $html = \App\Services\CaptivePortalTemplates::renderForRouter($router, (string) $file);
+        return response($html, 200, [
+            'Content-Type'  => 'text/plain; charset=utf-8',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+        ]);
+    })->name('provision.hotspot-portal');
+
     Route::get('/{token}/bootstrap', [\App\Http\Controllers\Api\ProvisioningController::class, 'bootstrap'])->middleware('throttle:60,1');
     Route::get('/{token}/done', [\App\Http\Controllers\Api\ProvisioningController::class, 'done'])->middleware('throttle:60,1');
 });
 
-Route::get('/portal', function () {
+Route::get('/portal', function (\Illuminate\Http\Request $r) {
+    if ($r->has('router') || $r->has('router_id') || $r->has('mac') || $r->has('link-login-only')) {
+        return redirect()->route('captive-portal.preview', $r->query());
+    }
     return redirect('/portal/login');
 });
 

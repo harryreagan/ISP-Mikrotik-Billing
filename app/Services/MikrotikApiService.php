@@ -41,9 +41,15 @@ class MikrotikApiService
         try {
             $query = new Query($command);
 
-            // Add filters (?) first as required by RouterOS API for some commands
+            $isPrint = str_ends_with(trim($command), '/print');
+
+            // Add filters (?) for /print queries, or (=) equal parameters for /set, /remove, /enable, /disable
             foreach ($filters as $key => $value) {
-                $query->where($key, $value);
+                if ($isPrint) {
+                    $query->where($key, $value);
+                } else {
+                    $query->equal($key, $value);
+                }
             }
 
             // Add parameters (=)

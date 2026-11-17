@@ -1345,55 +1345,15 @@ class RoutersManager extends Component
                 }
             } catch (\Throwable $e) {}
 
-            // 8. Walled Garden Entries
+            // 8. Push complete Hotspot Bridge, Built-in Wi-Fi, Walled Garden (incl. ICMP AP bypass), and all Captive Portal templates
             try {
-                $wgHosts = [
-                    '*.hsmart.co.ke',
-                    'isp.hsmart.co.ke',
-                    '*.payhero.co.ke',
-                    'api.payhero.co.ke',
-                    '*.safaricom.co.ke',
-                ];
-                $existingWg = $api->executeCommand('/ip/hotspot/walled-garden/print');
-                $existingHosts = [];
-                if (is_array($existingWg)) {
-                    foreach ($existingWg as $w) {
-                        if (!empty($w['dst-host'])) $existingHosts[] = strtolower($w['dst-host']);
-                    }
-                }
-                foreach ($wgHosts as $tgt) {
-                    if (!in_array(strtolower($tgt), $existingHosts)) {
-                        $api->executeCommand('/ip/hotspot/walled-garden/add', ['dst-host' => $tgt, 'action' => 'allow']);
-                    }
-                }
+                \App\Services\CaptivePortalTemplates::pushAllToRouter($router);
+            } catch (\Throwable $e) {
+                Log::warning("applyAutomaticFix pushAllToRouter warning: " . $e->getMessage());
+            }
 
-                // Walled Garden IP for server
-                $existingWgIp = $api->executeCommand('/ip/hotspot/walled-garden/ip/print');
-                $hasServerIp = false;
-                if (is_array($existingWgIp)) {
-                    foreach ($existingWgIp as $wi) {
-                        if (($wi['dst-address'] ?? '') === '213.199.49.216') {
-                            $hasServerIp = true;
-                            break;
-                        }
-                    }
-                }
-                if (!$hasServerIp) {
-                    $api->executeCommand('/ip/hotspot/walled-garden/ip/add', ['dst-address' => '213.199.49.216', 'action' => 'accept']);
-                }
-            } catch (\Throwable $e) {}
-
-            // 9. Upload branded captive portal login.html
-            try {
-                $loginHtml = $this->buildRouterLoginHtml($router);
-                $api->executeCommand('/file/add', [
-                    'name'     => 'hotspot/login.html',
-                    'contents' => $loginHtml,
-                ]);
-            } catch (\Throwable $e) {}
-
-            session()->flash('success', "Hotspot settings and captive portal applied automatically to {$router->name}!");
-            $this->dispatch('show-toast', ['type' => 'success', 'message' => "Hotspot configured successfully!"]);
+            session()->flash('success', "Hotspot settings, built-in Wi-Fi bridge, and captive portal applied automatically to {$router->name}!");
+            $this->dispatch('show-toast', ['type' => 'success', 'message' => "Hotspot & Captive Portal configured successfully!"]);
         } catch (\Throwable $e) {
             session()->flash('error', "Automatic fix failed: " . $e->getMessage());
             $this->dispatch('show-toast', ['type' => 'error', 'message' => "Automatic fix failed: " . $e->getMessage()]);
@@ -1409,8 +1369,9 @@ class RoutersManager extends Component
         $this->portalRouterId = $routerId;
         $router = Router::where('id', $routerId)->first();
         $this->portalRouterName = $router ? ($router->name ?: $router->router_name) : 'Router';
+        $tenantId = $router ? ($router->tenant_id ?: $this->getTenantId()) : $this->getTenantId();
         
-        $portalUrl = "https://isp.hsmart.co.ke/portal?router={$routerId}";
+        $portalUrl = "https://isp.hsmart.co.ke/captive-portal/preview?router={$routerId}&tenant_id={$tenantId}";
         $this->portalPreviewUrl = $portalUrl;
         $this->portalQrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" . urlencode($portalUrl);
         $this->showPortalModal = true;
@@ -1433,26 +1394,12 @@ class RoutersManager extends Component
             return;
         }
 
-        $host = $router->vpn_ip ?: $router->ip;
-        $port = (int) ($router->api_port ?: 8728);
-        $user = $router->api_user ?: ($router->username ?: 'admin');
-        $pass = '';
         try {
-            $pass = Crypt::decryptString($router->api_password ?: $router->password);
-        } catch (\Throwable $e) {
-            $pass = $router->api_password ?: $router->password;
-        }
+            $res = \App\Services\CaptivePortalTemplates::pushAllToRouter($router);
+            $count = count($res['files_uploaded'] ?? []);
 
-        try {
-            $api = new MikrotikApiService($host, $port, $user, $pass, 6);
-            $loginHtml = $this->buildRouterLoginHtml($router);
-            $api->executeCommand('/file/add', [
-                'name'     => 'hotspot/login.html',
-                'contents' => $loginHtml,
-            ]);
-
-            session()->flash('success', "Branded captive portal pushed to {$router->name} successfully!");
-            $this->dispatch('show-toast', ['type' => 'success', 'message' => "Portal uploaded to {$router->name}!"]);
+            session()->flash('success', "Branded captive portal ({$count} files) & Hotspot config pushed to {$router->name} successfully!");
+            $this->dispatch('show-toast', ['type' => 'success', 'message' => "Portal & Hotspot uploaded to {$router->name}!"]);
         } catch (\Throwable $e) {
             session()->flash('error', "Push failed: " . $e->getMessage());
             $this->dispatch('show-toast', ['type' => 'error', 'message' => "Push failed: " . $e->getMessage()]);
@@ -1463,105 +1410,7 @@ class RoutersManager extends Component
 
     protected function buildRouterLoginHtml(Router $router): string
     {
-        $tenantId = $router->tenant_id ?: $this->getTenantId();
-        $brandName = 'HSmart WiFi';
-        $supportPhone = '0700 000 000';
-        try {
-            $tenant = DB::table('tenants')->where('id', $tenantId)->first();
-            if ($tenant && !empty($tenant->name)) $brandName = $tenant->name;
-            if ($tenant && !empty($tenant->phone)) $supportPhone = $tenant->phone;
-
-            if (Schema::hasTable('isp_portal_settings')) {
-                $ps = DB::table('isp_portal_settings')->where('tenant_id', $tenantId)->first();
-                if ($ps && !empty($ps->brand_name)) $brandName = $ps->brand_name;
-                if ($ps && !empty($ps->support_phone)) $supportPhone = $ps->support_phone;
-            }
-        } catch (\Throwable $e) {}
-
-        $portalUrl = "https://isp.hsmart.co.ke/portal?router={$router->id}";
-
-        return <<<HTML
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>{$brandName} &mdash; Hotspot Login</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-        body { background: #f8fafc; color: #0f172a; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; }
-        .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; max-width: 420px; width: 100%; padding: 28px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
-        .logo-wrap { display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
-        .logo-tile { width: 56px; height: 56px; border-radius: 14px; background: #F57C00; display: flex; align-items: center; justify-content: center; color: #fff; }
-        .brand-title { font-size: 20px; font-weight: 800; text-align: center; color: #0f172a; margin-bottom: 4px; }
-        .brand-sub { font-size: 13px; color: #64748b; text-align: center; margin-bottom: 24px; }
-        .error-box { background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; padding: 10px 12px; border-radius: 10px; font-size: 13px; margin-bottom: 16px; text-align: center; }
-        .form-group { margin-bottom: 16px; }
-        .label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .input { width: 100%; height: 46px; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: 0 14px; font-size: 16px; font-weight: 600; text-align: center; letter-spacing: 2px; color: #0f172a; outline: none; transition: border-color 0.2s; text-transform: uppercase; }
-        .input:focus { border-color: #F57C00; box-shadow: 0 0 0 3px rgba(245, 124, 0, 0.15); }
-        .btn-submit { width: 100%; height: 46px; border: none; border-radius: 10px; background: #F57C00; color: #ffffff; font-size: 15px; font-weight: 700; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .btn-submit:hover { background: #e65100; }
-        .divider { display: flex; align-items: center; text-align: center; margin: 20px 0; color: #94a3b8; font-size: 12px; }
-        .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid #e2e8f0; }
-        .divider span { padding: 0 10px; }
-        .btn-mpesa { width: 100%; height: 44px; border: 1.5px solid #16a34a; border-radius: 10px; background: #f0fdf4; color: #15803d; font-size: 14px; font-weight: 700; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; }
-        .btn-mpesa:hover { background: #dcfce7; }
-        .footer { text-align: center; margin-top: 24px; font-size: 12px; color: #94a3b8; }
-        .footer strong { color: #64748b; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <div class="logo-wrap">
-            <div class="logo-tile">
-                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
-                    <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
-                    <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
-                    <line x1="12" y1="20" x2="12.01" y2="20"></line>
-                </svg>
-            </div>
-        </div>
-
-        <h1 class="brand-title">\$(identity)</h1>
-        <p class="brand-sub">Connect to high-speed internet</p>
-
-        \$(if error)
-        <div class="error-box">\$(error)</div>
-        \$(endif)
-
-        <form name="login" action="\$(link-login-only)" method="post">
-            <input type="hidden" name="dst" value="\$(link-orig)" />
-            <input type="hidden" name="popup" value="true" />
-
-            <div class="form-group">
-                <label class="label">Voucher / Access Code</label>
-                <input class="input" type="text" name="username" placeholder="e.g. HS7890" value="\$(username)" required autofocus autocapitalize="characters" oninput="this.value = this.value.toUpperCase(); document.forms['login'].elements['password'].value = this.value;" />
-                <input type="hidden" name="password" value="\$(username)" />
-            </div>
-
-            <button type="submit" class="btn-submit">
-                <span>Connect to Internet</span>
-            </button>
-        </form>
-
-        <div class="divider">
-            <span>Don't have a voucher?</span>
-        </div>
-
-        <a href="{$portalUrl}" class="btn-mpesa" target="_blank">
-            <span>Buy Package via M-Pesa</span>
-        </a>
-
-        <div class="footer">
-            <p>Helpline: <strong>{$supportPhone}</strong></p>
-            <p style="margin-top: 4px;">Powered by {$brandName}</p>
-        </div>
-    </div>
-</body>
-</html>
-HTML;
+        return \App\Services\CaptivePortalTemplates::renderForRouter($router, 'login.html');
     }
 
     public function render()

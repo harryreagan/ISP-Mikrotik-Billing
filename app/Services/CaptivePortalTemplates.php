@@ -282,6 +282,29 @@ CARD;
 
             <div id="statusMessage" class="status-msg"></div>
 
+            <!-- Voucher / Access Code Login Form (Works on MikroTik Hotspot & Cloud Portal) -->
+            <div style="margin-top: 18px; padding-top: 16px; border-top: 1px dashed rgba(148, 163, 184, 0.35);">
+                <form id="voucherLoginForm" name="login" action="$(link-login-only)" method="post" onsubmit="return handleVoucherSubmit(event)">
+                    <input type="hidden" name="dst" value="$(link-orig)" />
+                    <input type="hidden" name="popup" value="true" />
+                    <label class="form-label" for="voucherCodeInput">Have a Voucher or M-Pesa Receipt Code?</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text"
+                               id="voucherCodeInput"
+                               name="username"
+                               class="input-box"
+                               placeholder="Enter Voucher / Receipt Code"
+                               autocapitalize="characters"
+                               oninput="this.value = this.value.toUpperCase().trim(); document.getElementById('voucherPassInput').value = this.value;"
+                               style="flex: 1; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">
+                        <input type="hidden" id="voucherPassInput" name="password" value="" />
+                        <button type="submit" class="btn-pay" style="width: auto; padding: 0 18px; white-space: nowrap; font-size: 14px;">
+                            Connect &rarr;
+                        </button>
+                    </div>
+                </form>
+            </div>
+
             <div class="footer-note">
                 <p>{$instructions}</p>
                 <div class="footer-links">
@@ -299,6 +322,22 @@ CARD;
 let selectedPlanId = '{$packagesList[0]['id']}';
 let selectedPlanPrice = '{$packagesList[0]['price']}';
 let selectedPlanName = '{$packagesList[0]['name']}';
+let stkPollTimer = null;
+
+const apiBase = window.location.hostname.includes('hsmart.co.ke') ? '' : 'https://isp.hsmart.co.ke';
+const urlParams = new URLSearchParams(window.location.search);
+
+function getMikrotikVar(rawVal, paramName, fallback = '') {
+    if (urlParams.get(paramName)) return urlParams.get(paramName);
+    if (rawVal && !rawVal.startsWith('$(')) return rawVal;
+    return fallback;
+}
+
+const clientMac = getMikrotikVar('\$(mac)', 'mac', '');
+const clientIp = getMikrotikVar('\$(ip)', 'ip', '');
+const linkLoginOnly = getMikrotikVar('\$(link-login-only)', 'link-login-only', urlParams.get('link_login') || 'http://10.5.50.1/login');
+const linkOrig = getMikrotikVar('\$(link-orig)', 'link-orig', urlParams.get('link_orig') || 'https://www.google.com');
+const mtError = getMikrotikVar('\$(error)', 'error', '');
 
 function selectPlan(card, id, price, name) {
     document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
@@ -324,12 +363,76 @@ function normalizeKenyanPhone(phone) {
     return digits.length >= 10 ? digits : null;
 }
 
+function handleVoucherSubmit(e) {
+    const codeInput = document.getElementById('voucherCodeInput');
+    const passInput = document.getElementById('voucherPassInput');
+    const form = document.getElementById('voucherLoginForm');
+    if (!codeInput || !codeInput.value.trim()) {
+        e.preventDefault();
+        showStatus('Please enter a valid Voucher or M-Pesa Receipt Code.', 'error');
+        return false;
+    }
+    const code = codeInput.value.trim().toUpperCase();
+    codeInput.value = code;
+    if (passInput) passInput.value = code;
+
+    const currentAction = form.getAttribute('action') || '';
+    if (currentAction.startsWith('$(') || !currentAction) {
+        form.setAttribute('action', linkLoginOnly);
+    }
+    return true;
+}
+
+function autoConnectHotspot(voucherCode, password) {
+    const codeInput = document.getElementById('voucherCodeInput');
+    const passInput = document.getElementById('voucherPassInput');
+    const form = document.getElementById('voucherLoginForm');
+    if (codeInput && form) {
+        codeInput.value = voucherCode;
+        if (passInput) passInput.value = password || voucherCode;
+        const currentAction = form.getAttribute('action') || '';
+        if (currentAction.startsWith('$(') || !currentAction) {
+            form.setAttribute('action', linkLoginOnly);
+        }
+        showStatus('Payment confirmed! Connecting your device to internet (Voucher: ' + voucherCode + ')...', 'success');
+        setTimeout(() => { form.submit(); }, 600);
+    }
+}
+
+function startPaymentPolling(checkoutId, phone) {
+    if (stkPollTimer) clearInterval(stkPollTimer);
+    let attempts = 0;
+    stkPollTimer = setInterval(() => {
+        attempts++;
+        if (attempts > 40) {
+            clearInterval(stkPollTimer);
+            return;
+        }
+        const q = new URLSearchParams({
+            checkout_id: checkoutId || '',
+            phone: phone || '',
+            tenant_id: '{$tenantId}',
+            router_id: '{$routerId}'
+        });
+        fetch(apiBase + '/api/payment/daraja/status?' + q.toString(), {
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res && res.status === 'completed' && res.voucher_code) {
+                clearInterval(stkPollTimer);
+                autoConnectHotspot(res.voucher_code, res.password || res.voucher_code);
+            }
+        })
+        .catch(() => {});
+    }, 3000);
+}
+
 function handleMpesaPayment(e) {
     e.preventDefault();
     const phoneInput = document.getElementById('phoneInput');
     const rawPhone = phoneInput.value.trim();
     const normalized = normalizeKenyanPhone(rawPhone);
-    const statusDiv = document.getElementById('statusMessage');
     const payBtn = document.getElementById('payButton');
     const btnText = document.getElementById('btnText');
 
@@ -345,15 +448,16 @@ function handleMpesaPayment(e) {
 
     const payload = {
         plan_id: selectedPlanId,
+        package_id: selectedPlanId,
         phone: normalized,
         amount: selectedPlanPrice,
         tenant_id: '{$tenantId}',
         router_id: '{$routerId}',
-        mac: '\$(mac)',
-        ip: '\$(ip)'
+        mac: clientMac,
+        ip: clientIp
     };
 
-    fetch('/api/payment/daraja/stk-push', {
+    fetch(apiBase + '/api/payment/daraja/stk-push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify(payload)
@@ -362,16 +466,20 @@ function handleMpesaPayment(e) {
     .then(data => {
         payBtn.disabled = false;
         btnText.innerText = 'Pay KES ' + selectedPlanPrice + ' via M-Pesa';
+        const checkoutId = data.checkout_request_id || data.reference || '';
         if (data.status === 'success' || data.ResponseCode === '0' || data.success) {
-            showStatus('STK Push sent! Enter your M-Pesa PIN on your phone to complete connection.', 'success');
+            showStatus('STK Push sent! Enter your M-Pesa PIN on your phone — you will be connected automatically.', 'success');
+            startPaymentPolling(checkoutId, normalized);
         } else {
             showStatus(data.message || data.CustomerMessage || 'STK Push initiated. Check your phone.', 'success');
+            startPaymentPolling(checkoutId, normalized);
         }
     })
     .catch(err => {
         payBtn.disabled = false;
         btnText.innerText = 'Pay KES ' + selectedPlanPrice + ' via M-Pesa';
         showStatus('STK Push dispatched to ' + normalized + '. Please enter your M-Pesa PIN now.', 'success');
+        startPaymentPolling('', normalized);
     });
 }
 
@@ -382,11 +490,21 @@ function showStatus(msg, type) {
     statusDiv.style.display = 'block';
 }
 
-// Initial label on load
+// Initial label & error check on load
 document.addEventListener('DOMContentLoaded', () => {
     const btnText = document.getElementById('btnText');
     if (btnText && selectedPlanPrice) {
         btnText.innerText = 'Pay KES ' + selectedPlanPrice + ' via M-Pesa';
+    }
+    if (mtError) {
+        showStatus('Hotspot Login Error: ' + mtError, 'error');
+    }
+    const form = document.getElementById('voucherLoginForm');
+    if (form) {
+        const act = form.getAttribute('action') || '';
+        if (act.startsWith('$(')) {
+            form.setAttribute('action', linkLoginOnly);
+        }
     }
 });
 </script>
@@ -859,6 +977,766 @@ CSS;
         // Relative luminance formula (YIQ)
         $yiq = (($r * 299) + ($g * 587) + ($b * 114)) / 1000;
         return ($yiq >= 150) ? '#0f172a' : '#ffffff';
+    }
+
+    /**
+     * Resolve tenant settings and packages for a given Router and render the specified Hotspot file.
+     */
+    public static function renderForRouter(\App\Models\Router $router, string $filename = 'login.html'): string
+    {
+        $files = self::generateRouterPortalFiles($router);
+        $clean = strtolower(basename($filename));
+        return $files[$clean] ?? $files['login.html'];
+    }
+
+    /**
+     * Generate the complete suite of MikroTik Hotspot HTML files isolated to the router's tenant.
+     */
+    public static function generateRouterPortalFiles(\App\Models\Router $router): array
+    {
+        $tenantId = (int) ($router->tenant_id ?: 1);
+        $routerId = (int) $router->id;
+
+        $settings = [
+            'tenant_id'            => $tenantId,
+            'router_id'            => $routerId,
+            'brand_name'           => 'HSmart WiFi',
+            'headline'             => 'Welcome to High-Speed Internet',
+            'subheadline'          => 'Instant automated M-Pesa activation with zero buffering.',
+            'brand_color'          => '#ff6600',
+            'secondary_color'      => '#0f172a',
+            'support_phone'        => '+254 743 606 108',
+            'support_whatsapp'     => '254743606108',
+            'payment_instructions' => 'Select a package, enter your M-Pesa phone number, and accept the STK push on your phone.',
+            'terms_text'           => 'By connecting, you agree to our fair use policy and terms of service.',
+            'logo_url'             => 'https://isp.hsmart.co.ke/images/hsmart-isp-logo.svg',
+            'background_url'       => '',
+        ];
+        $template = 'midnight';
+
+        try {
+            $tenantObj = \Illuminate\Support\Facades\DB::table('tenants')->where('id', $tenantId)->first();
+            if ($tenantObj && !empty($tenantObj->name)) {
+                $settings['brand_name'] = $tenantObj->name;
+            }
+            if ($tenantObj && !empty($tenantObj->phone)) {
+                $settings['support_phone'] = $tenantObj->phone;
+                $settings['support_whatsapp'] = preg_replace('/\D/', '', $tenantObj->phone);
+            }
+
+            if (\Illuminate\Support\Facades\Schema::hasTable('isp_portal_settings')) {
+                $saved = \Illuminate\Support\Facades\DB::table('isp_portal_settings')->where('tenant_id', $tenantId)->first();
+                if ($saved) {
+                    $template = $saved->selected_template ?? 'midnight';
+                    if (!empty($saved->brand_name)) $settings['brand_name'] = $saved->brand_name;
+                    if (!empty($saved->headline)) $settings['headline'] = $saved->headline;
+                    if (!empty($saved->subheadline)) $settings['subheadline'] = $saved->subheadline;
+                    if (!empty($saved->brand_color)) $settings['brand_color'] = $saved->brand_color;
+                    if (!empty($saved->secondary_color)) $settings['secondary_color'] = $saved->secondary_color;
+                    if (!empty($saved->support_phone)) $settings['support_phone'] = $saved->support_phone;
+                    if (!empty($saved->support_whatsapp)) $settings['support_whatsapp'] = $saved->support_whatsapp;
+                    if (!empty($saved->payment_instructions)) $settings['payment_instructions'] = $saved->payment_instructions;
+                    if (!empty($saved->terms_text)) $settings['terms_text'] = $saved->terms_text;
+                    if (!empty($saved->logo_url)) $settings['logo_url'] = $saved->logo_url;
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        $plans = [];
+        try {
+            $plansQuery = \App\Models\PackageList::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where(function ($q) {
+                    $q->where('type', 'hotspot')->orWhereNull('type');
+                })
+                ->where(function ($q) {
+                    $q->where('is_active', true)->orWhereNull('is_active');
+                });
+
+            if ($routerId) {
+                $plansQuery->where(function ($q) use ($routerId) {
+                    $q->whereHas('routers', function ($rq) use ($routerId) {
+                        $rq->where('routers.id', $routerId);
+                    })->orWhereDoesntHave('routers');
+                });
+            }
+
+            $plans = $plansQuery->orderBy('price', 'asc')->take(8)->get()->toArray();
+
+            if (empty($plans)) {
+                $plans = \App\Models\PackageList::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where(function ($q) {
+                        $q->where('is_active', true)->orWhereNull('is_active');
+                    })
+                    ->orderBy('price', 'asc')
+                    ->take(6)
+                    ->get()
+                    ->toArray();
+            }
+        } catch (\Throwable $e) {}
+
+        $loginHtml = self::render($template, $settings, $plans);
+        $brandEsc  = htmlspecialchars($settings['brand_name'], ENT_QUOTES, 'UTF-8');
+
+        $rloginHtml = <<<HTML
+$(if http-status == 302)Hotspot login required$(endif)
+$(if http-header == "Location")$(link-redirect)$(endif)
+<!DOCTYPE html>
+<html>
+<head>
+<title>{$brandEsc} - Redirecting...</title>
+<meta http-equiv="refresh" content="0; url=$(link-redirect)">
+<meta http-equiv="pragma" content="no-cache">
+<meta http-equiv="expires" content="-1">
+</head>
+<body>
+<script>window.location.href = "$(link-redirect)";</script>
+</body>
+</html>
+HTML;
+
+        $redirectHtml = <<<HTML
+$(if http-status == 302)Hotspot redirect$(endif)
+$(if http-header == "Location")$(link-redirect)$(endif)
+<!DOCTYPE html>
+<html>
+<head>
+<title>{$brandEsc}</title>
+<meta http-equiv="refresh" content="0; url=$(link-redirect)">
+<meta http-equiv="pragma" content="no-cache">
+<meta http-equiv="expires" content="-1">
+</head>
+<body>
+<script>window.location.href = "$(link-redirect)";</script>
+</body>
+</html>
+HTML;
+
+        $aloginHtml = <<<HTML
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{$brandEsc} - Connected</title>
+<meta http-equiv="refresh" content="2; url=$(link-redirect)">
+<style>
+body { background: #0b0f19; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; padding: 20px; }
+.box { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 28px 24px; max-width: 380px; width: 100%; }
+.ok { width: 52px; height: 52px; border-radius: 50%; background: #10b981; color: #fff; font-size: 26px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+h2 { margin: 0 0 8px; font-size: 20px; }
+p { color: #94a3b8; font-size: 13px; margin: 0 0 18px; }
+a { display: inline-block; background: #ff6600; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 700; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="box">
+    <div class="ok">✓</div>
+    <h2>You Are Connected!</h2>
+    <p>Welcome to {$brandEsc}. Redirecting to the internet...</p>
+    <a href="$(link-redirect)">Continue Browsing &rarr;</a>
+</div>
+<script>setTimeout(function(){ window.location.href = "$(link-redirect)"; }, 1500);</script>
+</body>
+</html>
+HTML;
+
+        $statusHtml = <<<HTML
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{$brandEsc} - Session Status</title>
+<style>
+body { background: #0b0f19; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+.box { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 26px 22px; max-width: 400px; width: 100%; }
+h2 { margin: 0 0 14px; font-size: 19px; text-align: center; color: #10b981; }
+.row { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid #334155; font-size: 13px; }
+.row span { color: #94a3b8; }
+.btn { display: block; width: 100%; text-align: center; background: #ef4444; color: #fff; text-decoration: none; padding: 12px; border-radius: 10px; font-weight: 700; margin-top: 18px; border: none; cursor: pointer; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="box">
+    <h2>🟢 Connected to {$brandEsc}</h2>
+    <div class="row"><span>User / Voucher</span><strong>$(username)</strong></div>
+    <div class="row"><span>IP Address</span><strong>$(ip)</strong></div>
+    <div class="row"><span>MAC Address</span><strong>$(mac)</strong></div>
+    <div class="row"><span>Connected Time</span><strong>$(uptime)</strong></div>
+    <div class="row"><span>Data Used</span><strong>$(bytes-in-nice) / $(bytes-out-nice)</strong></div>
+    $(if session-time-left)
+    <div class="row"><span>Time Remaining</span><strong>$(session-time-left)</strong></div>
+    $(endif)
+    <form action="$(link-logout)" name="logout" method="post">
+        <button type="submit" class="btn">Disconnect Session</button>
+    </form>
+</div>
+</body>
+</html>
+HTML;
+
+        $logoutHtml = <<<HTML
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{$brandEsc} - Disconnected</title>
+<style>
+body { background: #0b0f19; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; padding: 20px; }
+.box { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 28px 24px; max-width: 380px; width: 100%; }
+h2 { margin: 0 0 8px; font-size: 20px; }
+p { color: #94a3b8; font-size: 13px; margin: 0 0 18px; }
+a { display: inline-block; background: #ff6600; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 700; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="box">
+    <h2>Session Disconnected</h2>
+    <p>You have disconnected from {$brandEsc}.</p>
+    <a href="$(link-login)">Reconnect to WiFi &rarr;</a>
+</div>
+</body>
+</html>
+HTML;
+
+        return [
+            'login.html'    => $loginHtml,
+            'flogin.html'   => $loginHtml,
+            'rlogin.html'   => $rloginHtml,
+            'redirect.html' => $redirectHtml,
+            'alogin.html'   => $aloginHtml,
+            'status.html'   => $statusHtml,
+            'logout.html'   => $logoutHtml,
+            'error.html'    => $loginHtml,
+        ];
+    }
+
+    /**
+     * Push complete Hotspot network, built-in Wi-Fi bridge (for hAP models), Walled Garden (incl. ICMP for Tenda/APs),
+     * and all Captive Portal templates onto a MikroTik router via API & /tool/fetch.
+     */
+    public static function pushAllToRouter(\App\Models\Router $router): array
+    {
+        $host = $router->vpn_ip ?: $router->ip;
+        $port = (int) ($router->api_port ?: 8728);
+        $user = $router->api_user ?: ($router->username ?: 'admin');
+        $pass = '';
+        try {
+            $pass = \Illuminate\Support\Facades\Crypt::decryptString($router->api_password ?: $router->password);
+        } catch (\Throwable $e) {
+            $pass = $router->api_password ?: $router->password;
+        }
+
+        if (!$host) {
+            throw new \RuntimeException("Router {$router->name} has no IP or VPN IP configured.");
+        }
+
+        $api = new \App\Services\MikrotikApiService($host, $port, $user, $pass, 10);
+
+        $tenantId = (int) ($router->tenant_id ?: 1);
+        $brandName = 'HSmart WiFi';
+        try {
+            $tenant = \Illuminate\Support\Facades\DB::table('tenants')->where('id', $tenantId)->first();
+            if ($tenant && !empty($tenant->name)) $brandName = $tenant->name;
+            if (\Illuminate\Support\Facades\Schema::hasTable('isp_portal_settings')) {
+                $ps = \Illuminate\Support\Facades\DB::table('isp_portal_settings')->where('tenant_id', $tenantId)->first();
+                if ($ps && !empty($ps->brand_name)) $brandName = $ps->brand_name;
+            }
+        } catch (\Throwable $e) {}
+
+        $roles = is_array($router->port_roles) ? $router->port_roles : [];
+        $wanPort = $router->wan_interface ?: ($roles['wan'] ?? 'ether1');
+        $pppPort = $roles['pppoe'] ?? 'ether3';
+        $configuredHsPort = $router->lan_interface ?: ($roles['hotspot'] ?? 'ether2');
+
+        // 1. Detect interfaces & whether built-in wireless (wlan1/wlan2/wifi1/wifi2) exists (e.g. MikroTik hAP lite RB941-2nD)
+        $ifaces = $api->executeCommand('/interface/print');
+        $wlanNames = [];
+        $etherHsPorts = [];
+        $hasFlash = false;
+
+        if (is_array($ifaces)) {
+            foreach ($ifaces as $if) {
+                $ifName = $if['name'] ?? '';
+                $ifType = $if['type'] ?? '';
+                if (in_array($ifType, ['wlan', 'wifi']) || str_starts_with($ifName, 'wlan') || str_starts_with($ifName, 'wifi')) {
+                    $wlanNames[] = $ifName;
+                }
+                if ($ifName === $configuredHsPort && $ifName !== $wanPort && $ifName !== 'wg-hsmart') {
+                    $etherHsPorts[] = $ifName;
+                }
+                if ($ifName === 'ether4' && $wanPort !== 'ether4' && $pppPort !== 'ether4') {
+                    $etherHsPorts[] = 'ether4';
+                }
+            }
+        }
+        if (empty($etherHsPorts) && $configuredHsPort !== 'hs-bridge' && $configuredHsPort !== $wanPort) {
+            $etherHsPorts[] = $configuredHsPort;
+        }
+        $etherHsPorts = array_values(array_unique($etherHsPorts));
+
+        // Enable and configure built-in wireless AP on MikroTik hAP models
+        if (!empty($wlanNames)) {
+            try {
+                // Ensure default security profile is open (none) for captive portal
+                $secProfs = $api->executeCommand('/interface/wireless/security-profiles/print');
+                if (is_array($secProfs)) {
+                    foreach ($secProfs as $sp) {
+                        if (($sp['name'] ?? '') === 'default') {
+                            $api->executeCommand('/interface/wireless/security-profiles/set', [
+                                'mode' => 'none',
+                            ], ['.id' => $sp['.id']]);
+                            break;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {}
+
+            try {
+                $wlans = $api->executeCommand('/interface/wireless/print');
+                if (is_array($wlans)) {
+                    foreach ($wlans as $idx => $wl) {
+                        $ssid = count($wlanNames) > 1 && $idx > 0 ? "{$brandName} 5G" : $brandName;
+                        try {
+                            $api->executeCommand('/interface/wireless/set', [
+                                'mode'             => 'ap-bridge',
+                                'ssid'             => $ssid,
+                                'security-profile' => 'default',
+                                'disabled'         => 'no',
+                                'default-forwarding' => 'yes',
+                            ], ['.id' => $wl['.id']]);
+                        } catch (\Throwable $we) {
+                            // Fallback if ap-bridge license level restricted
+                            try {
+                                $api->executeCommand('/interface/wireless/set', [
+                                    'ssid'     => $ssid,
+                                    'disabled' => 'no',
+                                ], ['.id' => $wl['.id']]);
+                            } catch (\Throwable $we2) {}
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        // 2. Create/Use Hotspot Bridge ('hs-bridge') bridging ether2 + ether4 + wlan1 so BOTH wired APs (Tenda) and built-in Wi-Fi serve Hotspot!
+        $targetHsInterface = $configuredHsPort;
+        try {
+            $bridges = $api->executeCommand('/interface/bridge/print');
+            $hasHsBridge = false;
+            if (is_array($bridges)) {
+                foreach ($bridges as $br) {
+                    if (($br['name'] ?? '') === 'hs-bridge') {
+                        $hasHsBridge = true;
+                        if (($br['disabled'] ?? 'false') === 'true') {
+                            $api->executeCommand('/interface/bridge/set', ['disabled' => 'no'], ['.id' => $br['.id']]);
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!$hasHsBridge) {
+                $api->executeCommand('/interface/bridge/add', [
+                    'name'    => 'hs-bridge',
+                    'comment' => 'hsmart-hotspot-bridge',
+                ]);
+            }
+
+            $bridgePorts = $api->executeCommand('/interface/bridge/port/print');
+            $existingBridgeMap = [];
+            if (is_array($bridgePorts)) {
+                foreach ($bridgePorts as $bp) {
+                    $existingBridgeMap[$bp['interface'] ?? ''] = $bp;
+                }
+            }
+
+            $portsToBridge = array_unique(array_merge($etherHsPorts, $wlanNames));
+            foreach ($portsToBridge as $pName) {
+                if (!$pName || $pName === $wanPort || $pName === $pppPort || $pName === 'wg-hsmart' || $pName === 'hs-bridge') {
+                    continue;
+                }
+                // Ensure physical port is enabled
+                if (is_array($ifaces)) {
+                    foreach ($ifaces as $if) {
+                        if (($if['name'] ?? '') === $pName && ($if['disabled'] ?? 'false') === 'true') {
+                            try {
+                                $api->executeCommand('/interface/set', ['disabled' => 'no'], ['.id' => $if['.id']]);
+                            } catch (\Throwable $e) {}
+                        }
+                    }
+                }
+                if (isset($existingBridgeMap[$pName])) {
+                    $bp = $existingBridgeMap[$pName];
+                    if (($bp['bridge'] ?? '') !== 'hs-bridge' || ($bp['disabled'] ?? 'false') === 'true') {
+                        try {
+                            $api->executeCommand('/interface/bridge/port/set', [
+                                'bridge'   => 'hs-bridge',
+                                'disabled' => 'no',
+                            ], ['.id' => $bp['.id']]);
+                        } catch (\Throwable $e) {}
+                    }
+                } else {
+                    try {
+                        $api->executeCommand('/interface/bridge/port/add', [
+                            'bridge'    => 'hs-bridge',
+                            'interface' => $pName,
+                        ]);
+                    } catch (\Throwable $e) {}
+                }
+            }
+
+            $targetHsInterface = 'hs-bridge';
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Bridge setup fallback on {$router->name}: " . $e->getMessage());
+        }
+
+        // 3. IP Address (10.5.50.1/24), IP Pool (hs-pool-10), DHCP Server (hs-dhcp-10) on $targetHsInterface
+        try {
+            $addrs = $api->executeCommand('/ip/address/print');
+            $foundHsAddr = false;
+            if (is_array($addrs)) {
+                foreach ($addrs as $ad) {
+                    if (str_contains($ad['address'] ?? '', '10.5.50.') || ($ad['comment'] ?? '') === 'hsmart-hotspot') {
+                        $api->executeCommand('/ip/address/set', [
+                            'address'   => '10.5.50.1/24',
+                            'interface' => $targetHsInterface,
+                            'disabled'  => 'no',
+                        ], ['.id' => $ad['.id']]);
+                        $foundHsAddr = true;
+                        break;
+                    }
+                }
+            }
+            if (!$foundHsAddr) {
+                $api->executeCommand('/ip/address/add', [
+                    'address'   => '10.5.50.1/24',
+                    'interface' => $targetHsInterface,
+                    'comment'   => 'hsmart-hotspot',
+                ]);
+            }
+        } catch (\Throwable $e) {}
+
+        try {
+            $pools = $api->executeCommand('/ip/pool/print');
+            $hasPool = false;
+            if (is_array($pools)) {
+                foreach ($pools as $p) {
+                    if (($p['name'] ?? '') === 'hs-pool-10') {
+                        $api->executeCommand('/ip/pool/set', ['ranges' => '10.5.50.10-10.5.50.254'], ['.id' => $p['.id']]);
+                        $hasPool = true;
+                        break;
+                    }
+                }
+            }
+            if (!$hasPool) {
+                $api->executeCommand('/ip/pool/add', ['name' => 'hs-pool-10', 'ranges' => '10.5.50.10-10.5.50.254']);
+            }
+        } catch (\Throwable $e) {}
+
+        try {
+            $dnets = $api->executeCommand('/ip/dhcp-server/network/print');
+            $hasDnet = false;
+            if (is_array($dnets)) {
+                foreach ($dnets as $dn) {
+                    if (($dn['address'] ?? '') === '10.5.50.0/24') {
+                        $api->executeCommand('/ip/dhcp-server/network/set', [
+                            'gateway'    => '10.5.50.1',
+                            'dns-server' => '10.5.50.1,8.8.8.8',
+                        ], ['.id' => $dn['.id']]);
+                        $hasDnet = true;
+                        break;
+                    }
+                }
+            }
+            if (!$hasDnet) {
+                $api->executeCommand('/ip/dhcp-server/network/add', [
+                    'address'    => '10.5.50.0/24',
+                    'gateway'    => '10.5.50.1',
+                    'dns-server' => '10.5.50.1,8.8.8.8',
+                    'comment'    => 'hsmart-hotspot',
+                ]);
+            }
+
+            $dhcps = $api->executeCommand('/ip/dhcp-server/print');
+            $hasDhcp = false;
+            if (is_array($dhcps)) {
+                foreach ($dhcps as $d) {
+                    if (($d['name'] ?? '') === 'hs-dhcp-10' || ($d['address-pool'] ?? '') === 'hs-pool-10' || in_array($d['interface'] ?? '', ['ether2', 'hs-bridge'])) {
+                        $api->executeCommand('/ip/dhcp-server/set', [
+                            'interface'    => $targetHsInterface,
+                            'address-pool' => 'hs-pool-10',
+                            'lease-time'   => '1h',
+                            'disabled'     => 'no',
+                        ], ['.id' => $d['.id']]);
+                        $hasDhcp = true;
+                        break;
+                    }
+                }
+            }
+            if (!$hasDhcp) {
+                $api->executeCommand('/ip/dhcp-server/add', [
+                    'name'         => 'hs-dhcp-10',
+                    'interface'    => $targetHsInterface,
+                    'address-pool' => 'hs-pool-10',
+                    'lease-time'   => '1h',
+                    'disabled'     => 'no',
+                ]);
+            }
+        } catch (\Throwable $e) {}
+
+        // 4. DNS & NAT Masquerade
+        try {
+            $api->executeCommand('/ip/dns/set', ['allow-remote-requests' => 'yes', 'servers' => '8.8.8.8,1.1.1.1']);
+        } catch (\Throwable $e) {}
+
+        try {
+            $nats = $api->executeCommand('/ip/firewall/nat/print');
+            $hasNat = false;
+            if (is_array($nats)) {
+                foreach ($nats as $n) {
+                    if (($n['action'] ?? '') === 'masquerade' && (($n['src-address'] ?? '') === '10.5.50.0/24' || ($n['comment'] ?? '') === 'hsmart-hotspot-masq')) {
+                        $hasNat = true;
+                        break;
+                    }
+                }
+            }
+            if (!$hasNat) {
+                $api->executeCommand('/ip/firewall/nat/add', [
+                    'chain'       => 'srcnat',
+                    'action'      => 'masquerade',
+                    'src-address' => '10.5.50.0/24',
+                    'comment'     => 'hsmart-hotspot-masq',
+                ]);
+            }
+        } catch (\Throwable $e) {}
+
+        // 5. Hotspot Profile & Server on $targetHsInterface
+        try {
+            $filesCheck = $api->executeCommand('/file/print');
+            $htmlDir = 'hotspot';
+            if (is_array($filesCheck)) {
+                foreach ($filesCheck as $fc) {
+                    if (($fc['name'] ?? '') === 'flash/hotspot' && ($fc['type'] ?? '') === 'directory') {
+                        $hasFlash = true;
+                    }
+                }
+            }
+
+            $hsprofName = 'hsmart-hsprof';
+            $profs = $api->executeCommand('/ip/hotspot/profile/print');
+            $hasProf = false;
+            if (is_array($profs)) {
+                foreach ($profs as $pr) {
+                    if (($pr['name'] ?? '') === $hsprofName) {
+                        $api->executeCommand('/ip/hotspot/profile/set', [
+                            'hotspot-address' => '10.5.50.1',
+                            'dns-name'        => 'hotspot.hsmart.lan',
+                            'html-directory'  => $htmlDir,
+                            'login-by'        => 'http-pap,http-chap,cookie,mac-cookie',
+                        ], ['.id' => $pr['.id']]);
+                        $hasProf = true;
+                        break;
+                    }
+                }
+            }
+            if (!$hasProf) {
+                $api->executeCommand('/ip/hotspot/profile/add', [
+                    'name'            => $hsprofName,
+                    'hotspot-address' => '10.5.50.1',
+                    'dns-name'        => 'hotspot.hsmart.lan',
+                    'html-directory'  => $htmlDir,
+                    'login-by'        => 'http-pap,http-chap,cookie,mac-cookie',
+                ]);
+            }
+
+            $hss = $api->executeCommand('/ip/hotspot/print');
+            $hasHs = false;
+            if (is_array($hss)) {
+                foreach ($hss as $h) {
+                    if (($h['name'] ?? '') === 'hsmart-hotspot' || in_array($h['interface'] ?? '', ['ether2', 'hs-bridge', $configuredHsPort])) {
+                        $api->executeCommand('/ip/hotspot/set', [
+                            'interface'         => $targetHsInterface,
+                            'profile'           => $hsprofName,
+                            'address-pool'      => 'hs-pool-10',
+                            'addresses-per-mac' => '10',
+                            'disabled'          => 'no',
+                        ], ['.id' => $h['.id']]);
+                        $hasHs = true;
+                        break;
+                    }
+                }
+            }
+            if (!$hasHs) {
+                $api->executeCommand('/ip/hotspot/add', [
+                    'name'              => 'hsmart-hotspot',
+                    'interface'         => $targetHsInterface,
+                    'profile'           => $hsprofName,
+                    'address-pool'      => 'hs-pool-10',
+                    'addresses-per-mac' => '10',
+                    'disabled'          => 'no',
+                ]);
+            }
+        } catch (\Throwable $e) {}
+
+        // 6. Walled Garden Domains, Server IP, AND ICMP Ping Allowance (so Tenda/TP-Link APs pass WAN internet check!)
+        try {
+            $wgHosts = [
+                '*.hsmart.co.ke',
+                'isp.hsmart.co.ke',
+                '*.payhero.co.ke',
+                'api.payhero.co.ke',
+                '*.safaricom.co.ke',
+            ];
+            $existingWg = $api->executeCommand('/ip/hotspot/walled-garden/print');
+            $existingHosts = [];
+            if (is_array($existingWg)) {
+                foreach ($existingWg as $w) {
+                    if (!empty($w['dst-host'])) $existingHosts[] = strtolower($w['dst-host']);
+                }
+            }
+            foreach ($wgHosts as $tgt) {
+                if (!in_array(strtolower($tgt), $existingHosts)) {
+                    $api->executeCommand('/ip/hotspot/walled-garden/add', ['dst-host' => $tgt, 'action' => 'allow']);
+                }
+            }
+
+            $existingWgIp = $api->executeCommand('/ip/hotspot/walled-garden/ip/print');
+            $hasServerIp = false;
+            $hasIcmpAllow = false;
+            if (is_array($existingWgIp)) {
+                foreach ($existingWgIp as $wi) {
+                    if (($wi['dst-address'] ?? '') === '213.199.49.216') {
+                        $hasServerIp = true;
+                    }
+                    if (($wi['protocol'] ?? '') === 'icmp' && ($wi['action'] ?? '') === 'accept') {
+                        $hasIcmpAllow = true;
+                    }
+                }
+            }
+            if (!$hasServerIp) {
+                $api->executeCommand('/ip/hotspot/walled-garden/ip/add', [
+                    'dst-address' => '213.199.49.216',
+                    'action'      => 'accept',
+                    'comment'     => 'hsmart-cloud-ip',
+                ]);
+            }
+            if (!$hasIcmpAllow) {
+                $api->executeCommand('/ip/hotspot/walled-garden/ip/add', [
+                    'protocol' => 'icmp',
+                    'action'   => 'accept',
+                    'comment'  => 'hsmart-allow-ap-icmp-check',
+                ]);
+            }
+
+            // Also add pre-hotspot ICMP accept in firewall filter so Tenda ping to 8.8.8.8 is never rejected by hs-unauth
+            $filters = $api->executeCommand('/ip/firewall/filter/print');
+            $hasPreHsIcmp = false;
+            if (is_array($filters)) {
+                foreach ($filters as $fl) {
+                    if (($fl['comment'] ?? '') === 'hsmart-ap-icmp-allow') {
+                        $hasPreHsIcmp = true;
+                        break;
+                    }
+                }
+            }
+            if (!$hasPreHsIcmp) {
+                try {
+                    $api->executeCommand('/ip/firewall/filter/add', [
+                        'chain'        => 'pre-hotspot',
+                        'protocol'     => 'icmp',
+                        'action'       => 'accept',
+                        'comment'      => 'hsmart-ap-icmp-allow',
+                    ]);
+                } catch (\Throwable $fe) {}
+            }
+        } catch (\Throwable $e) {}
+
+        // 7. Upload all Captive Portal HTML files into hotspot/ via /tool/fetch (over HTTP so no 4KB limit and overwrites cleanly!)
+        $portalFiles = self::generateRouterPortalFiles($router);
+        $uploadedFiles = [];
+
+        // Remove old stale files first so RouterOS writes fresh copies
+        try {
+            $existingFiles = $api->executeCommand('/file/print');
+            if (is_array($existingFiles)) {
+                foreach ($existingFiles as $ef) {
+                    $efName = $ef['name'] ?? '';
+                    foreach (array_keys($portalFiles) as $pfKey) {
+                        if ($efName === "hotspot/{$pfKey}" || $efName === "flash/hotspot/{$pfKey}") {
+                            try {
+                                $api->executeCommand('/file/remove', [], ['.id' => $ef['.id']]);
+                            } catch (\Throwable $re) {}
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        foreach ($portalFiles as $fileName => $fileContent) {
+            if (strlen($fileContent) < 3800) {
+                // Fast direct API write for compact companion templates (< 3.8KB)
+                try {
+                    $api->executeCommand('/file/add', [
+                        'name'     => "hotspot/{$fileName}",
+                        'contents' => $fileContent,
+                    ]);
+                    $uploadedFiles[] = "hotspot/{$fileName}";
+                    if ($hasFlash) {
+                        $api->executeCommand('/file/add', [
+                            'name'     => "flash/hotspot/{$fileName}",
+                            'contents' => $fileContent,
+                        ]);
+                    }
+                    continue;
+                } catch (\Throwable $ae) {}
+            }
+
+            // Full-size HTML templates (> 4KB) via /tool/fetch over HTTP
+            $fetchUrl = "http://isp.hsmart.co.ke/provision/hotspot-portal/{$router->id}/{$fileName}";
+            try {
+                $fastApi = new \App\Services\MikrotikApiService($host, $port, $user, $pass, 3);
+                $fastApi->executeCommand('/tool/fetch', [
+                    'url'      => $fetchUrl,
+                    'dst-path' => "hotspot/{$fileName}",
+                    'mode'     => 'http',
+                ]);
+                $uploadedFiles[] = "hotspot/{$fileName}";
+
+                if ($hasFlash) {
+                    $fastApi->executeCommand('/tool/fetch', [
+                        'url'      => $fetchUrl,
+                        'dst-path' => "flash/hotspot/{$fileName}",
+                        'mode'     => 'http',
+                    ]);
+                }
+            } catch (\Throwable $fe) {
+                \Illuminate\Support\Facades\Log::warning("Portal file {$fileName} upload error on {$router->name}: " . $fe->getMessage());
+            }
+        }
+
+        // Clear any unauthorized/stale hotspot host entries so connected APs/phones immediately re-trigger captive portal
+        try {
+            $hosts = $api->executeCommand('/ip/hotspot/host/print');
+            if (is_array($hosts)) {
+                foreach ($hosts as $h) {
+                    if (($h['authorized'] ?? 'false') === 'false') {
+                        try {
+                            $api->executeCommand('/ip/hotspot/host/remove', [], ['.id' => $h['.id']]);
+                        } catch (\Throwable $he) {}
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        return [
+            'success'        => true,
+            'interface'      => $targetHsInterface,
+            'wlans_enabled'  => $wlanNames,
+            'files_uploaded' => $uploadedFiles,
+        ];
     }
 }
 
