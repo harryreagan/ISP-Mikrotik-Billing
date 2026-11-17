@@ -437,9 +437,14 @@
                                 @endforeach
                             </select>
                         </div>
-                        <a href="{{ route('admin.portal-customizer') }}" class="btn btn-link btn-sm text-decoration-none p-0">
-                            {{ __('Customize Colors & Logo') }} <i class="bi bi-arrow-right"></i>
-                        </a>
+                        <div class="d-flex align-items-center gap-2">
+                            <a href="{{ route('captive-portal.preview', ['template' => $portalTemplate]) }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-box-arrow-up-right me-1"></i>{{ __('Full Preview') }}
+                            </a>
+                            <a href="{{ route('admin.portal-customizer') }}" class="btn btn-link btn-sm text-decoration-none p-0">
+                                {{ __('Customize Colors & Logo') }} <i class="bi bi-arrow-right"></i>
+                            </a>
+                        </div>
                     </div>
 
                     <div class="p-3 bg-light rounded-4 d-flex justify-content-center align-items-center" style="min-height: 580px;">

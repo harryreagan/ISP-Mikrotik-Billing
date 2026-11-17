@@ -95,8 +95,14 @@ if (! function_exists('site_image')) {
      * Correctly resolve site images from public or storage.
      * Handles both string paths and Filament FileUpload array values.
      */
-    function site_image($path, $fallback = 'images/logo.png')
+    function site_image($path, $fallback = 'images/hsmart-isp-logo.svg')
     {
+        // Sanitize legacy default fallbacks so CodePagol assets are never served
+        if ($fallback === 'images/logo.png' || $fallback === 'images/logo.svg') {
+            $fallback = 'images/hsmart-isp-logo.svg';
+        } elseif ($fallback === 'images/favicon.png') {
+            $fallback = 'images/hsmart-isp-icon.svg';
+        }
         // Filament FileUpload sometimes returns an array — unwrap it
         if (is_array($path)) {
             $path = array_values(array_filter($path))[0] ?? null;

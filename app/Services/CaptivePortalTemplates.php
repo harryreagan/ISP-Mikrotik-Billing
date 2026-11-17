@@ -87,7 +87,8 @@ class CaptivePortalTemplates
         // 1. Sanitize & Normalize Settings
         $s = is_array($settings) ? (object) $settings : $settings;
 
-        $brandName      = htmlspecialchars($s->brand_name ?? 'High-Speed WiFi', ENT_QUOTES, 'UTF-8');
+        $defaultBrand   = (function_exists('siteUrlSettings') ? siteUrlSettings('site_name') : null) ?: 'HSmart WiFi';
+        $brandName      = htmlspecialchars(!empty($s->brand_name) && strtolower($s->brand_name) !== 'high-speed wifi' ? $s->brand_name : $defaultBrand, ENT_QUOTES, 'UTF-8');
         $headline       = htmlspecialchars($s->headline ?? 'Welcome to Fast Internet', ENT_QUOTES, 'UTF-8');
         $subheadline    = htmlspecialchars($s->subheadline ?? 'Choose a package and pay via M-Pesa for instant connection.', ENT_QUOTES, 'UTF-8');
         $instructions   = htmlspecialchars($s->payment_instructions ?? 'Select your plan, enter your M-Pesa number, and approve the payment on your phone.', ENT_QUOTES, 'UTF-8');
@@ -101,7 +102,7 @@ class CaptivePortalTemplates
         $buttonTextCol  = self::getContrastColor($primaryColor);
 
         // Validate URLs (http / https only)
-        $logoUrl        = self::sanitizeUrl($s->logo_url ?? null);
+        $logoUrl        = self::sanitizeUrl($s->logo_url ?? null) ?: (function_exists('asset') ? asset('images/hsmart-isp-logo.svg') : '/images/hsmart-isp-logo.svg');
         $backgroundUrl  = self::sanitizeUrl($s->background_url ?? null);
 
         // Normalize packages list

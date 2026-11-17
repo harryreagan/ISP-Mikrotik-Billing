@@ -115,6 +115,44 @@ Route::get('/warning', function () {
 Route::get('/recharge/voucher', [PortalVoucherController::class, 'showRechargeForm'])->name('welcome.voucher.recharge');
 Route::post('/recharge/voucher', [PortalVoucherController::class, 'redeem'])->name('welcome.voucher.redeem');
 
+// Captive Portal Public Live Preview & Direct Access
+Route::match(['get', 'post'], '/captive-portal/preview', function(\Illuminate\Http\Request $request) {
+    $user = auth()->user();
+    $tenantId = $user ? ($user->tenant_id ?: 1) : 1;
+    $portalSetting = null;
+    try {
+        if (\Illuminate\Support\Facades\Schema::hasTable('isp_portal_settings')) {
+            $portalSetting = \Illuminate\Support\Facades\DB::table('isp_portal_settings')
+                ->where('tenant_id', $tenantId)
+                ->first();
+        }
+    } catch (\Throwable $e) {}
+
+    $template = $request->input('template') ?: ($portalSetting->template ?? 'midnight');
+    $settings = $request->input('settings', []);
+    if (empty($settings) && $portalSetting) {
+        $settings = (array) $portalSetting;
+    }
+    if (empty($settings['brand_name'])) {
+        $settings['brand_name'] = $user?->tenant?->name ?: (function_exists('siteUrlSettings') ? siteUrlSettings('site_name') : null) ?: 'HSmart WiFi';
+    }
+    if (empty($settings['logo_url'])) {
+        $settings['logo_url'] = asset('images/hsmart-isp-logo.svg');
+    }
+
+    $plans = \App\Models\PackageList::where('is_active', true)
+        ->orWhereNull('is_active')
+        ->orderBy('price', 'asc')
+        ->take(8)
+        ->get()
+        ->toArray();
+
+    $html = \App\Services\CaptivePortalTemplates::render($template, $settings, $plans);
+    return response($html)->header('Content-Type', 'text/html');
+})->name('captive-portal.preview');
+Route::get('/captive-portal', fn() => redirect()->route('captive-portal.preview'))->name('captive-portal.live');
+Route::get('/hotspot/preview', fn() => redirect()->route('captive-portal.preview'))->name('hotspot.preview');
+
 // MikroTik Automated Provisioning Endpoints (.rsc Bootstrap & Done Callback)
 Route::prefix('provision')->group(function () {
     Route::get('/{token}/bootstrap', [\App\Http\Controllers\Api\ProvisioningController::class, 'bootstrap'])->middleware('throttle:60,1');
@@ -197,13 +235,6 @@ Route::middleware([
         Route::get('/payment-gateways', fn() => redirect()->route('admin.payment-gateways'));
         Route::get('/admin/portal-customizer', \App\Livewire\Admin\CaptivePortalCustomizer::class)->name('admin.portal-customizer');
         Route::get('/admin/captive-portal', fn() => redirect()->route('admin.portal-customizer'))->name('admin.captive-portal');
-        Route::post('/captive-portal/preview', function(\Illuminate\Http\Request $request) {
-            $template = $request->input('template', 'midnight');
-            $settings = $request->input('settings', []);
-            $plans = \App\Models\PackageList::where('is_active', true)->orWhereNull('is_active')->take(6)->get()->toArray();
-            $html = \App\Services\CaptivePortalTemplates::render($template, $settings, $plans);
-            return response($html)->header('Content-Type', 'text/html');
-        })->name('captive-portal.preview');
 
         // Mikrotik Setup Routes (Redirect old wizard/setup URLs to new Add Router wizard, keep HotspotManager intact)
         Route::prefix('mikrotik-setup')->group(function () {

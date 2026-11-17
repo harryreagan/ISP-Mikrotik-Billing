@@ -5,6 +5,9 @@
         subtitle="Select from 8 crafted designs, customize your branding, and deploy directly to your MikroTik routers."
     >
         <x-slot:actions>
+            <a href="{{ route('captive-portal.preview', ['template' => $template]) }}" target="_blank" class="btn btn-outline-primary me-2">
+                <i class="bi bi-box-arrow-up-right me-1"></i>Open Live Portal Preview
+            </a>
             <button type="button" wire:click="saveSettings" class="btn btn-primary">
                 <i class="bi bi-save me-1"></i>Save Portal Settings
             </button>
@@ -175,7 +178,11 @@
                         <h5 class="ui-section-title mb-0"><i class="bi bi-eye text-orange-500 me-2"></i>Live Portal Mockup</h5>
                         <small class="text-muted">Design: <strong>{{ ucfirst($template) }}</strong> (Fully responsive)</small>
                     </div>
-                    <div class="btn-group btn-group-sm">
+                    <div class="d-flex align-items-center gap-2">
+                        <a href="{{ route('captive-portal.preview', ['template' => $template]) }}" target="_blank" class="btn btn-sm btn-outline-primary" title="Open Fullscreen Preview in new tab">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>Full Preview
+                        </a>
+                        <div class="btn-group btn-group-sm">
                         <button type="button" 
                                 wire:click="$set('preview_device', 'mobile')" 
                                 class="btn {{ $preview_device === 'mobile' ? 'btn-primary' : 'btn-secondary' }}">

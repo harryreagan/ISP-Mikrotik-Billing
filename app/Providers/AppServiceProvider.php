@@ -140,6 +140,51 @@ class AppServiceProvider extends ServiceProvider
         Auth::provider('pppoe_provider', function ($app, array $config) {
             return new class($app['hash'], $config['model']) extends EloquentUserProvider
             {
+                public function retrieveByCredentials(array $credentials)
+                {
+                    if (empty($credentials) || (count($credentials) === 1 && array_key_exists('password', $credentials))) {
+                        return null;
+                    }
+
+                    $username = trim((string)($credentials['username'] ?? ''));
+                    if ($username === '') {
+                        return null;
+                    }
+
+                    // 1. Direct match on PPPSecrets username
+                    $user = $this->createModel()->newQuery()->where('username', $username)->first();
+                    if ($user) {
+                        return $user;
+                    }
+
+                    // 2. Normalize Kenyan phone (e.g. 0712345678 <-> 254712345678)
+                    $cleanPhone = preg_replace('/\D/', '', $username);
+                    $phoneVariants = array_values(array_filter([
+                        $username,
+                        $cleanPhone,
+                        str_starts_with($cleanPhone, '254') ? '0' . substr($cleanPhone, 3) : null,
+                        str_starts_with($cleanPhone, '0') ? '254' . substr($cleanPhone, 1) : null,
+                    ]));
+
+                    // 3. Match via CustomersInfo phone or account_no
+                    if (!empty($phoneVariants)) {
+                        try {
+                            $customer = \App\Models\CustomersInfo::where(function($q) use ($phoneVariants, $username) {
+                                $q->whereIn('phone', $phoneVariants)
+                                  ->orWhereIn('alt_phone', $phoneVariants)
+                                  ->orWhere('account_no', $username);
+                            })->whereNotNull('ppp_user_id')->first();
+
+                            if ($customer && $customer->ppp_user_id) {
+                                return $this->createModel()->newQuery()->find($customer->ppp_user_id);
+                            }
+                        } catch (\Throwable $e) {}
+                    }
+
+                    // 4. Match caller_id in PPPSecrets
+                    return $this->createModel()->newQuery()->where('caller_id', $username)->first();
+                }
+
                 public function validateCredentials(Authenticatable $user, array $credentials)
                 {
                     $plain = $credentials['password'];
