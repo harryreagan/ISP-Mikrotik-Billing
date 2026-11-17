@@ -176,6 +176,7 @@ Route::middleware([
         Route::get('/admin-users', ManageUser::class)->name('admin-users');
         Route::get('/admin-roles', ManageRole::class)->name('admin-roles');
         Route::get('/support-tickets', ManageTickets::class)->name('admin-tickets');
+        Route::post('/api/hub/support/ticket', [\App\Http\Controllers\HubSupportController::class, 'submitTicket'])->name('hub.support.ticket');
         Route::get('/admin/routers', \App\Livewire\Admin\RoutersManager::class)->name('admin.routers');
         Route::get('/mikrotik', \App\Livewire\Admin\RoutersManager::class)->name('mikrotik-sync');
         Route::get('/routers', \App\Livewire\Admin\RoutersManager::class)->name('mikrotik');
