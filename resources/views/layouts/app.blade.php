@@ -1350,7 +1350,5 @@
 
     @include('components.floating-support')
 
-    @include('partials.floating-support')
-
 </body>
 </html>

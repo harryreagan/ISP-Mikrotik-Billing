@@ -144,6 +144,11 @@ Route::post('/auth/reset-password-otp', [\App\Http\Controllers\Auth\CustomAuthCo
 Route::get('/auth/google/redirect', [\App\Http\Controllers\Auth\CustomAuthController::class, 'redirectToGoogle'])->name('auth.google');
 Route::get('/auth/google/callback', [\App\Http\Controllers\Auth\CustomAuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
 
+// HSmart Live Chat Direct Desk Endpoints (Accessible for both authenticated merchants & visitors)
+Route::get('/api/live-chat/messages', [\App\Http\Controllers\IspLiveChatController::class, 'messages'])->name('live-chat.messages');
+Route::post('/api/live-chat/send', [\App\Http\Controllers\IspLiveChatController::class, 'send'])->name('live-chat.send');
+Route::get('/api/live-chat/unread-count', [\App\Http\Controllers\IspLiveChatController::class, 'unreadCount'])->name('live-chat.unread-count');
+
 Route::middleware([
     'auth:sanctum',
     config('jetstream.auth_session'),
