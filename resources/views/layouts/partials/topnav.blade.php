@@ -24,8 +24,8 @@
     }
 @endphp
 
-<nav class="navbar navbar-light navbar-glass navbar-top navbar-expand-lg d-flex align-items-center justify-content-between gap-2 w-100 min-w-0" style="display: none;">
-    <div class="d-flex align-items-center gap-2 min-w-0">
+<nav class="navbar navbar-light navbar-glass navbar-top navbar-expand-lg d-flex align-items-center justify-content-between gap-1 gap-sm-2 w-100 min-w-0 flex-nowrap" style="display: none;">
+    <div class="d-flex align-items-center gap-1 gap-sm-2 min-w-0 flex-shrink-0">
         <!-- Hamburger on Mobile / Tablet -->
         <button class="btn navbar-toggler-humburger-icon navbar-toggler p-0 d-xl-none border-0" type="button" id="mobileMenuToggleBtn" aria-label="Toggle navigation" style="width: 38px; height: 38px; display: inline-grid; place-items: center; border-radius: 8px; flex-shrink: 0; background: transparent;">
             <span class="navbar-toggle-icon">
@@ -58,7 +58,7 @@
     </div>
 
     <!-- Right Side Toolbar: Search & User Controls -->
-    <div class="d-flex align-items-center gap-1 ms-auto flex-shrink-0">
+    <div class="d-flex align-items-center gap-1 ms-auto flex-shrink-0 flex-nowrap">
         <div class="collapse navbar-collapse scrollbar d-none d-md-block" id="navbarStandard">
             @include('layouts.partials.searchbar')
         </div>

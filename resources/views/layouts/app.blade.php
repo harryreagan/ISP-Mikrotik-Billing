@@ -204,7 +204,11 @@
         }
 
         .navbar-vertical .navbar-vertical-label-wrapper,
-        .navbar-vertical .row.navbar-vertical-label-wrapper {
+        .mobile-sidebar-drawer .navbar-vertical-label-wrapper,
+        .navbar-vertical .row.navbar-vertical-label-wrapper,
+        .mobile-sidebar-drawer .row.navbar-vertical-label-wrapper,
+        .navbar-vertical-label-wrapper,
+        .row.navbar-vertical-label-wrapper {
             margin-left: 0 !important;
             margin-right: 0 !important;
             padding-left: 1.25rem !important;
@@ -213,17 +217,22 @@
             margin-bottom: 0.25rem !important;
             width: 100% !important;
             display: flex !important;
+            box-sizing: border-box !important;
         }
 
-        .navbar-vertical .navbar-vertical-label-wrapper > .col-auto {
+        .navbar-vertical .navbar-vertical-label-wrapper > .col-auto,
+        .mobile-sidebar-drawer .navbar-vertical-label-wrapper > .col-auto,
+        .navbar-vertical-label-wrapper > .col-auto {
             padding-left: 0 !important;
             margin-left: 0 !important;
             flex: 0 0 auto !important;
             width: auto !important;
+            box-sizing: border-box !important;
         }
 
         .navbar-vertical-label,
-        .navbar-vertical .navbar-vertical-label {
+        .navbar-vertical .navbar-vertical-label,
+        .mobile-sidebar-drawer .navbar-vertical-label {
             font-size: 11px !important;
             font-weight: 700 !important;
             text-transform: uppercase !important;
@@ -233,6 +242,7 @@
             margin-left: 0 !important;
             white-space: nowrap !important;
             overflow: visible !important;
+            display: inline-block !important;
         }
 
         .navbar-vertical-collapsed .navbar-vertical .navbar-vertical-label-wrapper {
@@ -243,11 +253,20 @@
             display: none !important;
         }
 
-        .navbar-vertical .nav-link {
+        .navbar-vertical .nav-link,
+        .mobile-sidebar-drawer .nav-link {
             border-radius: 0.5rem !important;
             margin: 2px 8px !important;
             padding: 0.5rem 0.75rem !important;
             font-size: 0.8125rem !important;
+        }
+
+        .mobile-sidebar-drawer .navbar-nav,
+        .mobile-sidebar-drawer #navbarVerticalNav {
+            padding-left: 0 !important;
+            margin-left: 0 !important;
+            width: 100% !important;
+        }
             font-weight: 500 !important;
             color: #475569 !important;
             height: 40px !important;
@@ -307,6 +326,44 @@
             display: flex !important;
             align-items: center !important;
             gap: 0.75rem !important;
+            flex-wrap: nowrap !important;
+        }
+
+        .navbar-top .navbar-nav-icons {
+            flex-wrap: nowrap !important;
+        }
+
+        @media (max-width: 767.98px) {
+            .navbar-top {
+                padding: 0 0.75rem !important;
+                min-height: 56px !important;
+                height: 56px !important;
+                gap: 0.35rem !important;
+                flex-wrap: nowrap !important;
+            }
+
+            .content,
+            .main .content,
+            [data-layout="container"] .content {
+                padding: 0 0.75rem 1.5rem 0.75rem !important;
+            }
+
+            .navbar-nav-icons {
+                gap: 2px !important;
+            }
+
+            .navbar-top .btn-toolbar-icon {
+                padding: 4px 5px !important;
+                width: 30px !important;
+                height: 30px !important;
+                font-size: 13px !important;
+            }
+
+            .sms-balance-pill {
+                padding: 3px 7px !important;
+                font-size: 11px !important;
+                gap: 4px !important;
+            }
         }
 
         /* Layout Shell: Professional docked sidebar with zero overlap */
@@ -1292,6 +1349,8 @@
          data-credit="Powered by CodePagol | https://codepagol.com"></div>
 
     @include('components.floating-support')
+
+    @include('partials.floating-support')
 
 </body>
 </html>

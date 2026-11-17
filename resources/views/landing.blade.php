@@ -1930,5 +1930,6 @@
     applyLanguage(initialLang);
 })();
 </script>
+@include('partials.floating-support')
 </body>
 </html>

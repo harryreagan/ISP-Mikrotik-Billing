@@ -1,7 +1,7 @@
 {{-- theme, alerts and settings --}}
-<ul class="navbar-nav navbar-nav-icons ms-auto flex-row align-items-center gap-1">
+<ul class="navbar-nav navbar-nav-icons ms-auto flex-row align-items-center gap-1 flex-nowrap">
     {{-- SMS Balance Indicator --}}
-    <li class="nav-item d-flex align-items-center me-1">
+    <li class="nav-item d-flex align-items-center me-0 me-sm-1 flex-shrink-0">
         <x-sms-balance />
     </li>
 
@@ -89,7 +89,7 @@
         </a>
     </li>
 
-    <li class="nav-item dropdown px-1">
+    <li class="nav-item dropdown px-1 d-none d-sm-block">
         <a class="nav-link btn-toolbar-icon" id="navbarDropdownMenu" role="button" data-hide-on-body-scroll="data-hide-on-body-scroll" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="{{ __('Quick Links') }}">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="text-secondary">
                 <circle cx="2.5" cy="2.5" r="1.5"></circle>
