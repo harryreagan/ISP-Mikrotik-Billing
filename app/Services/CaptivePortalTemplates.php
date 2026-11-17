@@ -87,6 +87,8 @@ class CaptivePortalTemplates
         // 1. Sanitize & Normalize Settings
         $s = is_array($settings) ? (object) $settings : $settings;
 
+        $tenantId       = (int)($s->tenant_id ?? 1);
+        $routerId       = (int)($s->router_id ?? 0);
         $defaultBrand   = (function_exists('siteUrlSettings') ? siteUrlSettings('site_name') : null) ?: 'HSmart WiFi';
         $brandName      = htmlspecialchars(!empty($s->brand_name) && strtolower($s->brand_name) !== 'high-speed wifi' ? $s->brand_name : $defaultBrand, ENT_QUOTES, 'UTF-8');
         $headline       = htmlspecialchars($s->headline ?? 'Welcome to Fast Internet', ENT_QUOTES, 'UTF-8');
@@ -345,6 +347,8 @@ function handleMpesaPayment(e) {
         plan_id: selectedPlanId,
         phone: normalized,
         amount: selectedPlanPrice,
+        tenant_id: '{$tenantId}',
+        router_id: '{$routerId}',
         mac: '\$(mac)',
         ip: '\$(ip)'
     };

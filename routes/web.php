@@ -115,10 +115,56 @@ Route::get('/warning', function () {
 Route::get('/recharge/voucher', [PortalVoucherController::class, 'showRechargeForm'])->name('welcome.voucher.recharge');
 Route::post('/recharge/voucher', [PortalVoucherController::class, 'redeem'])->name('welcome.voucher.redeem');
 
-// Captive Portal Public Live Preview & Direct Access
+// Captive Portal Public Live Preview & Direct Access (Strictly Isolated per ISP Tenant & Router)
 Route::match(['get', 'post'], '/captive-portal/preview', function(\Illuminate\Http\Request $request) {
     $user = auth()->user();
-    $tenantId = $user ? ($user->tenant_id ?: 1) : 1;
+    $tenantId = null;
+    $routerId = null;
+
+    // 1. Explicit query or input parameter (?tenant_id=...)
+    if ($request->filled('tenant_id')) {
+        $tenantId = (int) $request->input('tenant_id');
+    }
+
+    // 2. Explicit router_id lookup (?router_id=...)
+    if ($request->filled('router_id')) {
+        $routerId = (int) $request->input('router_id');
+        $router = \App\Models\Router::find($routerId) ?: \App\Models\RouterList::find($routerId);
+        if ($router && $router->tenant_id && !$tenantId) {
+            $tenantId = (int) $router->tenant_id;
+        }
+    }
+
+    // 3. Router setup_token or identity parameter (?token=... or ?identity=...)
+    if (!$tenantId && ($request->filled('token') || $request->filled('identity'))) {
+        $token = $request->input('token') ?: $request->input('identity');
+        $router = \App\Models\Router::where('setup_token', $token)
+            ->orWhere('name', $token)
+            ->first();
+        if ($router && $router->tenant_id) {
+            $tenantId = (int) $router->tenant_id;
+            $routerId = (int) $router->id;
+        }
+    }
+
+    // 4. Authenticated admin/reseller viewing their own portal
+    if (!$tenantId && $user) {
+        $tenantId = (int) ($user->tenant_id ?: 1);
+    }
+
+    // 5. Hostname / subdomain resolution
+    if (!$tenantId) {
+        $host = $request->getHost();
+        $tenant = \App\Models\Tenant::where('domain', $host)->orWhere('slug', explode('.', $host)[0])->first();
+        if ($tenant) {
+            $tenantId = (int) $tenant->id;
+        }
+    }
+
+    // Default fallback
+    $tenantId = $tenantId ?: 1;
+
+    // ── Load Tenant's Isolated Portal Settings ──
     $portalSetting = null;
     try {
         if (\Illuminate\Support\Facades\Schema::hasTable('isp_portal_settings')) {
@@ -133,19 +179,49 @@ Route::match(['get', 'post'], '/captive-portal/preview', function(\Illuminate\Ht
     if (empty($settings) && $portalSetting) {
         $settings = (array) $portalSetting;
     }
-    if (empty($settings['brand_name'])) {
-        $settings['brand_name'] = $user?->tenant?->name ?: (function_exists('siteUrlSettings') ? siteUrlSettings('site_name') : null) ?: 'HSmart WiFi';
+
+    // Tenant info
+    $tenantObj = \App\Models\Tenant::find($tenantId);
+    $tenantName = $tenantObj?->name ?: ($user && $user->tenant_id == $tenantId ? ($user->tenant?->name ?? $user->name) : 'HSmart WiFi');
+
+    $settings['tenant_id'] = $tenantId;
+    $settings['router_id'] = $routerId;
+
+    if (empty($settings['brand_name']) || strtolower($settings['brand_name']) === 'high-speed wifi') {
+        $settings['brand_name'] = $tenantName ?: 'HSmart WiFi';
     }
     if (empty($settings['logo_url'])) {
         $settings['logo_url'] = asset('images/hsmart-isp-logo.svg');
     }
 
-    $plans = \App\Models\PackageList::where('is_active', true)
-        ->orWhereNull('is_active')
-        ->orderBy('price', 'asc')
-        ->take(8)
-        ->get()
-        ->toArray();
+    // ── Strictly Isolated Hotspot Packages for THIS Tenant & Router ──
+    $plansQuery = \App\Models\PackageList::forTenant($tenantId)
+        ->where(function($q) {
+            $q->where('type', 'hotspot')->orWhereNull('type');
+        })
+        ->where(function($q) {
+            $q->where('is_active', true)->orWhereNull('is_active');
+        });
+
+    if ($routerId) {
+        $plansQuery->where(function($q) use ($routerId) {
+            $q->whereHas('routers', function($rq) use ($routerId) {
+                $rq->where('routers.id', $routerId);
+            })->orWhereDoesntHave('routers');
+        });
+    }
+
+    $plans = $plansQuery->orderBy('price', 'asc')->take(8)->get()->toArray();
+
+    // Fallback within tenant if no hotspot tagged packages exist
+    if (empty($plans)) {
+        $plans = \App\Models\PackageList::where('tenant_id', $tenantId)
+            ->where(function($q) { $q->where('is_active', true)->orWhereNull('is_active'); })
+            ->orderBy('price', 'asc')
+            ->take(6)
+            ->get()
+            ->toArray();
+    }
 
     $html = \App\Services\CaptivePortalTemplates::render($template, $settings, $plans);
     return response($html)->header('Content-Type', 'text/html');

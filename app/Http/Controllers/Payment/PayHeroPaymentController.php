@@ -39,15 +39,22 @@ class PayHeroPaymentController extends Controller
         $amount = (float) $request->amount;
         $customerRef = $request->account_reference ?: ('HS-' . substr(preg_replace('/[^0-9]/', '', $phone), -4));
 
-        // Resolve Tenant
+        // Resolve Tenant strictly for isolated captive portal & payments
         $tenantId = 1;
-        if ($request->has('router_id') && !empty($request->router_id)) {
-            $router = RouterList::find($request->router_id);
+        if ($request->filled('tenant_id')) {
+            $tenantId = (int) $request->tenant_id;
+        } elseif ($request->filled('router_id')) {
+            $router = RouterList::find($request->router_id) ?: \App\Models\Router::find($request->router_id);
             if ($router && $router->tenant_id) {
-                $tenantId = $router->tenant_id;
+                $tenantId = (int) $router->tenant_id;
+            }
+        } elseif ($request->filled('plan_id')) {
+            $plan = PackageList::find($request->plan_id);
+            if ($plan && $plan->tenant_id) {
+                $tenantId = (int) $plan->tenant_id;
             }
         } elseif (auth()->check() && auth()->user()->tenant_id) {
-            $tenantId = auth()->user()->tenant_id;
+            $tenantId = (int) auth()->user()->tenant_id;
         }
 
         try {
