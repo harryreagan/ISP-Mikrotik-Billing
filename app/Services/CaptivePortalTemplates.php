@@ -387,6 +387,22 @@ function autoConnectHotspot(voucherCode, password) {
     const codeInput = document.getElementById('voucherCodeInput');
     const passInput = document.getElementById('voucherPassInput');
     const form = document.getElementById('voucherLoginForm');
+    const payBtn = document.getElementById('payButton');
+    const btnText = document.getElementById('btnText');
+    const statusDiv = document.getElementById('statusMessage');
+
+    if (payBtn) payBtn.disabled = false;
+    if (btnText) btnText.innerText = '✅ Connected! (' + voucherCode + ')';
+
+    if (statusDiv) {
+        statusDiv.className = 'status-msg status-success';
+        statusDiv.style.display = 'block';
+        statusDiv.innerHTML =
+            '<div style="font-weight:800;font-size:15px;margin-bottom:4px;">✅ Payment Confirmed — You Are Connected!</div>' +
+            '<div style="font-size:12.5px;margin-bottom:8px;">M-Pesa Voucher: <strong>' + voucherCode + '</strong>. Signing your device in now...</div>' +
+            '<button type="button" onclick="document.getElementById(\'voucherLoginForm\').submit()" style="background:#15803d;color:#fff;border:none;padding:8px 14px;border-radius:8px;font-weight:700;font-size:12.5px;cursor:pointer;">Continue to Internet &rarr;</button>';
+    }
+
     if (codeInput && form) {
         codeInput.value = voucherCode;
         if (passInput) passInput.value = password || voucherCode;
@@ -394,22 +410,28 @@ function autoConnectHotspot(voucherCode, password) {
         if (currentAction.startsWith('$(') || !currentAction) {
             form.setAttribute('action', linkLoginOnly);
         }
-        showStatus('Payment confirmed! Connecting your device to internet (Voucher: ' + voucherCode + ')...', 'success');
-        setTimeout(() => { form.submit(); }, 600);
+        setTimeout(() => { form.submit(); }, 900);
     }
 }
 
-function startPaymentPolling(checkoutId, phone) {
+function startPaymentPolling(checkoutId, merchantRef, phone) {
     if (stkPollTimer) clearInterval(stkPollTimer);
     let attempts = 0;
+    const payBtn = document.getElementById('payButton');
+    const btnText = document.getElementById('btnText');
+
     stkPollTimer = setInterval(() => {
         attempts++;
-        if (attempts > 40) {
+        if (attempts > 48) {
             clearInterval(stkPollTimer);
+            if (payBtn) payBtn.disabled = false;
+            if (btnText) btnText.innerText = 'Pay KES ' + selectedPlanPrice + ' via M-Pesa';
+            showStatus('Still waiting for M-Pesa confirmation. If you already paid, enter your M-Pesa Receipt Code in the Voucher box below to connect instantly.', 'error');
             return;
         }
         const q = new URLSearchParams({
             checkout_id: checkoutId || '',
+            reference: merchantRef || checkoutId || '',
             phone: phone || '',
             tenant_id: '{$tenantId}',
             router_id: '{$routerId}'
@@ -419,13 +441,19 @@ function startPaymentPolling(checkoutId, phone) {
         })
         .then(r => r.json())
         .then(res => {
-            if (res && res.status === 'completed' && res.voucher_code) {
+            if (!res) return;
+            if (res.status === 'completed' && res.voucher_code) {
                 clearInterval(stkPollTimer);
                 autoConnectHotspot(res.voucher_code, res.password || res.voucher_code);
+            } else if (res.status === 'failed') {
+                clearInterval(stkPollTimer);
+                if (payBtn) payBtn.disabled = false;
+                if (btnText) btnText.innerText = 'Pay KES ' + selectedPlanPrice + ' via M-Pesa';
+                showStatus('❌ ' + (res.message || 'Payment was cancelled or failed. Please try again.'), 'error');
             }
         })
         .catch(() => {});
-    }, 3000);
+    }, 2500);
 }
 
 function handleMpesaPayment(e) {
@@ -444,7 +472,7 @@ function handleMpesaPayment(e) {
     // Lock button with spinner
     payBtn.disabled = true;
     btnText.innerText = 'Sending STK Push to ' + rawPhone + '...';
-    showStatus('Processing STK Push request. Please check your phone to enter M-Pesa PIN...', 'success');
+    showStatus('⏳ Sending M-Pesa STK Push. Please check your phone...', 'success');
 
     const payload = {
         plan_id: selectedPlanId,
@@ -464,22 +492,22 @@ function handleMpesaPayment(e) {
     })
     .then(r => r.json())
     .then(data => {
-        payBtn.disabled = false;
-        btnText.innerText = 'Pay KES ' + selectedPlanPrice + ' via M-Pesa';
-        const checkoutId = data.checkout_request_id || data.reference || '';
-        if (data.status === 'success' || data.ResponseCode === '0' || data.success) {
-            showStatus('STK Push sent! Enter your M-Pesa PIN on your phone — you will be connected automatically.', 'success');
-            startPaymentPolling(checkoutId, normalized);
+        if (data && (data.success === true || data.status === 'success' || data.ResponseCode === '0')) {
+            const checkoutId = data.checkout_request_id || '';
+            const merchantRef = data.reference || data.external_reference || checkoutId;
+            btnText.innerText = '⏳ Waiting for M-Pesa PIN...';
+            showStatus('📱 STK Push sent! Enter your M-Pesa PIN on your phone. Waiting for confirmation to connect you automatically...', 'success');
+            startPaymentPolling(checkoutId, merchantRef, normalized);
         } else {
-            showStatus(data.message || data.CustomerMessage || 'STK Push initiated. Check your phone.', 'success');
-            startPaymentPolling(checkoutId, normalized);
+            payBtn.disabled = false;
+            btnText.innerText = 'Pay KES ' + selectedPlanPrice + ' via M-Pesa';
+            showStatus('❌ ' + (data.message || data.CustomerMessage || 'Could not initiate M-Pesa STK Push. Please try again.'), 'error');
         }
     })
     .catch(err => {
         payBtn.disabled = false;
         btnText.innerText = 'Pay KES ' + selectedPlanPrice + ' via M-Pesa';
-        showStatus('STK Push dispatched to ' + normalized + '. Please enter your M-Pesa PIN now.', 'success');
-        startPaymentPolling('', normalized);
+        showStatus('⚠️ Network error reaching payment server. Please retry.', 'error');
     });
 }
 

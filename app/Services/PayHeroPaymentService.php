@@ -59,17 +59,28 @@ class PayHeroPaymentService
 
     protected function loadTenantChannel(int $tenantId): void
     {
-        $channel = PaymentChannel::where('tenant_id', $tenantId)
+        $channel = PaymentChannel::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
             ->where('gateway', 'payhero')
             ->where('is_active', true)
             ->orderBy('is_default', 'desc')
+            ->orderBy('id', 'desc')
             ->first();
 
-        if ($channel) {
-            if ($channel->payhero_channel_id) {
-                $this->channelId = (string) $channel->payhero_channel_id;
-            }
+        if ($channel && !empty($channel->payhero_channel_id)) {
+            $this->channelId = (string) $channel->payhero_channel_id;
+            return;
         }
+
+        // Secondary tenant-scoped fallback: tenants.payhero_channel_id column
+        try {
+            $tenantChannelId = \Illuminate\Support\Facades\DB::table('tenants')
+                ->where('id', $tenantId)
+                ->value('payhero_channel_id');
+            if (!empty($tenantChannelId)) {
+                $this->channelId = (string) $tenantChannelId;
+            }
+        } catch (\Throwable $e) {}
     }
 
     public function isConfigured(): bool
@@ -181,9 +192,9 @@ class PayHeroPaymentService
     }
 
     /**
-     * Initiate STK Push via PayHero with automatic channel resolution.
+     * Initiate STK Push via PayHero with strict per-tenant channel isolation.
      */
-    public function initiatePayment(string $phone, float $amount, string $customerReference, ?int $channelId = null, ?string $shortCode = null, ?string $channelType = null): array
+    public function initiatePayment(string $phone, float $amount, string $customerReference, ?int $channelId = null, ?string $shortCode = null, ?string $channelType = null, array $meta = []): array
     {
         $cleanPhone = function_exists('normalizeKenyanPhone') ? normalizeKenyanPhone($phone) : null;
         if (!$cleanPhone) {
@@ -201,51 +212,72 @@ class PayHeroPaymentService
             return ['success' => false, 'message' => 'Invalid Kenyan mobile phone number.'];
         }
 
-        // 1. Resolve target channel ID
+        // 1. STRICT TENANT-ISOLATED CHANNEL RESOLUTION (NEVER fall back to another merchant's PayHero channel!)
         $resolvedChannelId = null;
+        $channelLabel = null;
 
-        if ($channelId && is_numeric($channelId) && (int)$channelId > 0 && strlen((string)$channelId) <= 6) {
+        if ($channelId && is_numeric($channelId) && (int) $channelId > 0 && strlen((string) $channelId) <= 6) {
             $resolvedChannelId = (int) $channelId;
         }
 
-        // Check tenant's default active channel
+        // Look up THIS tenant's active default channel bypassing session TenantScope (safe for public captive portal API)
         if (!$resolvedChannelId && $this->tenantId) {
-            $channel = PaymentChannel::where('tenant_id', $this->tenantId)
+            $channel = PaymentChannel::withoutGlobalScopes()
+                ->where('tenant_id', $this->tenantId)
                 ->where('gateway', 'payhero')
                 ->where('is_active', true)
                 ->orderBy('is_default', 'desc')
+                ->orderBy('id', 'desc')
                 ->first();
 
-            if ($channel && $channel->payhero_channel_id) {
-                $resolvedChannelId = (int) $channel->payhero_channel_id;
+            if ($channel) {
+                $channelLabel = $channel->channel_name ?: ($channel->short_code . ' / ' . $channel->account_number);
+                if (!empty($channel->payhero_channel_id) && is_numeric($channel->payhero_channel_id)) {
+                    $resolvedChannelId = (int) $channel->payhero_channel_id;
+                } elseif (!empty($channel->short_code)) {
+                    // Match THIS tenant's exact short_code + account_number on PayHero
+                    $activeChannels = $this->getActiveChannels();
+                    foreach ($activeChannels as $ch) {
+                        $chShort = (string) ($ch['short_code'] ?? '');
+                        $chAcc   = (string) ($ch['account_number'] ?? '');
+                        if ($chShort === (string) $channel->short_code && (empty($channel->account_number) || $chAcc === (string) $channel->account_number)) {
+                            $resolvedChannelId = (int) $ch['id'];
+                            $channel->updateQuietly(['payhero_channel_id' => $resolvedChannelId]);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Secondary check: tenants.payhero_channel_id column for THIS tenant
+            if (!$resolvedChannelId) {
+                try {
+                    $tenantRow = \Illuminate\Support\Facades\DB::table('tenants')->where('id', $this->tenantId)->first();
+                    if ($tenantRow && !empty($tenantRow->payhero_channel_id) && is_numeric($tenantRow->payhero_channel_id)) {
+                        $resolvedChannelId = (int) $tenantRow->payhero_channel_id;
+                    }
+                } catch (\Throwable $e) {}
             }
         }
 
-        // If not found by tenant, match by short code against active channels
+        // Only match by explicit shortCode if caller supplied one
         if (!$resolvedChannelId && !empty($shortCode)) {
             $activeChannels = $this->getActiveChannels();
             foreach ($activeChannels as $ch) {
                 $chShort = (string) ($ch['short_code'] ?? ($ch['paybill'] ?? ($ch['till'] ?? '')));
                 $chAcc   = (string) ($ch['account_number'] ?? '');
-                if ((string)$shortCode === $chShort || (string)$shortCode === $chAcc) {
+                if ((string) $shortCode === $chShort || (string) $shortCode === $chAcc) {
                     $resolvedChannelId = (int) $ch['id'];
                     break;
                 }
             }
         }
 
-        // Fallback: check all active PayHero channels
         if (!$resolvedChannelId) {
-            $activeChannels = $this->getActiveChannels();
-            if (!empty($activeChannels[0]['id'])) {
-                $resolvedChannelId = (int) $activeChannels[0]['id'];
-            }
-        }
-
-        if (!$resolvedChannelId) {
+            Log::warning("PayHero isolation guard: Tenant #{$this->tenantId} has no active payment channel configured. Refusing cross-tenant fallback.");
             return [
                 'success' => false,
-                'message' => 'No active PayHero settlement channel could be resolved. Please configure a payment channel.',
+                'message' => 'This ISP has not linked an active M-Pesa payment channel yet. Please configure Payment Gateways in your ISP dashboard.',
             ];
         }
 
@@ -267,7 +299,7 @@ class PayHeroPaymentService
             'callback_url'       => $callbackUrl,
         ];
 
-        Log::info('PayHero Initiation Payload:', $payload);
+        Log::info("PayHero Initiation Payload (Tenant #{$this->tenantId}, Channel={$resolvedChannelId}):", $payload);
 
         try {
             $response = $this->getClient()->post('/payments', $payload);
@@ -276,23 +308,37 @@ class PayHeroPaymentService
             Log::info('PayHero Initiation Response:', ['status' => $response->status(), 'body' => $res]);
 
             if ($response->successful()) {
-                $checkoutId = $res['reference'] ?? $res['checkout_request_id'] ?? $extRef;
+                $merchantRef = $res['reference'] ?? $extRef;
+                $checkoutId  = $res['CheckoutRequestID'] ?? $res['checkout_request_id'] ?? $merchantRef;
 
-                MpesaStkTransaction::create([
+                $storedMeta = array_merge($meta, [
+                    'tenant_id'          => $this->tenantId ?: 1,
+                    'channel_id'         => (int) $resolvedChannelId,
+                    'channel_label'      => $channelLabel,
+                    'external_reference' => $extRef,
+                    'merchant_reference' => $merchantRef,
+                    'checkout_request_id'=> $checkoutId,
+                ]);
+
+                MpesaStkTransaction::withoutGlobalScopes()->create([
+                    'tenant_id'           => $this->tenantId ?: 1,
                     'gateway'             => 'payhero',
+                    'merchant_request_id' => $merchantRef,
                     'checkout_request_id' => $checkoutId,
                     'amount'              => $amount,
                     'phone'               => $cleanPhone,
-                    'reference'           => $customerReference,
+                    'reference'           => $extRef,
                     'status'              => 'pending',
+                    'raw_callback'        => $storedMeta,
                 ]);
 
                 return [
                     'success'             => true,
                     'message'             => $res['message'] ?? 'STK push prompt sent to phone. Enter M-Pesa PIN.',
                     'checkout_request_id' => $checkoutId,
-                    'reference'           => $checkoutId,
+                    'reference'           => $merchantRef,
                     'external_reference'  => $extRef,
+                    'channel_id'          => (int) $resolvedChannelId,
                 ];
             }
 
@@ -310,7 +356,7 @@ class PayHeroPaymentService
     }
 
     /**
-     * Reverse-verify transaction status with PayHero API.
+     * Reverse-verify transaction status with PayHero API (supports both PascalCase and lowercase responses).
      */
     public function verifyStatus(string $reference): array
     {
@@ -323,21 +369,31 @@ class PayHeroPaymentService
 
             if ($response->successful()) {
                 $data = $response->json();
-                $respObj = $data['response'] ?? $data;
-                $status = strtoupper(trim((string) ($respObj['status'] ?? $data['status'] ?? '')));
+                $respObj = (isset($data['response']) && is_array($data['response'])) ? $data['response'] : $data;
+                $rawStatus = $respObj['Status'] ?? $respObj['status'] ?? (is_string($data['status'] ?? null) ? $data['status'] : '');
+                $status = strtoupper(trim((string) $rawStatus));
+                $resultCode = $respObj['ResultCode'] ?? $respObj['result_code'] ?? null;
+
+                $isPaid = in_array($status, ['SUCCESS', 'COMPLETED', 'SUCCESSFUL'], true)
+                    || ($resultCode !== null && is_numeric($resultCode) && (int) $resultCode === 0);
+
+                $isFailed = in_array($status, ['FAILED', 'CANCELLED', 'CANCELED', 'REJECTED', 'TIMEOUT'], true)
+                    || ($resultCode !== null && is_numeric($resultCode) && (int) $resultCode !== 0);
 
                 return [
-                    'verified' => true,
-                    'status'   => $status,
-                    'is_paid'  => in_array($status, ['SUCCESS', 'COMPLETED', 'SUCCESSFUL'], true),
-                    'data'     => $data,
+                    'verified'  => true,
+                    'status'    => $status,
+                    'is_paid'   => $isPaid,
+                    'is_failed' => $isFailed,
+                    'message'   => $respObj['ResultDesc'] ?? $respObj['result_desc'] ?? null,
+                    'data'      => $data,
                 ];
             }
 
-            return ['verified' => false, 'status' => 'PENDING', 'is_paid' => false, 'error' => $response->body()];
+            return ['verified' => false, 'status' => 'PENDING', 'is_paid' => false, 'is_failed' => false, 'error' => $response->body()];
         } catch (\Throwable $e) {
             Log::error('PayHero verifyStatus failed: ' . $e->getMessage());
-            return ['verified' => false, 'status' => 'ERROR', 'is_paid' => false, 'error' => $e->getMessage()];
+            return ['verified' => false, 'status' => 'ERROR', 'is_paid' => false, 'is_failed' => false, 'error' => $e->getMessage()];
         }
     }
 }

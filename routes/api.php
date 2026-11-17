@@ -18,6 +18,14 @@ Route::middleware(['web', 'auth'])->get('/sms/balance', \App\Http\Controllers\Ap
 // 1. M-Pesa SMS Forwarder Webhook
 Route::middleware(['throttle:60,1', 'webhook.log'])->post('/payment/mfs/sms-receiver', [WebhookPaymentController::class, 'handleSmsReceiver']);
 
+// CORS preflight handler for Captive Portal cross-origin requests from MikroTik (http://hotspot.hsmart.lan / 10.5.50.1)
+Route::options('/payment/{any}', function () {
+    return response('', 204)
+        ->header('Access-Control-Allow-Origin', '*')
+        ->header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        ->header('Access-Control-Allow-Headers', 'Content-Type, Accept, X-Requested-With, Authorization');
+})->where('any', '.*');
+
 // 2. M-Pesa Daraja (STK Callback, C2B, STK Push & Polling Status)
 Route::prefix('payment/daraja')->group(function () {
     Route::post('/stk-callback', [DarajaPaymentController::class, 'handleStkCallback'])->middleware(['throttle:60,1', 'webhook.log']);

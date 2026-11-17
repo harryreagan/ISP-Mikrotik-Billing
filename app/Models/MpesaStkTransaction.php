@@ -11,6 +11,7 @@ class MpesaStkTransaction extends Model
     use HasFactory, BelongsToTenant;
 
     protected $fillable = [
+        'tenant_id',
         'gateway',
         'merchant_request_id',
         'checkout_request_id',

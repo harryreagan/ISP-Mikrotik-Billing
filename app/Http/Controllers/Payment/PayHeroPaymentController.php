@@ -25,8 +25,16 @@ class PayHeroPaymentController extends Controller
         $this->payheroService = $payheroService;
     }
 
+    protected function withCors($response)
+    {
+        return $response
+            ->header('Access-Control-Allow-Origin', '*')
+            ->header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+            ->header('Access-Control-Allow-Headers', 'Content-Type, Accept, X-Requested-With, Authorization');
+    }
+
     /**
-     * Initiate Portal STK Push via PayHero.
+     * Initiate Portal STK Push via PayHero with strict tenant isolation.
      */
     public function initiatePortalPayment(Request $request)
     {
@@ -39,61 +47,66 @@ class PayHeroPaymentController extends Controller
         $amount = (float) $request->amount;
         $customerRef = $request->account_reference ?: ('HS-' . substr(preg_replace('/[^0-9]/', '', $phone), -4));
 
-        // Resolve Tenant strictly for isolated captive portal & payments
-        $tenantId = 1;
-        if ($request->filled('tenant_id')) {
-            $tenantId = (int) $request->tenant_id;
-        } elseif ($request->filled('router_id')) {
-            $router = RouterList::find($request->router_id) ?: \App\Models\Router::find($request->router_id);
+        // Resolve Tenant strictly bypassing session TenantScope for unauthenticated captive portal requests
+        $tenantId = null;
+        if ($request->filled('router_id') && (int) $request->router_id > 0) {
+            $router = \App\Models\Router::withoutGlobalScopes()->find((int) $request->router_id)
+                ?: RouterList::withoutGlobalScopes()->find((int) $request->router_id);
             if ($router && $router->tenant_id) {
                 $tenantId = (int) $router->tenant_id;
             }
-        } elseif ($request->filled('plan_id')) {
-            $plan = PackageList::find($request->plan_id);
+        }
+        if (!$tenantId && $request->filled('tenant_id') && (int) $request->tenant_id > 0) {
+            $tenantId = (int) $request->tenant_id;
+        }
+        if (!$tenantId && ($request->filled('plan_id') || $request->filled('package_id'))) {
+            $pid = (int) ($request->plan_id ?: $request->package_id);
+            $plan = PackageList::withoutGlobalScopes()->find($pid);
             if ($plan && $plan->tenant_id) {
                 $tenantId = (int) $plan->tenant_id;
             }
-        } elseif (auth()->check() && auth()->user()->tenant_id) {
+        }
+        if (!$tenantId && auth()->check() && auth()->user()->tenant_id) {
             $tenantId = (int) auth()->user()->tenant_id;
         }
+        if (!$tenantId) {
+            $tenantId = 1;
+        }
+
+        $meta = [
+            'package_id' => $request->plan_id ?? $request->package_id ?? null,
+            'router_id'  => $request->router_id ? (int) $request->router_id : null,
+            'mac'        => $request->mac ?: null,
+            'ip'         => $request->ip ?: null,
+            'tenant_id'  => $tenantId,
+        ];
 
         try {
             $service = PayHeroPaymentService::forTenant($tenantId);
-            $result = $service->initiatePayment($phone, $amount, $customerRef);
+            $result = $service->initiatePayment($phone, $amount, $customerRef, null, null, null, $meta);
 
             if (!empty($result['success'])) {
-                // Attach extra metadata if transaction was created
-                $checkoutId = $result['checkout_request_id'] ?? $result['reference'] ?? null;
-                if ($checkoutId) {
-                    MpesaStkTransaction::where('checkout_request_id', $checkoutId)->update([
-                        'raw_callback' => [
-                            'package_id' => $request->plan_id ?? $request->package_id ?? null,
-                            'router_id'  => $request->router_id ?? null,
-                            'mac'        => $request->mac ?? null,
-                            'ip'         => $request->ip ?? null,
-                            'tenant_id'  => $tenantId,
-                        ],
-                    ]);
-                }
-
-                return response()->json([
+                return $this->withCors(response()->json([
                     'success'             => true,
-                    'checkout_request_id' => $checkoutId,
+                    'checkout_request_id' => $result['checkout_request_id'] ?? $result['reference'] ?? null,
+                    'reference'           => $result['reference'] ?? $result['checkout_request_id'] ?? null,
+                    'external_reference'  => $result['external_reference'] ?? null,
+                    'channel_id'          => $result['channel_id'] ?? null,
                     'message'             => $result['message'] ?? 'STK push sent to your phone. Please enter your M-Pesa PIN.',
-                ])->header('Access-Control-Allow-Origin', '*');
+                ]));
             }
 
-            return response()->json([
+            return $this->withCors(response()->json([
                 'success' => false,
                 'message' => $result['message'] ?? 'Failed to initiate STK push.',
-            ], 422)->header('Access-Control-Allow-Origin', '*');
+            ], 422));
 
         } catch (\Throwable $e) {
             Log::error('[PayHeroPaymentController] initiatePortalPayment error: ' . $e->getMessage());
-            return response()->json([
+            return $this->withCors(response()->json([
                 'success' => false,
                 'message' => 'Payment service error: ' . $e->getMessage(),
-            ], 500)->header('Access-Control-Allow-Origin', '*');
+            ], 500));
         }
     }
 
@@ -102,47 +115,99 @@ class PayHeroPaymentController extends Controller
      */
     public function checkPortalStatus(Request $request)
     {
-        $checkoutId = $request->query('checkout_id') ?: $request->query('reference');
-        $phone = $request->query('phone');
+        $checkoutId = trim((string) ($request->query('checkout_id') ?: $request->query('reference') ?: ''));
+        $reference  = trim((string) ($request->query('reference') ?: ''));
+        $phone      = trim((string) ($request->query('phone') ?: ''));
+        $reqTenant  = (int) ($request->query('tenant_id') ?: 0);
 
-        if ($checkoutId) {
-            $stkTx = MpesaStkTransaction::where('checkout_request_id', $checkoutId)->first();
+        $stkTx = null;
+        if ($checkoutId || $reference) {
+            $stkTx = MpesaStkTransaction::withoutGlobalScopes()
+                ->where(function ($q) use ($checkoutId, $reference) {
+                    if ($checkoutId) {
+                        $q->where('checkout_request_id', $checkoutId)
+                          ->orWhere('merchant_request_id', $checkoutId)
+                          ->orWhere('reference', $checkoutId);
+                    }
+                    if ($reference && $reference !== $checkoutId) {
+                        $q->orWhere('merchant_request_id', $reference)
+                          ->orWhere('checkout_request_id', $reference)
+                          ->orWhere('reference', $reference);
+                    }
+                })
+                ->latest('id')
+                ->first();
+        }
 
-            // 1. If already completed in local DB
-            if ($stkTx && $stkTx->status === 'completed') {
+        if ($stkTx) {
+            // 1. Completed in DB (set by webhook or prior poll)
+            if ($stkTx->status === 'completed') {
                 $code = strtoupper($stkTx->mpesa_receipt_number ?: $stkTx->checkout_request_id);
-                return response()->json([
+                return $this->withCors(response()->json([
                     'status'       => 'completed',
                     'voucher_code' => $code,
                     'password'     => $code,
-                ])->header('Access-Control-Allow-Origin', '*');
+                    'message'      => 'Payment confirmed! Connecting you to Wi-Fi...',
+                ]));
             }
 
-            // 2. If pending, query PayHero API reverse verification directly
-            if ($stkTx && $stkTx->status === 'pending') {
+            // 2. Failed or cancelled by user
+            if ($stkTx->status === 'failed') {
+                return $this->withCors(response()->json([
+                    'status'  => 'failed',
+                    'message' => $stkTx->result_desc ?: 'Payment was cancelled or failed. Please try again.',
+                ]));
+            }
+
+            // 3. Pending: actively poll PayHero /transaction-status using PayHero's reference (merchant_request_id)
+            if ($stkTx->status === 'pending') {
                 try {
                     $meta = is_array($stkTx->raw_callback) ? $stkTx->raw_callback : [];
-                    $tenantId = (int) ($meta['tenant_id'] ?? ($request->query('tenant_id') ?: 1));
+                    $tenantId = (int) ($stkTx->tenant_id ?: ($meta['tenant_id'] ?? ($reqTenant ?: 1)));
                     $service = PayHeroPaymentService::forTenant($tenantId);
-                    $verifyResult = $service->verifyStatus($checkoutId);
+                    $verifyKey = $stkTx->merchant_request_id ?: ($meta['merchant_reference'] ?? $stkTx->checkout_request_id);
+                    $verifyResult = $service->verifyStatus($verifyKey);
+
                     if (!empty($verifyResult['is_paid'])) {
                         $vData = $verifyResult['data'] ?? [];
-                        $apiReceipt = strtoupper(trim((string) ($vData['mpesa_receipt_number'] ?? $vData['response']['mpesa_receipt_number'] ?? $checkoutId)));
-                        $apiAmount = (float) ($vData['amount'] ?? $vData['response']['amount'] ?? $stkTx->amount);
+                        $vResp = (isset($vData['response']) && is_array($vData['response'])) ? $vData['response'] : $vData;
+                        $apiReceipt = strtoupper(trim((string) (
+                            $vResp['MpesaReceiptNumber']
+                            ?? $vResp['mpesa_receipt_number']
+                            ?? $vData['mpesa_receipt_number']
+                            ?? $vResp['provider_reference']
+                            ?? $vData['provider_reference']
+                            ?? $stkTx->checkout_request_id
+                        )));
+                        $apiAmount = (float) ($vResp['Amount'] ?? $vResp['amount'] ?? $vData['amount'] ?? $stkTx->amount);
 
-                        $stkTx->update([
+                        MpesaStkTransaction::withoutGlobalScopes()->where('id', $stkTx->id)->update([
                             'status'               => 'completed',
                             'mpesa_receipt_number' => $apiReceipt,
+                            'result_code'          => 0,
+                            'result_desc'          => 'Payment confirmed via PayHero status check.',
                         ]);
+                        $stkTx->status = 'completed';
+                        $stkTx->mpesa_receipt_number = $apiReceipt;
 
-                        // Fulfill subscriber or record collection & provision hotspot voucher
                         $this->fulfillSuccessfulTransaction($stkTx, $apiReceipt, $apiAmount);
 
-                        return response()->json([
+                        return $this->withCors(response()->json([
                             'status'       => 'completed',
                             'voucher_code' => $apiReceipt,
                             'password'     => $apiReceipt,
-                        ])->header('Access-Control-Allow-Origin', '*');
+                            'message'      => 'Payment confirmed! Connecting you to Wi-Fi...',
+                        ]));
+                    } elseif (!empty($verifyResult['is_failed'])) {
+                        $desc = $verifyResult['message'] ?: 'Payment cancelled or failed.';
+                        MpesaStkTransaction::withoutGlobalScopes()->where('id', $stkTx->id)->update([
+                            'status'      => 'failed',
+                            'result_desc' => $desc,
+                        ]);
+                        return $this->withCors(response()->json([
+                            'status'  => 'failed',
+                            'message' => $desc,
+                        ]));
                     }
                 } catch (\Throwable $e) {
                     Log::warning('[PayHero checkPortalStatus] Verification poll exception: ' . $e->getMessage());
@@ -150,28 +215,31 @@ class PayHeroPaymentController extends Controller
             }
         }
 
-        // 3. Fallback: check CollectionSummary by phone within last 5 minutes
-        if ($phone) {
+        // 4. Fallback: check recent completed transaction for this phone & tenant within last 3 minutes
+        if ($phone && !$stkTx) {
             $cleanPhone = function_exists('normalizeKenyanPhone') ? normalizeKenyanPhone($phone) : $phone;
-            $recent = CollectionSummary::where(function ($q) use ($phone, $cleanPhone) {
-                    $q->where('customer_collection_unique_id', 'like', "%{$phone}%")
-                      ->orWhere('customer_collection_unique_id', 'like', "%{$cleanPhone}%");
+            $recentTx = MpesaStkTransaction::withoutGlobalScopes()
+                ->where('status', 'completed')
+                ->where(function ($q) use ($phone, $cleanPhone) {
+                    $q->where('phone', $cleanPhone)->orWhere('phone', $phone);
                 })
-                ->where('created_at', '>=', now()->subMinutes(5))
-                ->latest()
+                ->when($reqTenant > 0, fn($q) => $q->where('tenant_id', $reqTenant))
+                ->where('updated_at', '>=', now()->subMinutes(3))
+                ->latest('id')
                 ->first();
 
-            if ($recent) {
-                $code = strtoupper($recent->transaction_id);
-                return response()->json([
+            if ($recentTx && $recentTx->mpesa_receipt_number) {
+                $code = strtoupper($recentTx->mpesa_receipt_number);
+                return $this->withCors(response()->json([
                     'status'       => 'completed',
                     'voucher_code' => $code,
                     'password'     => $code,
-                ])->header('Access-Control-Allow-Origin', '*');
+                    'message'      => 'Payment confirmed! Connecting you to Wi-Fi...',
+                ]));
             }
         }
 
-        return response()->json(['status' => 'pending'])->header('Access-Control-Allow-Origin', '*');
+        return $this->withCors(response()->json(['status' => 'pending']));
     }
 
     /**
@@ -180,31 +248,43 @@ class PayHeroPaymentController extends Controller
     protected function fulfillSuccessfulTransaction(MpesaStkTransaction $stkTx, string $receipt, float $amount): void
     {
         $receipt = strtoupper(trim($receipt));
+        $meta = is_array($stkTx->raw_callback) ? $stkTx->raw_callback : [];
+        $tenantId = (int) ($stkTx->tenant_id ?: ($meta['tenant_id'] ?? 1));
 
-        // Always provision Hotspot voucher on tenant's router(s) so M-Pesa receipt code & phone work immediately
+        // Always provision Hotspot voucher & direct login on tenant's router(s) so customer connects immediately
         try {
             $this->provisionHotspotVoucherOnRouter($stkTx, $receipt);
         } catch (\Throwable $he) {
             Log::warning('[PayHero] Hotspot voucher router provisioning note: ' . $he->getMessage());
         }
 
-        // Check idempotency
-        if (CollectionSummary::where('transaction_id', $receipt)->exists()) {
+        // Check idempotency bypassing TenantScope
+        if (CollectionSummary::withoutGlobalScopes()->where('transaction_id', $receipt)->exists()) {
             return;
         }
 
         $customer = null;
         if ($stkTx->reference) {
-            $customer = CustomersInfo::where('customer_unique_id', $stkTx->reference)->first();
+            $customer = CustomersInfo::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('customer_unique_id', $stkTx->reference)
+                ->first();
             if (!$customer) {
-                $customer = CustomersInfo::whereHas('pppUser', fn($q) => $q->where('username', $stkTx->reference))->first();
+                $customer = CustomersInfo::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->whereHas('pppUser', fn($q) => $q->withoutGlobalScopes()->where('username', $stkTx->reference))
+                    ->first();
             }
         }
 
         if (!$customer && $stkTx->phone) {
             $normalizedPhone = function_exists('normalizeKenyanPhone') ? normalizeKenyanPhone($stkTx->phone) : $stkTx->phone;
-            $customer = CustomersInfo::where('mobile', $normalizedPhone)
-                ->orWhere('mobile', '+' . $normalizedPhone)
+            $customer = CustomersInfo::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where(function ($q) use ($normalizedPhone) {
+                    $q->where('mobile', $normalizedPhone)
+                      ->orWhere('mobile', '+' . $normalizedPhone);
+                })
                 ->first();
         }
 
@@ -221,34 +301,43 @@ class PayHeroPaymentController extends Controller
                 Log::error('fulfillSuccessfulTransaction error: ' . $e->getMessage());
             }
         } else {
-            // Hotspot / guest voucher collection record
-            $maxInvoice = CollectionSummary::max('invoice_no');
+            // Hotspot / guest voucher collection record scoped strictly to this tenant
+            $maxInvoice = CollectionSummary::withoutGlobalScopes()->max('invoice_no');
             $invoiceNo = $maxInvoice ? ($maxInvoice + 1) : 100001;
 
-            CollectionSummary::create([
-                'customer_collection_unique_id' => $stkTx->phone,
-                'collection_date'               => now(),
-                'collection_amount'             => $amount,
-                'collected_by'                  => 'Online Payment (PAYHERO)',
-                'payment_type'                  => 'online',
-                'payment_method'                => 'payhero',
-                'transaction_id'                => $receipt,
-                'payment_status'                => 'paid',
-                'invoice_no'                    => $invoiceNo,
-                'bill_month'                    => now()->format('F Y'),
-            ]);
+            try {
+                \Illuminate\Support\Facades\DB::table('collection_summaries')->insert([
+                    'tenant_id'                     => $tenantId,
+                    'customer_collection_unique_id' => $stkTx->phone,
+                    'collection_date'               => now(),
+                    'collection_amount'             => $amount,
+                    'collected_by'                  => 'Online Payment (PAYHERO)',
+                    'payment_type'                  => 'online',
+                    'payment_method'                => 'payhero',
+                    'transaction_id'                => $receipt,
+                    'payment_status'                => 'paid',
+                    'invoice_no'                    => $invoiceNo,
+                    'bill_month'                    => now()->format('F Y'),
+                    'created_at'                    => now(),
+                    'updated_at'                    => now(),
+                ]);
+            } catch (\Throwable $ce) {
+                Log::warning('CollectionSummary insert fallback note: ' . $ce->getMessage());
+            }
         }
     }
 
     /**
-     * Provision a paid Hotspot user on the MikroTik router so the receipt code and phone number can log in immediately.
+     * Provision a paid Hotspot user on the MikroTik router and authorize the client's IP/MAC immediately.
      */
     protected function provisionHotspotVoucherOnRouter(MpesaStkTransaction $stkTx, string $receipt): void
     {
         $meta = is_array($stkTx->raw_callback) ? $stkTx->raw_callback : [];
-        $routerId = $meta['router_id'] ?? null;
-        $tenantId = (int) ($meta['tenant_id'] ?? 1);
+        $routerId  = !empty($meta['router_id']) ? (int) $meta['router_id'] : null;
+        $tenantId  = (int) ($stkTx->tenant_id ?: ($meta['tenant_id'] ?? 1));
         $packageId = $meta['package_id'] ?? null;
+        $clientIp  = $meta['ip'] ?? null;
+        $clientMac = $meta['mac'] ?? null;
 
         $limitUptime = '1d';
         if ($packageId) {
@@ -290,90 +379,150 @@ class PayHeroPaymentController extends Controller
             }
 
             try {
-                $api = new \App\Services\MikrotikApiService($host, $port, $user, $pass, 5);
+                $api = new \App\Services\MikrotikApiService($host, $port, $user, $pass, 6);
                 $code = strtoupper(trim($receipt));
-                $api->executeCommand('/ip/hotspot/user/add', [
-                    'name'         => $code,
-                    'password'     => $code,
-                    'limit-uptime' => $limitUptime,
-                    'comment'      => 'M-Pesa ' . ($stkTx->phone ?: ''),
-                ]);
+
+                // 1. Add Hotspot voucher user (username = receipt, password = receipt)
+                $existingUsers = $api->executeCommand('/ip/hotspot/user/print');
+                $exists = false;
+                if (is_array($existingUsers)) {
+                    foreach ($existingUsers as $eu) {
+                        if (strtoupper($eu['name'] ?? '') === $code) {
+                            $exists = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$exists) {
+                    $api->executeCommand('/ip/hotspot/user/add', [
+                        'name'         => $code,
+                        'password'     => $code,
+                        'limit-uptime' => $limitUptime,
+                        'comment'      => 'M-Pesa ' . ($stkTx->phone ?: ''),
+                    ]);
+                }
+
+                // 2. Directly authorize the client session on MikroTik if valid IP is known (instant internet even if popup closes)
+                if ($clientIp && filter_var($clientIp, FILTER_VALIDATE_IP)) {
+                    $loginParams = [
+                        'user'     => $code,
+                        'password' => $code,
+                        'ip'       => $clientIp,
+                    ];
+                    if ($clientMac && preg_match('/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/', $clientMac)) {
+                        $loginParams['mac-address'] = strtoupper($clientMac);
+                    }
+                    $api->executeCommand('/ip/hotspot/active/login', $loginParams);
+                }
+
+                Log::info("[PayHero] Provisioned Hotspot user '{$code}' ({$limitUptime}) on router {$router->name}" . ($clientIp ? " and logged in IP {$clientIp}" : ''));
             } catch (\Throwable $e) {
-                Log::debug("Hotspot user add note on {$router->name}: " . $e->getMessage());
+                Log::warning("Hotspot user add note on {$router->name}: " . $e->getMessage());
             }
         }
     }
 
     /**
-     * Handle PayHero Webhook Notification.
+     * Handle PayHero Webhook Notification (supports PascalCase & lowercase payloads, bypassing session TenantScope).
      */
     public function handleWebhook(Request $request)
     {
         \App\Services\Security\SafePayloadLogger::info('PayHero Webhook Received', $request->all());
 
         $payload = $request->all();
-        $responseObj = $payload['response'] ?? $payload;
+        $responseObj = (isset($payload['response']) && is_array($payload['response'])) ? $payload['response'] : $payload;
 
-        $status    = strtoupper(trim((string) ($responseObj['status'] ?? $payload['status'] ?? '')));
-        $reference = trim((string) ($responseObj['reference'] ?? $payload['reference'] ?? $payload['external_reference'] ?? ''));
-        $receipt   = strtoupper(trim((string) ($responseObj['mpesa_receipt_number'] ?? $payload['mpesa_receipt_number'] ?? $reference)));
-        $amount    = (float) ($responseObj['amount'] ?? $payload['amount'] ?? 0);
-        $phone     = (string) ($responseObj['phone_number'] ?? $payload['phone_number'] ?? $responseObj['phone'] ?? '');
+        // Parse BOTH PascalCase (PayHero v2 live format) and lowercase keys
+        $rawStatus = $responseObj['Status']
+            ?? $responseObj['status']
+            ?? (is_string($payload['status'] ?? null) ? $payload['status'] : '');
+        $status = strtoupper(trim((string) $rawStatus));
 
-        $stkTx = MpesaStkTransaction::where('checkout_request_id', $reference)
-            ->orWhere('mpesa_receipt_number', $receipt)
-            ->first();
+        $resultCode = $responseObj['ResultCode'] ?? $responseObj['result_code'] ?? $payload['result_code'] ?? null;
+        $resultDesc = (string) ($responseObj['ResultDesc'] ?? $responseObj['result_desc'] ?? $payload['result_desc'] ?? '');
 
-        // 1. Check initial status
-        if ($status !== 'SUCCESS' && $status !== 'COMPLETED' && $status !== 'SUCCESSFUL') {
-            Log::warning("PayHero webhook non-success status: '{$status}' for reference {$reference}");
+        $merchantReqId = trim((string) ($responseObj['MerchantRequestID'] ?? $responseObj['merchant_request_id'] ?? $responseObj['reference'] ?? $payload['reference'] ?? ''));
+        $checkoutReqId = trim((string) ($responseObj['CheckoutRequestID'] ?? $responseObj['checkout_request_id'] ?? $payload['checkout_request_id'] ?? ''));
+        $externalRef   = trim((string) ($responseObj['ExternalReference'] ?? $responseObj['external_reference'] ?? $payload['external_reference'] ?? ''));
+        $receipt       = strtoupper(trim((string) ($responseObj['MpesaReceiptNumber'] ?? $responseObj['mpesa_receipt_number'] ?? $payload['mpesa_receipt_number'] ?? '')));
+        $amount        = (float) ($responseObj['Amount'] ?? $responseObj['amount'] ?? $payload['amount'] ?? 0);
+        $phone         = (string) ($responseObj['Phone'] ?? $responseObj['phone_number'] ?? $responseObj['phone'] ?? $payload['phone_number'] ?? '');
+
+        $lookupKeys = array_values(array_filter([$merchantReqId, $checkoutReqId, $externalRef, $receipt]));
+
+        $stkTx = null;
+        if (!empty($lookupKeys)) {
+            $stkTx = MpesaStkTransaction::withoutGlobalScopes()
+                ->where(function ($q) use ($lookupKeys) {
+                    $q->whereIn('checkout_request_id', $lookupKeys)
+                      ->orWhereIn('merchant_request_id', $lookupKeys)
+                      ->orWhereIn('reference', $lookupKeys)
+                      ->orWhereIn('mpesa_receipt_number', $lookupKeys);
+                })
+                ->latest('id')
+                ->first();
+        }
+
+        // 1. Check success vs failed/cancelled
+        $isSuccess = in_array($status, ['SUCCESS', 'COMPLETED', 'SUCCESSFUL'], true)
+            || ($resultCode !== null && is_numeric($resultCode) && (int) $resultCode === 0);
+
+        if (!$isSuccess) {
+            Log::warning("PayHero webhook non-success status: '{$status}' (ResultCode={$resultCode}, Desc='{$resultDesc}') for ref={$merchantReqId}/{$checkoutReqId}");
             if ($stkTx) {
-                $stkTx->update([
+                $existingMeta = is_array($stkTx->raw_callback) ? $stkTx->raw_callback : [];
+                MpesaStkTransaction::withoutGlobalScopes()->where('id', $stkTx->id)->update([
                     'status'       => 'failed',
-                    'raw_callback' => $payload,
+                    'result_code'  => is_numeric($resultCode) ? (int) $resultCode : null,
+                    'result_desc'  => $resultDesc ?: ('Payment ' . ($status ?: 'failed')),
+                    'raw_callback' => array_merge($existingMeta, ['webhook' => $payload]),
                 ]);
             }
             return response()->json(['status' => 'ignored', 'message' => 'Transaction was not successful'], 200);
         }
 
-        // 2. Reverse-verify with PayHero API before activating
-        $verifyResult = $this->payheroService->verifyStatus($reference);
-        if (!$verifyResult['verified']) {
-            Log::error("PayHero reverse-verification failed for reference: {$reference}");
-            return response()->json(['status' => 'error', 'message' => 'Reverse verification failed'], 422);
+        // 2. Reverse-verify with PayHero API when possible
+        $verifyRef = $merchantReqId ?: ($checkoutReqId ?: $externalRef);
+        $apiAmount = $amount;
+        $apiReceipt = $receipt;
+        if ($verifyRef) {
+            $verifyResult = $this->payheroService->verifyStatus($verifyRef);
+            if (!empty($verifyResult['verified'])) {
+                $vData = $verifyResult['data'] ?? [];
+                $vResp = (isset($vData['response']) && is_array($vData['response'])) ? $vData['response'] : $vData;
+                if (!empty($verifyResult['is_failed'])) {
+                    Log::warning("PayHero reverse-verification confirmed transaction FAILED for ref={$verifyRef}");
+                    return response()->json(['status' => 'ignored', 'message' => 'PayHero API reported failure'], 200);
+                }
+                $vReceipt = strtoupper(trim((string) ($vResp['MpesaReceiptNumber'] ?? $vResp['mpesa_receipt_number'] ?? $vData['mpesa_receipt_number'] ?? '')));
+                $vAmount  = (float) ($vResp['Amount'] ?? $vResp['amount'] ?? $vData['amount'] ?? 0);
+                if ($vReceipt) $apiReceipt = $vReceipt;
+                if ($vAmount > 0) $apiAmount = $vAmount;
+            }
         }
 
-        $vData = $verifyResult['data'] ?? [];
-        $apiStatus = strtoupper(trim((string) ($vData['status'] ?? $vData['response']['status'] ?? '')));
-        $apiAmount = (float) ($vData['amount'] ?? $vData['response']['amount'] ?? $amount);
-        $apiReceipt = strtoupper(trim((string) ($vData['mpesa_receipt_number'] ?? $vData['response']['mpesa_receipt_number'] ?? $receipt)));
-
-        if (!in_array($apiStatus, ['SUCCESS', 'COMPLETED', 'SUCCESSFUL'], true)) {
-            Log::warning("PayHero reverse-verification confirmed transaction is NOT successful: Status={$apiStatus}");
-            return response()->json(['status' => 'ignored', 'message' => 'PayHero API did not confirm successful payment'], 200);
-        }
-
-        $finalReceipt = $apiReceipt ?: $receipt;
+        $finalReceipt = $apiReceipt ?: ($receipt ?: $verifyRef);
         $finalAmount  = $apiAmount > 0 ? $apiAmount : $amount;
 
-        // 3. Idempotency Guard
-        if (CollectionSummary::where('transaction_id', $finalReceipt)->exists()) {
-            Log::info("PayHero duplicate transaction ignored: {$finalReceipt}");
-            if ($stkTx) {
-                $stkTx->update(['status' => 'completed', 'mpesa_receipt_number' => $finalReceipt]);
-            }
-            return response()->json(['status' => 'ignored', 'message' => 'Transaction already processed'], 200);
-        }
-
+        // 3. Preserve original router/tenant/mac/ip metadata while updating STK transaction to completed
         if ($stkTx) {
-            $stkTx->update([
+            $existingMeta = is_array($stkTx->raw_callback) ? $stkTx->raw_callback : [];
+            $mergedMeta = array_merge($existingMeta, ['webhook' => $payload]);
+
+            MpesaStkTransaction::withoutGlobalScopes()->where('id', $stkTx->id)->update([
                 'status'               => 'completed',
                 'mpesa_receipt_number' => $finalReceipt,
-                'raw_callback'         => $payload,
+                'result_code'          => 0,
+                'result_desc'          => $resultDesc ?: 'Success',
+                'raw_callback'         => $mergedMeta,
             ]);
+
+            $stkTx->status = 'completed';
+            $stkTx->mpesa_receipt_number = $finalReceipt;
+            $stkTx->raw_callback = $mergedMeta;
         }
 
-        // 4. Fulfill transaction
+        // 4. Fulfill transaction & provision Hotspot user on MikroTik immediately
         if ($stkTx) {
             $this->fulfillSuccessfulTransaction($stkTx, $finalReceipt, $finalAmount);
         }
