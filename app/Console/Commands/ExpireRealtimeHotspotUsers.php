@@ -53,7 +53,7 @@ class ExpireRealtimeHotspotUsers extends Command
         }
 
         if (\Illuminate\Support\Facades\Schema::hasColumn('hotspot_sales', 'status') && \Illuminate\Support\Facades\Schema::hasColumn('hotspot_sales', 'expires_at')) {
-            HotspotSale::where('status', 'completed')
+            HotspotSale::whereIn('status', ['completed', 'active'])
                 ->whereNotNull('expires_at')
                 ->where('expires_at', '<=', $now)
                 ->update(['status' => 'expired']);
@@ -189,6 +189,18 @@ class ExpireRealtimeHotspotUsers extends Command
                     try {
                         $api->executeCommand('/ip/hotspot/active/remove', ['.id' => $sessionId]);
                         Log::info("[ExpireHotspot] Forcefully kicked active user '{$username}' from router {$router->name}. Reason: {$reason}");
+
+                        // Also remove cookie so mac-cookie never bypasses limit-uptime
+                        try {
+                            $cookies = $api->executeCommand('/ip/hotspot/cookie/print');
+                            if (is_array($cookies)) {
+                                foreach ($cookies as $ck) {
+                                    if (strcasecmp($ck['user'] ?? '', $username) === 0) {
+                                        $api->executeCommand('/ip/hotspot/cookie/remove', ['.id' => $ck['.id']]);
+                                    }
+                                }
+                            }
+                        } catch (\Throwable $ckEx) {}
 
                         // Also remove or disable the user from router so they cannot reconnect without paying
                         if ($routerUser && !empty($routerUser['.id'])) {

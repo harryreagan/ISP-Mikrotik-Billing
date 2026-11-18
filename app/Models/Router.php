@@ -25,6 +25,7 @@ class Router extends Model
         'last_polled_at'             => 'datetime',
         'vpn_connected_at'           => 'datetime',
         'provisioned_at'             => 'datetime',
+        'network_changed_at'         => 'datetime',
     ];
 
     protected static function booted()

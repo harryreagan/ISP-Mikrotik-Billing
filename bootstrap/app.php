@@ -38,9 +38,64 @@ return Application::configure(basePath: dirname(__DIR__))
             '/payment/paybridge/*',
             '/api/payment/*',
             '/api/*',
+            '/captive-portal/*',
+            '/captive-portal',
+            '/provision/hotspot-portal/*',
+            '/recharge/*',
+            '/portal/recharge/*',
+            '/payment/stk-push',
+            '/payment/status',
+            '/payment/daraja/*',
+            '/payment/payhero/*',
+            '/payment/kopokopo/*',
+            '/portal/returning-user',
+            '/portal/check-session',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        // Graceful 419 / TokenMismatchException Handling (Zero "Page Expired" errors)
+        $exceptions->render(function (\Illuminate\Session\TokenMismatchException $e, \Illuminate\Http\Request $request) {
+            $isAjax = $request->expectsJson() || $request->isXmlHttpRequest() || $request->header('X-Livewire') || $request->header('X-Inertia') || $request->is('api/*');
+            $isPortal = $request->is('portal') || $request->is('portal/*');
+            $loginPath = $isPortal ? '/portal/login' : '/login';
+
+            if ($isAjax) {
+                return response()->json([
+                    'message'         => 'Your session has expired. Please sign in again.',
+                    'session_expired' => true,
+                    'redirect'        => url($loginPath),
+                ], 419);
+            }
+
+            $targetUrl = $request->isMethod('GET') ? $request->fullUrl() : url()->previous();
+
+            return redirect()->guest($loginPath)
+                ->with('intended_url', $targetUrl)
+                ->with('warning', 'Your session expired after inactivity. Please sign in again to continue.');
+        });
+
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e, \Illuminate\Http\Request $request) {
+            if ($e->getStatusCode() === 419) {
+                $isAjax = $request->expectsJson() || $request->isXmlHttpRequest() || $request->header('X-Livewire') || $request->header('X-Inertia') || $request->is('api/*');
+                $isPortal = $request->is('portal') || $request->is('portal/*');
+                $loginPath = $isPortal ? '/portal/login' : '/login';
+
+                if ($isAjax) {
+                    return response()->json([
+                        'message'         => 'Your session has expired. Please sign in again.',
+                        'session_expired' => true,
+                        'redirect'        => url($loginPath),
+                    ], 419);
+                }
+
+                $targetUrl = $request->isMethod('GET') ? $request->fullUrl() : url()->previous();
+
+                return redirect()->guest($loginPath)
+                    ->with('intended_url', $targetUrl)
+                    ->with('warning', 'Your session expired after inactivity. Please sign in again to continue.');
+            }
+        });
+
         $exceptions->report(function (\Throwable $e) {
             try {
                 if (app()->bound('auth') && app()->bound('hash')) {

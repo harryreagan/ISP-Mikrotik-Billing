@@ -244,25 +244,27 @@ class PayHeroPaymentController extends Controller
 
     /**
      * Helper to fulfill payment after successful STK confirmation.
+     * Decouples financial recording (hotspot_sales / collection_summaries) from router reachability.
      */
     protected function fulfillSuccessfulTransaction(MpesaStkTransaction $stkTx, string $receipt, float $amount): void
     {
         $receipt = strtoupper(trim($receipt));
         $meta = is_array($stkTx->raw_callback) ? $stkTx->raw_callback : [];
         $tenantId = (int) ($stkTx->tenant_id ?: ($meta['tenant_id'] ?? 1));
+        $routerId = !empty($meta['router_id']) ? (int) $meta['router_id'] : ($stkTx->router_id ?: null);
+        $packageId = $meta['package_id'] ?? null;
+        $clientIp = $meta['ip'] ?? null;
+        $clientMac = $meta['mac'] ?? null;
 
-        // Always provision Hotspot voucher & direct login on tenant's router(s) so customer connects immediately
-        try {
-            $this->provisionHotspotVoucherOnRouter($stkTx, $receipt);
-        } catch (\Throwable $he) {
-            Log::warning('[PayHero] Hotspot voucher router provisioning note: ' . $he->getMessage());
+        // Ensure STK transaction has tenant_id and router_id recorded
+        if (!$stkTx->tenant_id || !$stkTx->router_id) {
+            MpesaStkTransaction::withoutGlobalScopes()->where('id', $stkTx->id)->update([
+                'tenant_id' => $tenantId,
+                'router_id' => $routerId,
+            ]);
         }
 
-        // Check idempotency bypassing TenantScope
-        if (CollectionSummary::withoutGlobalScopes()->where('transaction_id', $receipt)->exists()) {
-            return;
-        }
-
+        // Check customer in CustomersInfo for PPPoE / regular subscriber
         $customer = null;
         if ($stkTx->reference) {
             $customer = CustomersInfo::withoutGlobalScopes()
@@ -289,115 +291,32 @@ class PayHeroPaymentController extends Controller
         }
 
         if ($customer) {
-            try {
-                $this->paymentService->fulfill(
-                    $customer,
-                    $amount,
-                    'payhero',
-                    $receipt,
-                    ['checkout_request_id' => $stkTx->checkout_request_id, 'phone' => $stkTx->phone]
-                );
-            } catch (\Throwable $e) {
-                Log::error('fulfillSuccessfulTransaction error: ' . $e->getMessage());
-            }
-        } else {
-            // 1. Record into hotspot_sales (powers Dashboard "Today's hotspot sales", "Total global revenue", and Hotspot Manager)
-            try {
-                if (\Illuminate\Support\Facades\Schema::hasTable('hotspot_sales')) {
-                    $existsHs = \Illuminate\Support\Facades\DB::table('hotspot_sales')
-                        ->where('voucher_code', $receipt)
-                        ->exists();
-
-                    if (!$existsHs) {
-                        $routerName = 'Hotspot';
-                        if (!empty($meta['router_id'])) {
-                            $rObj = \App\Models\Router::withoutGlobalScopes()->find((int) $meta['router_id']);
-                            if ($rObj && !empty($rObj->name)) {
-                                $routerName = $rObj->name;
-                            }
-                        }
-
-                        $profileName = 'Hotspot Plan';
-                        if (!empty($meta['package_id'])) {
-                            $pkg = PackageList::withoutGlobalScopes()->find((int) $meta['package_id']);
-                            if ($pkg) {
-                                $profileName = $pkg->package_name ?: ($pkg->name ?: 'Hotspot Plan');
-                            }
-                        }
-
-                        $hsRow = [
-                            'router_name'    => $routerName,
-                            'voucher_code'   => $receipt,
-                            'profile'        => $profileName,
-                            'username'       => $stkTx->phone ?: $receipt,
-                            'amount'         => $amount,
-                            'payment_method' => 'mpesa_payhero',
-                            'note'           => 'M-Pesa Captive Portal STK (' . $receipt . ')',
-                            'sale_date'      => now()->timezone('Africa/Nairobi')->toDateString(),
-                            'sold_by'        => null,
-                            'created_at'     => now(),
-                            'updated_at'     => now(),
-                        ];
-                        if (\Illuminate\Support\Facades\Schema::hasColumn('hotspot_sales', 'tenant_id')) {
-                            $hsRow['tenant_id'] = $tenantId;
-                        }
-
-                        \Illuminate\Support\Facades\DB::table('hotspot_sales')->insert($hsRow);
-                    }
+            // Check idempotency for CollectionSummary
+            if (!CollectionSummary::withoutGlobalScopes()->where('transaction_id', $receipt)->exists()) {
+                try {
+                    $this->paymentService->fulfill(
+                        $customer,
+                        $amount,
+                        'payhero',
+                        $receipt,
+                        ['checkout_request_id' => $stkTx->checkout_request_id, 'phone' => $stkTx->phone]
+                    );
+                } catch (\Throwable $e) {
+                    Log::error('fulfillSuccessfulTransaction customer error: ' . $e->getMessage());
                 }
-            } catch (\Throwable $hse) {
-                Log::warning('HotspotSale insert note: ' . $hse->getMessage());
             }
-
-            // 2. Also record into collection_summaries (safe check for tenant_id column)
-            try {
-                if (\Illuminate\Support\Facades\Schema::hasTable('collection_summaries')) {
-                    $maxInvoice = CollectionSummary::withoutGlobalScopes()->max('invoice_no');
-                    $invoiceNo = $maxInvoice ? ($maxInvoice + 1) : 100001;
-
-                    $colRow = [
-                        'customer_collection_unique_id' => $stkTx->phone,
-                        'collection_date'               => now(),
-                        'collection_amount'             => $amount,
-                        'collected_by'                  => 'Hotspot M-Pesa (PAYHERO)',
-                        'payment_type'                  => 'hotspot',
-                        'payment_method'                => 'payhero',
-                        'transaction_id'                => $receipt,
-                        'payment_status'                => 'paid',
-                        'invoice_no'                    => $invoiceNo,
-                        'bill_month'                    => now()->format('F Y'),
-                        'created_at'                    => now(),
-                        'updated_at'                    => now(),
-                    ];
-                    if (\Illuminate\Support\Facades\Schema::hasColumn('collection_summaries', 'tenant_id')) {
-                        $colRow['tenant_id'] = $tenantId;
-                    }
-
-                    \Illuminate\Support\Facades\DB::table('collection_summaries')->insert($colRow);
-                }
-            } catch (\Throwable $ce) {
-                Log::warning('CollectionSummary insert note: ' . $ce->getMessage());
-            }
+            return;
         }
-    }
 
-    /**
-     * Provision a paid Hotspot user on the MikroTik router and authorize the client's IP/MAC immediately.
-     */
-    protected function provisionHotspotVoucherOnRouter(MpesaStkTransaction $stkTx, string $receipt): void
-    {
-        $meta = is_array($stkTx->raw_callback) ? $stkTx->raw_callback : [];
-        $routerId  = !empty($meta['router_id']) ? (int) $meta['router_id'] : null;
-        $tenantId  = (int) ($stkTx->tenant_id ?: ($meta['tenant_id'] ?? 1));
-        $packageId = $meta['package_id'] ?? null;
-        $clientIp  = $meta['ip'] ?? null;
-        $clientMac = $meta['mac'] ?? null;
-
+        // ── HOTSPOT PURCHASE ──
+        // 1. Resolve package duration & data limits
         $durationInfo = \App\Services\MikrotikDuration::parse('1h');
         $limitBytes = null;
+        $profileName = 'Hotspot Plan';
         if ($packageId) {
             $pkg = PackageList::withoutGlobalScopes()->find($packageId);
             if ($pkg) {
+                $profileName = $pkg->package_name ?: ($pkg->name ?: 'Hotspot Plan');
                 $durationVal = !empty($pkg->duration) ? $pkg->duration : (!empty($pkg->validity) ? $pkg->validity : '1h');
                 $durationUnit = !empty($pkg->duration_unit) ? $pkg->duration_unit : null;
                 $durationInfo = \App\Services\MikrotikDuration::parse($durationVal, $durationUnit);
@@ -412,13 +331,138 @@ class PayHeroPaymentController extends Controller
                 }
             }
         }
+        $durationSeconds = $durationInfo['seconds'] > 0 ? $durationInfo['seconds'] : 3600;
+        $durationMinutes = (int) round($durationSeconds / 60);
         $limitUptime = $durationInfo['mikrotik'];
-        $expiresAt = now()->timezone('Africa/Nairobi')->addSeconds($durationInfo['seconds']);
 
+        // 2. Resolve Router (permanent identity)
+        $routerObj = null;
+        $routerName = 'Hotspot';
+        if ($routerId) {
+            $routerObj = \App\Models\Router::withoutGlobalScopes()->find($routerId);
+            if ($routerObj) {
+                $routerName = $routerObj->name;
+            }
+        }
+
+        // 3. Stacking calculation (if user has active session, add duration to current expires_at)
+        $existingActive = HotspotSale::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where(function ($q) use ($stkTx, $clientMac) {
+                if ($stkTx->phone) $q->where('phone', $stkTx->phone);
+                if ($clientMac) $q->orWhere('mac_address', strtoupper($clientMac));
+            })
+            ->where('expires_at', '>', now())
+            ->whereIn('status', ['completed', 'active', 'pending_router'])
+            ->latest('expires_at')
+            ->first();
+
+        if ($existingActive && $existingActive->expires_at) {
+            $startedAt = $existingActive->started_at ?: now();
+            $expiresAt = \Carbon\Carbon::parse($existingActive->expires_at)->addSeconds($durationSeconds);
+            $totalMinutes = (int) $existingActive->duration_minutes + $durationMinutes;
+        } else {
+            $startedAt = now();
+            $expiresAt = now()->addSeconds($durationSeconds);
+            $totalMinutes = $durationMinutes;
+        }
+
+        // 4. Financial Record: Save to hotspot_sales FIRST
+        $hotspotSale = null;
+        try {
+            $hotspotSale = HotspotSale::withoutGlobalScopes()->updateOrCreate(
+                [
+                    'tenant_id'    => $tenantId,
+                    'voucher_code' => $receipt,
+                ],
+                [
+                    'router_id'        => $routerId,
+                    'router_name'      => $routerName,
+                    'profile'          => $profileName,
+                    'username'         => $stkTx->phone ?: $receipt,
+                    'phone'            => $stkTx->phone,
+                    'mac_address'      => $clientMac ? strtoupper($clientMac) : null,
+                    'ip_address'       => $clientIp,
+                    'amount'           => $amount,
+                    'payment_method'   => 'mpesa_payhero',
+                    'status'           => 'pending_router',
+                    'duration_minutes' => $totalMinutes,
+                    'started_at'       => $startedAt,
+                    'expires_at'       => $expiresAt,
+                    'note'             => 'M-Pesa Captive Portal STK (' . $receipt . ')',
+                    'sale_date'        => now()->timezone('Africa/Nairobi')->toDateString(),
+                ]
+            );
+        } catch (\Throwable $hse) {
+            Log::warning('[PayHero] HotspotSale save note: ' . $hse->getMessage());
+        }
+
+        // 5. Financial Record: Save to collection_summaries FIRST
+        try {
+            if (!CollectionSummary::withoutGlobalScopes()->where('transaction_id', $receipt)->exists()) {
+                $maxInvoice = CollectionSummary::withoutGlobalScopes()->max('invoice_no');
+                $invoiceNo = $maxInvoice ? ($maxInvoice + 1) : 100001;
+
+                CollectionSummary::withoutGlobalScopes()->create([
+                    'tenant_id'                     => $tenantId,
+                    'customer_collection_unique_id' => $stkTx->phone,
+                    'collection_date'               => now(),
+                    'collection_amount'             => $amount,
+                    'collected_by'                  => 'Hotspot M-Pesa (PAYHERO)',
+                    'payment_type'                  => 'hotspot',
+                    'payment_method'                => 'payhero',
+                    'transaction_id'                => $receipt,
+                    'payment_status'                => 'paid',
+                    'invoice_no'                    => $invoiceNo,
+                    'bill_month'                    => now()->format('F Y'),
+                ]);
+            }
+        } catch (\Throwable $ce) {
+            Log::warning('[PayHero] CollectionSummary save note: ' . $ce->getMessage());
+        }
+
+        // 6. Router Provisioning (Instant or Queue via RouterPendingActivationService)
+        try {
+            $this->provisionHotspotVoucherOnRouter(
+                $stkTx,
+                $receipt,
+                $routerObj,
+                $tenantId,
+                $routerId,
+                $limitUptime,
+                $limitBytes,
+                $clientIp,
+                $clientMac,
+                $expiresAt,
+                $hotspotSale?->id
+            );
+        } catch (\Throwable $he) {
+            Log::warning('[PayHero] Hotspot router provisioning note: ' . $he->getMessage());
+        }
+    }
+
+    /**
+     * Provision a paid Hotspot user on the MikroTik router and authorize the client's IP/MAC immediately.
+     * If the router is unreachable or offline, enqueues the activation for automatic background retry.
+     */
+    protected function provisionHotspotVoucherOnRouter(
+        MpesaStkTransaction $stkTx,
+        string $receipt,
+        ?\App\Models\Router $routerObj,
+        int $tenantId,
+        ?int $routerId,
+        string $limitUptime,
+        ?int $limitBytes,
+        ?string $clientIp,
+        ?string $clientMac,
+        \Carbon\Carbon $expiresAt,
+        ?int $saleId
+    ): void {
         $routersQuery = \App\Models\Router::withoutGlobalScopes()->where(function ($q) {
             $q->where('status', 'online')
               ->orWhere('action', 'connected')
-              ->orWhereNotNull('vpn_ip');
+              ->orWhereNotNull('vpn_ip')
+              ->orWhereNotNull('last_known_ip');
         });
         if ($routerId) {
             $routersQuery->where('id', $routerId);
@@ -427,8 +471,31 @@ class PayHeroPaymentController extends Controller
         }
         $routers = $routersQuery->get();
 
+        if ($routers->isEmpty()) {
+            Log::warning("[PayHero] No online router found for tenant #{$tenantId} / router #{$routerId}. Enqueuing pending activation.");
+            \App\Services\RouterPendingActivationService::enqueue(
+                $tenantId,
+                $routerId,
+                $receipt,
+                $stkTx->phone ?: $receipt,
+                $receipt,
+                'Hotspot Plan',
+                $limitUptime,
+                $limitBytes,
+                $clientIp,
+                $clientMac,
+                $expiresAt,
+                $saleId,
+                'Router offline / no route available'
+            );
+            return;
+        }
+
+        $provisionedAny = false;
+        $lastError = null;
+
         foreach ($routers as $router) {
-            $host = $router->vpn_ip ?: $router->ip;
+            $host = $router->vpn_ip ?: ($router->last_known_ip ?: $router->ip);
             if (!$host) continue;
             $port = (int) ($router->api_port ?: 8728);
             $user = $router->api_user ?: ($router->username ?: 'admin');
@@ -439,34 +506,52 @@ class PayHeroPaymentController extends Controller
             }
 
             try {
-                $api = new \App\Services\MikrotikApiService($host, $port, $user, $pass, 6);
+                $api = new \App\Services\MikrotikApiService($host, $port, $user, $pass, 5);
                 $code = strtoupper(trim($receipt));
 
-                // 1. Add Hotspot voucher user (username = receipt, password = receipt)
+                // 1. Add / Update Hotspot voucher user (username = receipt, password = receipt)
                 $existingUsers = $api->executeCommand('/ip/hotspot/user/print');
-                $exists = false;
+                $matchedUser = null;
                 if (is_array($existingUsers)) {
                     foreach ($existingUsers as $eu) {
                         if (strtoupper($eu['name'] ?? '') === $code) {
-                            $exists = true;
+                            $matchedUser = $eu;
                             break;
                         }
                     }
                 }
-                if (!$exists) {
-                    $userPayload = [
-                        'name'         => $code,
-                        'password'     => $code,
-                        'limit-uptime' => $limitUptime,
-                        'comment'      => 'M-Pesa ' . ($stkTx->phone ?: '') . ' exp:' . $expiresAt->toDateTimeString(),
-                    ];
-                    if ($limitBytes) {
-                        $userPayload['limit-bytes-total'] = (string) $limitBytes;
-                    }
+
+                $comment = 'M-Pesa ' . ($stkTx->phone ?: '') . ' exp:' . $expiresAt->toDateTimeString();
+                $userPayload = [
+                    'name'         => $code,
+                    'password'     => $code,
+                    'limit-uptime' => $limitUptime,
+                    'comment'      => $comment,
+                ];
+                if ($limitBytes && $limitBytes > 0) {
+                    $userPayload['limit-bytes-total'] = (string) $limitBytes;
+                }
+
+                if ($matchedUser && !empty($matchedUser['.id'])) {
+                    $userPayload['.id'] = $matchedUser['.id'];
+                    $api->executeCommand('/ip/hotspot/user/set', $userPayload);
+                } else {
                     $api->executeCommand('/ip/hotspot/user/add', $userPayload);
                 }
 
-                // 2. Directly authorize the client session on MikroTik if valid IP is known (instant internet even if popup closes)
+                // 2. Remove stale cookies so mac-cookie never bypasses limit-uptime
+                try {
+                    $cookies = $api->executeCommand('/ip/hotspot/cookie/print');
+                    if (is_array($cookies)) {
+                        foreach ($cookies as $ck) {
+                            if (strtoupper($ck['user'] ?? '') === $code) {
+                                $api->executeCommand('/ip/hotspot/cookie/remove', ['.id' => $ck['.id']]);
+                            }
+                        }
+                    }
+                } catch (\Throwable $ckEx) {}
+
+                // 3. Directly authorize the client session on MikroTik if valid IP is known
                 if ($clientIp && filter_var($clientIp, FILTER_VALIDATE_IP)) {
                     $loginParams = [
                         'user'     => $code,
@@ -479,9 +564,43 @@ class PayHeroPaymentController extends Controller
                     $api->executeCommand('/ip/hotspot/active/login', $loginParams);
                 }
 
+                $provisionedAny = true;
                 Log::info("[PayHero] Provisioned Hotspot user '{$code}' ({$limitUptime}) on router {$router->name}" . ($clientIp ? " and logged in IP {$clientIp}" : ''));
             } catch (\Throwable $e) {
-                Log::warning("Hotspot user add note on {$router->name}: " . $e->getMessage());
+                $lastError = $e->getMessage();
+                Log::warning("Hotspot user add error on {$router->name}: " . $e->getMessage());
+            }
+        }
+
+        if ($provisionedAny) {
+            if ($saleId) {
+                HotspotSale::withoutGlobalScopes()->where('id', $saleId)->update([
+                    'status'     => 'completed',
+                    'sync_error' => null,
+                ]);
+            }
+        } else {
+            // Queue pending activation for automatic retry as soon as router reconnects
+            \App\Services\RouterPendingActivationService::enqueue(
+                $tenantId,
+                $routerId,
+                $receipt,
+                $stkTx->phone ?: $receipt,
+                $receipt,
+                'Hotspot Plan',
+                $limitUptime,
+                $limitBytes,
+                $clientIp,
+                $clientMac,
+                $expiresAt,
+                $saleId,
+                $lastError ?: 'Router connection failed'
+            );
+            if ($saleId) {
+                HotspotSale::withoutGlobalScopes()->where('id', $saleId)->update([
+                    'status'     => 'pending_router',
+                    'sync_error' => $lastError ?: 'Router connection failed',
+                ]);
             }
         }
     }

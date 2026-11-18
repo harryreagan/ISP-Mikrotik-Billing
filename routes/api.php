@@ -53,8 +53,8 @@ Route::middleware(['throttle:60,1', 'webhook.log'])->post('/payment/payhero/webh
 // 4. KopoKopo Webhook
 Route::middleware(['throttle:60,1', 'webhook.log'])->post('/payment/kopokopo/webhook', [KopoKopoPaymentController::class, 'handleWebhook']);
 
-// 5. Router Hello Heartbeat for Onboarding & Online Health
-Route::get('/router-hello/{token}', function (string $token) {
+// 5. Router Hello Heartbeat for Onboarding & Online Health & Network Move Detection
+Route::get('/router-hello/{token}', function (\Illuminate\Http\Request $request, string $token) {
     $cleanToken = preg_replace('/[^a-zA-Z0-9_\-]/', '', $token);
     if (empty($cleanToken) || strlen($cleanToken) < 8) {
         return response()->json(['status' => 'ignored'], 200);
@@ -63,12 +63,31 @@ Route::get('/router-hello/{token}', function (string $token) {
     $router = \App\Services\ProvisioningTokenService::validateToken($cleanToken);
 
     if ($router) {
-        $router->update([
+        $incomingIp = $request->ip();
+        $updates = [
             'status'           => 'online',
             'last_seen_at'     => now(),
             'vpn_connected_at' => $router->vpn_connected_at ?: now(),
-        ]);
-        \Illuminate\Support\Facades\Log::info("[RouterHello] Router #{$router->id} ({$router->name}) signaled online via token");
+        ];
+
+        // Network Move Detection: router moved to a new public IP or LAN
+        if (!empty($incomingIp)) {
+            if (!empty($router->last_known_ip) && $router->last_known_ip !== $incomingIp) {
+                \Illuminate\Support\Facades\Log::warning("[RouterMoved] Router #{$router->id} ({$router->name}) public IP changed from '{$router->last_known_ip}' to '{$incomingIp}'. Triggering health sync.");
+                $updates['network_changed_at'] = now();
+            }
+            $updates['last_known_ip'] = $incomingIp;
+        }
+
+        $router->update($updates);
+        \Illuminate\Support\Facades\Log::info("[RouterHello] Router #{$router->id} ({$router->name}) signaled online from IP {$incomingIp}");
+
+        // Automatically flush and provision any pending hotspot activations for this router
+        try {
+            app(\App\Services\RouterPendingActivationService::class)->processPendingForRouter($router);
+        } catch (\Throwable $actEx) {
+            \Illuminate\Support\Facades\Log::warning("[RouterHello] Pending activation flush note: " . $actEx->getMessage());
+        }
     }
 
     return response()->json(['status' => 'ok', 'timestamp' => now()->timestamp], 200);

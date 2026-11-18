@@ -1365,6 +1365,17 @@
 
         // Livewire 3 hooks for robust 3rd party integration (e.g., DataTables)
         document.addEventListener('livewire:init', () => {
+            // Graceful handling of expired sessions in Livewire (never show 419 Page Expired modal)
+            if (typeof Livewire !== 'undefined' && Livewire.hook) {
+                Livewire.hook('request', ({ fail }) => {
+                    fail(({ status, preventDefault }) => {
+                        if (status === 419) {
+                            preventDefault();
+                            window.location.href = '/login?expired=1';
+                        }
+                    });
+                });
+            }
             // 1. Destroy ALL DataTables on the page BEFORE any component morph starts.
             // Broad destruction is safer in Livewire 3 to prevent parent-child node conflicts.
             Livewire.hook('commit.prepare', ({ component }) => {

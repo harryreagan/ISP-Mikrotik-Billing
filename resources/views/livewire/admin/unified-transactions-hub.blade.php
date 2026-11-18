@@ -5,22 +5,28 @@
         :subtitle="__('Unified real-time financial ledger, customer invoice statements, instant unmatched claim, and collection recording')"
     >
         <x-slot:actions>
-            <div class="btn-group btn-group-sm" role="group">
-                <button type="button" wire:click="setTab('transactions')" class="btn {{ $activeTab === 'transactions' ? 'btn-primary' : 'btn-outline-secondary' }}">
-                    <i class="bi bi-receipt-cutoff me-1"></i> {{ __('Ledger') }}
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" wire:click="reconcilePayments" wire:loading.attr="disabled" class="btn btn-sm btn-outline-success">
+                    <span wire:loading.remove wire:target="reconcilePayments"><i class="bi bi-arrow-repeat me-1"></i> {{ __('Reconcile Payments') }}</span>
+                    <span wire:loading wire:target="reconcilePayments"><span class="spinner-border spinner-border-sm me-1"></span> {{ __('Reconciling...') }}</span>
                 </button>
-                <button type="button" wire:click="setTab('invoices')" class="btn {{ $activeTab === 'invoices' ? 'btn-primary' : 'btn-outline-secondary' }}">
-                    <i class="bi bi-file-earmark-text me-1"></i> {{ __('Invoices') }}
-                </button>
-                <button type="button" wire:click="setTab('unmatched')" class="btn {{ $activeTab === 'unmatched' ? 'btn-primary' : 'btn-outline-secondary' }}">
-                    <i class="bi bi-patch-question me-1"></i> {{ __('Unmatched') }}
-                    @if($metrics['pending_unmatched'] > 0)
-                        <span class="badge bg-warning text-dark ms-1">{{ $metrics['pending_unmatched'] }}</span>
-                    @endif
-                </button>
-                <button type="button" wire:click="setTab('collect')" class="btn {{ $activeTab === 'collect' ? 'btn-primary' : 'btn-outline-secondary' }}">
-                    <i class="bi bi-cash-stack me-1"></i> {{ __('Record Collection') }}
-                </button>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" wire:click="setTab('transactions')" class="btn {{ $activeTab === 'transactions' ? 'btn-primary' : 'btn-outline-secondary' }}">
+                        <i class="bi bi-receipt-cutoff me-1"></i> {{ __('Ledger') }}
+                    </button>
+                    <button type="button" wire:click="setTab('invoices')" class="btn {{ $activeTab === 'invoices' ? 'btn-primary' : 'btn-outline-secondary' }}">
+                        <i class="bi bi-file-earmark-text me-1"></i> {{ __('Invoices') }}
+                    </button>
+                    <button type="button" wire:click="setTab('unmatched')" class="btn {{ $activeTab === 'unmatched' ? 'btn-primary' : 'btn-outline-secondary' }}">
+                        <i class="bi bi-patch-question me-1"></i> {{ __('Unmatched') }}
+                        @if($metrics['pending_unmatched'] > 0)
+                            <span class="badge bg-warning text-dark ms-1">{{ $metrics['pending_unmatched'] }}</span>
+                        @endif
+                    </button>
+                    <button type="button" wire:click="setTab('collect')" class="btn {{ $activeTab === 'collect' ? 'btn-primary' : 'btn-outline-secondary' }}">
+                        <i class="bi bi-cash-stack me-1"></i> {{ __('Record Collection') }}
+                    </button>
+                </div>
             </div>
         </x-slot:actions>
     </x-ui.page-header>
@@ -98,6 +104,22 @@
             </div>
         </div>
     </div>
+
+    {{-- Global Alert Banner --}}
+    @if ($statusMessage)
+        <div class="alert alert-success alert-dismissible fade show d-flex align-items-center mb-3" role="alert">
+            <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+            <div>{{ $statusMessage }}</div>
+            <button type="button" class="btn-close" wire:click="$set('statusMessage', '')"></button>
+        </div>
+    @endif
+    @if ($errorMessage)
+        <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center mb-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+            <div>{{ $errorMessage }}</div>
+            <button type="button" class="btn-close" wire:click="$set('errorMessage', '')"></button>
+        </div>
+    @endif
 
     {{-- Main Tabs Navigation --}}
     <ul class="nav nav-tabs mb-4 border-bottom">

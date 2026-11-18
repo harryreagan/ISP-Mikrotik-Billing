@@ -568,6 +568,22 @@ class UnifiedTransactionsHub extends Component
     // ══════════════════════════════════════════════════════════════════════
     // RENDER
     // ══════════════════════════════════════════════════════════════════════
+    public function reconcilePayments(): void
+    {
+        try {
+            $user = auth()->user();
+            $tenantId = $user?->tenant_id ?: null;
+            \Illuminate\Support\Facades\Artisan::call('isp:reconcile-payments', [
+                '--tenant' => $tenantId,
+            ]);
+            $this->statusMessage = 'Reconciliation complete! M-Pesa gateway records matched and queued router activations processed.';
+            $this->errorMessage = '';
+            Log::info('[UnifiedTransactionsHub] Manual reconcile triggered by user ' . ($user?->id ?? 'unknown'));
+        } catch (\Throwable $e) {
+            $this->errorMessage = 'Reconciliation error: ' . $e->getMessage();
+        }
+    }
+
     public function render()
     {
         $tenantId = $this->getTenantId();

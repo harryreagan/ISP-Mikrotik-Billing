@@ -39,6 +39,7 @@ Schedule::call(function () {
 
 
 Schedule::command('isp:lifecycle-automations')->everyMinute()->withoutOverlapping();
+Schedule::command('isp:process-pending-router-activations')->everyMinute()->withoutOverlapping();
 Schedule::command('isp:check-router-offline-alerts')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('isp:check-portal-health')->everyFifteenMinutes()->withoutOverlapping();
 

@@ -5,10 +5,18 @@ namespace App\Http\Controllers\Payment;
 use App\Http\Controllers\Controller;
 use App\Models\CollectionSummary;
 use App\Models\CustomersInfo;
+use App\Models\HotspotSale;
 use App\Models\MpesaStkTransaction;
+use App\Models\PackageList;
+use App\Models\Router;
 use App\Models\UnmatchedPayment;
+use App\Services\MikrotikApiService;
+use App\Services\MikrotikDuration;
 use App\Services\PaymentService;
+use App\Services\RouterPendingActivationService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 
 class DarajaPaymentController extends Controller
@@ -140,6 +148,15 @@ class DarajaPaymentController extends Controller
         }
 
         if (! $customer) {
+            $meta = is_array($stkTx?->raw_callback) ? $stkTx->raw_callback : [];
+            $isHotspot = ($stkTx && ($stkTx->router_id || !empty($meta['router_id']) || !empty($meta['package_id']) || str_starts_with((string)$reference, 'HS-')));
+
+            if ($isHotspot || $stkTx) {
+                // Fulfill as Hotspot voucher sale
+                $this->fulfillHotspotTransaction($stkTx, $mpesaReceiptNumber, $amount, $phoneNumber);
+                return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Accepted']);
+            }
+
             Log::warning("Daraja STK Payment received but customer could not be resolved. Receipt: {$mpesaReceiptNumber}, Phone: {$phoneNumber}, Ref: {$reference}. Storing in unmatched_payments.");
 
             UnmatchedPayment::updateOrCreate(
@@ -353,5 +370,314 @@ class DarajaPaymentController extends Controller
         }
 
         return response()->json(['status' => 'pending']);
+    }
+
+    /**
+     * Fulfill a confirmed M-Pesa STK payment as a Hotspot purchase.
+     * Decouples financial record from router reachability.
+     */
+    protected function fulfillHotspotTransaction(?MpesaStkTransaction $stkTx, string $receipt, float $amount, ?string $phone): void
+    {
+        $receipt = strtoupper(trim($receipt));
+        $meta = is_array($stkTx?->raw_callback) ? $stkTx->raw_callback : [];
+        $tenantId = (int) ($stkTx?->tenant_id ?: ($meta['tenant_id'] ?? 1));
+        $routerId = !empty($meta['router_id']) ? (int) $meta['router_id'] : ($stkTx?->router_id ?: null);
+        $packageId = $meta['package_id'] ?? null;
+        $clientIp = $meta['ip'] ?? null;
+        $clientMac = $meta['mac'] ?? null;
+
+        if ($stkTx && (!$stkTx->tenant_id || !$stkTx->router_id)) {
+            MpesaStkTransaction::withoutGlobalScopes()->where('id', $stkTx->id)->update([
+                'tenant_id' => $tenantId,
+                'router_id' => $routerId,
+            ]);
+        }
+
+        // 1. Resolve package details
+        $durationInfo = MikrotikDuration::parse('1h');
+        $limitBytes = null;
+        $profileName = 'Hotspot Plan';
+        if ($packageId) {
+            $pkg = PackageList::withoutGlobalScopes()->find($packageId);
+            if ($pkg) {
+                $profileName = $pkg->package_name ?: ($pkg->name ?: 'Hotspot Plan');
+                $durationVal = !empty($pkg->duration) ? $pkg->duration : (!empty($pkg->validity) ? $pkg->validity : '1h');
+                $durationUnit = !empty($pkg->duration_unit) ? $pkg->duration_unit : null;
+                $durationInfo = MikrotikDuration::parse($durationVal, $durationUnit);
+
+                if (!empty($pkg->volume) && is_numeric($pkg->volume) && $pkg->volume > 0) {
+                    $unit = strtolower($pkg->volume_unit ?? 'mb');
+                    $bytes = (int) $pkg->volume;
+                    if ($unit === 'gb') $bytes *= 1073741824;
+                    elseif ($unit === 'mb') $bytes *= 1048576;
+                    elseif ($unit === 'kb') $bytes *= 1024;
+                    $limitBytes = $bytes;
+                }
+            }
+        }
+        $durationSeconds = $durationInfo['seconds'] > 0 ? $durationInfo['seconds'] : 3600;
+        $durationMinutes = (int) round($durationSeconds / 60);
+        $limitUptime = $durationInfo['mikrotik'];
+
+        // 2. Resolve Router
+        $routerObj = null;
+        $routerName = 'Hotspot';
+        if ($routerId) {
+            $routerObj = Router::withoutGlobalScopes()->find($routerId);
+            if ($routerObj) {
+                $routerName = $routerObj->name;
+            }
+        }
+
+        // 3. Stacking calculation
+        $existingActive = HotspotSale::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where(function ($q) use ($phone, $clientMac) {
+                if ($phone) $q->where('phone', $phone);
+                if ($clientMac) $q->orWhere('mac_address', strtoupper($clientMac));
+            })
+            ->where('expires_at', '>', now())
+            ->whereIn('status', ['completed', 'active', 'pending_router'])
+            ->latest('expires_at')
+            ->first();
+
+        if ($existingActive && $existingActive->expires_at) {
+            $startedAt = $existingActive->started_at ?: now();
+            $expiresAt = Carbon::parse($existingActive->expires_at)->addSeconds($durationSeconds);
+            $totalMinutes = (int) $existingActive->duration_minutes + $durationMinutes;
+        } else {
+            $startedAt = now();
+            $expiresAt = now()->addSeconds($durationSeconds);
+            $totalMinutes = $durationMinutes;
+        }
+
+        // 4. Record HotspotSale FIRST
+        $hotspotSale = null;
+        try {
+            $hotspotSale = HotspotSale::withoutGlobalScopes()->updateOrCreate(
+                [
+                    'tenant_id'    => $tenantId,
+                    'voucher_code' => $receipt,
+                ],
+                [
+                    'router_id'        => $routerId,
+                    'router_name'      => $routerName,
+                    'profile'          => $profileName,
+                    'username'         => $phone ?: $receipt,
+                    'phone'            => $phone,
+                    'mac_address'      => $clientMac ? strtoupper($clientMac) : null,
+                    'ip_address'       => $clientIp,
+                    'amount'           => $amount,
+                    'payment_method'   => 'mpesa_daraja',
+                    'status'           => 'pending_router',
+                    'duration_minutes' => $totalMinutes,
+                    'started_at'       => $startedAt,
+                    'expires_at'       => $expiresAt,
+                    'note'             => 'M-Pesa Daraja STK (' . $receipt . ')',
+                    'sale_date'        => now()->timezone('Africa/Nairobi')->toDateString(),
+                ]
+            );
+        } catch (\Throwable $hse) {
+            Log::warning('[Daraja] HotspotSale save note: ' . $hse->getMessage());
+        }
+
+        // 5. Record CollectionSummary FIRST
+        try {
+            if (!CollectionSummary::withoutGlobalScopes()->where('transaction_id', $receipt)->exists()) {
+                $maxInvoice = CollectionSummary::withoutGlobalScopes()->max('invoice_no');
+                $invoiceNo = $maxInvoice ? ($maxInvoice + 1) : 100001;
+
+                CollectionSummary::withoutGlobalScopes()->create([
+                    'tenant_id'                     => $tenantId,
+                    'customer_collection_unique_id' => $phone,
+                    'collection_date'               => now(),
+                    'collection_amount'             => $amount,
+                    'collected_by'                  => 'Hotspot M-Pesa (DARAJA)',
+                    'payment_type'                  => 'hotspot',
+                    'payment_method'                => 'daraja',
+                    'transaction_id'                => $receipt,
+                    'payment_status'                => 'paid',
+                    'invoice_no'                    => $invoiceNo,
+                    'bill_month'                    => now()->format('F Y'),
+                ]);
+            }
+        } catch (\Throwable $ce) {
+            Log::warning('[Daraja] CollectionSummary save note: ' . $ce->getMessage());
+        }
+
+        // 6. Router Provisioning (Instant or Queue)
+        try {
+            $this->provisionHotspotVoucherOnRouter(
+                $receipt,
+                $phone,
+                $tenantId,
+                $routerId,
+                $limitUptime,
+                $limitBytes,
+                $clientIp,
+                $clientMac,
+                $expiresAt,
+                $hotspotSale?->id
+            );
+        } catch (\Throwable $he) {
+            Log::warning('[Daraja] Hotspot router provisioning note: ' . $he->getMessage());
+        }
+    }
+
+    /**
+     * Provision a paid Hotspot user on the router with fallback queueing.
+     */
+    protected function provisionHotspotVoucherOnRouter(
+        string $receipt,
+        ?string $phone,
+        int $tenantId,
+        ?int $routerId,
+        string $limitUptime,
+        ?int $limitBytes,
+        ?string $clientIp,
+        ?string $clientMac,
+        Carbon $expiresAt,
+        ?int $saleId
+    ): void {
+        $routersQuery = Router::withoutGlobalScopes()->where(function ($q) {
+            $q->where('status', 'online')
+              ->orWhere('action', 'connected')
+              ->orWhereNotNull('vpn_ip')
+              ->orWhereNotNull('last_known_ip');
+        });
+        if ($routerId) {
+            $routersQuery->where('id', $routerId);
+        } else {
+            $routersQuery->where('tenant_id', $tenantId);
+        }
+        $routers = $routersQuery->get();
+
+        if ($routers->isEmpty()) {
+            RouterPendingActivationService::enqueue(
+                $tenantId,
+                $routerId,
+                $receipt,
+                $phone ?: $receipt,
+                $receipt,
+                'Hotspot Plan',
+                $limitUptime,
+                $limitBytes,
+                $clientIp,
+                $clientMac,
+                $expiresAt,
+                $saleId,
+                'Router offline / no route available'
+            );
+            return;
+        }
+
+        $provisionedAny = false;
+        $lastError = null;
+
+        foreach ($routers as $router) {
+            $host = $router->vpn_ip ?: ($router->last_known_ip ?: $router->ip);
+            if (!$host) continue;
+            $port = (int) ($router->api_port ?: 8728);
+            $user = $router->api_user ?: ($router->username ?: 'admin');
+            try {
+                $pass = Crypt::decryptString($router->api_password ?: $router->password);
+            } catch (\Throwable $e) {
+                $pass = $router->api_password ?: $router->password;
+            }
+
+            try {
+                $api = new MikrotikApiService($host, $port, $user, $pass, 5);
+                $code = strtoupper(trim($receipt));
+
+                $existingUsers = $api->executeCommand('/ip/hotspot/user/print');
+                $matchedUser = null;
+                if (is_array($existingUsers)) {
+                    foreach ($existingUsers as $eu) {
+                        if (strtoupper($eu['name'] ?? '') === $code) {
+                            $matchedUser = $eu;
+                            break;
+                        }
+                    }
+                }
+
+                $comment = 'M-Pesa ' . ($phone ?: '') . ' exp:' . $expiresAt->toDateTimeString();
+                $userPayload = [
+                    'name'         => $code,
+                    'password'     => $code,
+                    'limit-uptime' => $limitUptime,
+                    'comment'      => $comment,
+                ];
+                if ($limitBytes && $limitBytes > 0) {
+                    $userPayload['limit-bytes-total'] = (string) $limitBytes;
+                }
+
+                if ($matchedUser && !empty($matchedUser['.id'])) {
+                    $userPayload['.id'] = $matchedUser['.id'];
+                    $api->executeCommand('/ip/hotspot/user/set', $userPayload);
+                } else {
+                    $api->executeCommand('/ip/hotspot/user/add', $userPayload);
+                }
+
+                try {
+                    $cookies = $api->executeCommand('/ip/hotspot/cookie/print');
+                    if (is_array($cookies)) {
+                        foreach ($cookies as $ck) {
+                            if (strtoupper($ck['user'] ?? '') === $code) {
+                                $api->executeCommand('/ip/hotspot/cookie/remove', ['.id' => $ck['.id']]);
+                            }
+                        }
+                    }
+                } catch (\Throwable $ckEx) {}
+
+                if ($clientIp && filter_var($clientIp, FILTER_VALIDATE_IP)) {
+                    $loginParams = [
+                        'user'     => $code,
+                        'password' => $code,
+                        'ip'       => $clientIp,
+                    ];
+                    if ($clientMac && preg_match('/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/', $clientMac)) {
+                        $loginParams['mac-address'] = strtoupper($clientMac);
+                    }
+                    $api->executeCommand('/ip/hotspot/active/login', $loginParams);
+                }
+
+                $provisionedAny = true;
+                Log::info("[Daraja] Provisioned Hotspot user '{$code}' ({$limitUptime}) on router {$router->name}");
+            } catch (\Throwable $e) {
+                $lastError = $e->getMessage();
+                Log::warning("Hotspot user add error on {$router->name}: " . $e->getMessage());
+            }
+        }
+
+        if ($provisionedAny) {
+            if ($saleId) {
+                HotspotSale::withoutGlobalScopes()->where('id', $saleId)->update([
+                    'status'     => 'completed',
+                    'sync_error' => null,
+                ]);
+            }
+        } else {
+            RouterPendingActivationService::enqueue(
+                $tenantId,
+                $routerId,
+                $receipt,
+                $phone ?: $receipt,
+                $receipt,
+                'Hotspot Plan',
+                $limitUptime,
+                $limitBytes,
+                $clientIp,
+                $clientMac,
+                $expiresAt,
+                $saleId,
+                $lastError ?: 'Router connection failed'
+            );
+            if ($saleId) {
+                HotspotSale::withoutGlobalScopes()->where('id', $saleId)->update([
+                    'status'     => 'pending_router',
+                    'sync_error' => $lastError ?: 'Router connection failed',
+                ]);
+            }
+        }
     }
 }

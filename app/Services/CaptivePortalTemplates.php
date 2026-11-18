@@ -608,7 +608,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         })
         .catch(() => {});
-    }
+    // Auto-refresh when tab becomes visible after payment on mobile
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && clientMac) {
+            fetch(apiBase + '/api/portal/check-session?mac=' + encodeURIComponent(clientMac) + '&tenant_id={$tenantId}&router_id={$routerId}', {
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res && res.status === 'active') {
+                    showStatus('Payment confirmed! Reconnecting your device...', 'success');
+                    autoConnectHotspot(res.username || res.voucher_code, res.password || res.username || res.voucher_code);
+                }
+            })
+            .catch(() => {});
+        }
+    });
 });
 </script>
 
@@ -1271,7 +1286,10 @@ h2 { margin: 0 0 14px; font-size: 19px; text-align: center; color: #10b981; }
     <div class="row"><span>Connected Time</span><strong>$(uptime)</strong></div>
     <div class="row"><span>Data Used</span><strong>$(bytes-in-nice) / $(bytes-out-nice)</strong></div>
     $(if session-time-left)
-    <div class="row"><span>Time Remaining</span><strong>$(session-time-left)</strong></div>
+    <div class="row"><span>Time Remaining</span><strong style="color:#10b981;">$(session-time-left)</strong></div>
+    $(endif)
+    $(if remain-bytes-total-nice)
+    <div class="row"><span>Data Remaining</span><strong style="color:#10b981;">$(remain-bytes-total-nice)</strong></div>
     $(endif)
     <form action="$(link-logout)" name="logout" method="post">
         <button type="submit" class="btn">Disconnect Session</button>
@@ -1682,10 +1700,11 @@ HTML;
                 foreach ($profs as $pr) {
                     if (($pr['name'] ?? '') === $hsprofName) {
                         $api->executeCommand('/ip/hotspot/profile/set', [
-                            'hotspot-address' => '10.5.50.1',
-                            'dns-name'        => 'hotspot.hsmart.lan',
-                            'html-directory'  => $htmlDir,
-                            'login-by'        => 'http-pap,http-chap,cookie,mac-cookie',
+                            'hotspot-address'   => '10.5.50.1',
+                            'dns-name'          => 'hotspot.hsmart.lan',
+                            'html-directory'    => $htmlDir,
+                            'login-by'          => 'http-pap,http-chap,cookie',
+                            'keepalive-timeout' => '2m',
                         ], ['.id' => $pr['.id']]);
                         $hasProf = true;
                         break;
@@ -1694,11 +1713,12 @@ HTML;
             }
             if (!$hasProf) {
                 $api->executeCommand('/ip/hotspot/profile/add', [
-                    'name'            => $hsprofName,
-                    'hotspot-address' => '10.5.50.1',
-                    'dns-name'        => 'hotspot.hsmart.lan',
-                    'html-directory'  => $htmlDir,
-                    'login-by'        => 'http-pap,http-chap,cookie,mac-cookie',
+                    'name'              => $hsprofName,
+                    'hotspot-address'   => '10.5.50.1',
+                    'dns-name'          => 'hotspot.hsmart.lan',
+                    'html-directory'    => $htmlDir,
+                    'login-by'          => 'http-pap,http-chap,cookie',
+                    'keepalive-timeout' => '2m',
                 ]);
             }
 
@@ -1736,9 +1756,16 @@ HTML;
             $wgHosts = [
                 '*.hsmart.co.ke',
                 'isp.hsmart.co.ke',
+                'pos.hsmart.co.ke',
                 '*.payhero.co.ke',
                 'api.payhero.co.ke',
                 '*.safaricom.co.ke',
+                'daraja.safaricom.co.ke',
+                '*.kopokopo.com',
+                'api.kopokopo.com',
+                '*.paystack.co',
+                'paystack.com',
+                'api.paystack.co',
             ];
             if (!empty($extraWalledGarden)) {
                 foreach ($extraWalledGarden as $dom) {
@@ -1903,6 +1930,49 @@ HTML;
                         } catch (\Throwable $he) {}
                     }
                 }
+            }
+        } catch (\Throwable $e) {}
+
+        // 8. Push Layer 3 On-Router Limit & Expiry Enforcer Script & Scheduler
+        try {
+            $scripts = $api->executeCommand('/system/script/print');
+            $hasScript = false;
+            if (is_array($scripts)) {
+                foreach ($scripts as $sc) {
+                    if (($sc['name'] ?? '') === 'hsmart_enforce_limits') {
+                        $hasScript = true;
+                        break;
+                    }
+                }
+            }
+            $scriptSource = ':do { /ip hotspot user { :foreach u in=[find] do={ :local lim [/ip hotspot user get $u limit-uptime]; :local up [/ip hotspot user get $u uptime]; :local uname [/ip hotspot user get $u name]; :if ($lim != "" and $lim != "0s" and $lim != "00:00:00") do={ :if ($up >= $lim) do={ /ip hotspot active remove [find user=$uname]; /ip hotspot cookie remove [find user=$uname]; /ip hotspot user remove $u; :log info ("[HSmart] Auto-kicked expired user: " . $uname); }; }; }; }; } on-error={};';
+            if ($hasScript) {
+                $api->executeCommand('/system/script/set', ['source' => $scriptSource], ['name' => 'hsmart_enforce_limits']);
+            } else {
+                $api->executeCommand('/system/script/add', [
+                    'name'   => 'hsmart_enforce_limits',
+                    'policy' => 'read,write,policy,test',
+                    'source' => $scriptSource,
+                ]);
+            }
+
+            $scheds = $api->executeCommand('/system/scheduler/print');
+            $hasSched = false;
+            if (is_array($scheds)) {
+                foreach ($scheds as $sch) {
+                    if (($sch['name'] ?? '') === 'hsmart_enforce_scheduler') {
+                        $hasSched = true;
+                        break;
+                    }
+                }
+            }
+            if (!$hasSched) {
+                $api->executeCommand('/system/scheduler/add', [
+                    'name'       => 'hsmart_enforce_scheduler',
+                    'interval'   => '1m',
+                    'on-event'   => 'hsmart_enforce_limits',
+                    'start-time' => 'startup',
+                ]);
             }
         } catch (\Throwable $e) {}
 
