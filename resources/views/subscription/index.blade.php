@@ -35,6 +35,33 @@
             </div>
         </div>
 
+        {{-- Flash Alerts --}}
+        @if(session('success'))
+            <div class="alert alert-success alert-dismissible fade show rounded-4 border-0 shadow-sm p-3 mb-4 d-flex align-items-center gap-3" role="alert">
+                <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center shrink-0" style="width: 38px; height: 38px;">
+                    <i class="bi bi-check-lg fs-5"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <strong class="d-block text-dark">Success!</strong>
+                    <span class="text-secondary small">{{ session('success') }}</span>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
+        @if(session('error'))
+            <div class="alert alert-danger alert-dismissible fade show rounded-4 border-0 shadow-sm p-3 mb-4 d-flex align-items-center gap-3" role="alert">
+                <div class="rounded-circle bg-danger text-white d-flex align-items-center justify-content-center shrink-0" style="width: 38px; height: 38px;">
+                    <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <strong class="d-block text-dark">Payment Notice</strong>
+                    <span class="text-secondary small">{{ session('error') }}</span>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
         {{-- Current Subscription Overview Card --}}
         <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
             <div class="card-body p-4">
@@ -230,7 +257,7 @@
                                     </td>
                                     <td class="fw-bold text-dark">KES {{ number_format($pmt->amount, 2) }}</td>
                                     <td>
-                                        <span class="badge bg-light text-secondary">
+                                        <span class="badge {{ $pmt->gateway === 'paystack' ? 'bg-info-subtle text-info border border-info-subtle' : 'bg-success-subtle text-success border border-success-subtle' }}">
                                             {{ strtoupper($pmt->gateway) }}
                                         </span>
                                     </td>
@@ -244,7 +271,7 @@
                                             </span>
                                         @elseif($pmt->status === 'pending')
                                             <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">
-                                                <i class="bi bi-clock me-1"></i> Pending PIN
+                                                <i class="bi bi-clock me-1"></i> Pending
                                             </span>
                                         @else
                                             <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
@@ -268,18 +295,21 @@
         </div>
     </div>
 
-    {{-- M-Pesa STK Push Payment Modal --}}
+    {{-- Modern Subscription Payment Modal (Styled like SmsTopUpModal.vue) --}}
     <div class="modal fade" id="subscriptionPaymentModal" tabindex="-1" aria-labelledby="subscriptionPaymentModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content rounded-4 border-0 shadow">
+                {{-- Modal Header --}}
                 <div class="modal-header border-0 pb-0 pt-4 px-4">
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="rounded-circle d-flex align-items-center justify-content-center text-white" style="width: 42px; height: 42px; background: #00A348;">
-                            <i class="bi bi-phone-fill fs-5"></i>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="rounded-3 p-2 d-flex align-items-center justify-content-center text-white shadow-sm" 
+                             id="modalHeaderIconBadge"
+                             style="width: 44px; height: 44px; background: linear-gradient(135deg, #10B981 0%, #059669 100%);">
+                            <i class="bi bi-phone-fill fs-5" id="modalHeaderIcon"></i>
                         </div>
                         <div>
-                            <h5 class="modal-title fw-bold text-dark mb-0" id="subscriptionPaymentModalLabel">M-Pesa STK Push Checkout</h5>
-                            <small class="text-muted">Instant activation for HSmart ISP</small>
+                            <h5 class="modal-title fw-bold text-dark mb-0" id="subscriptionPaymentModalLabel">Subscription Checkout</h5>
+                            <small class="text-muted">System Gateway Renewal (Harry Smart Tech)</small>
                         </div>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -289,8 +319,11 @@
                     {{-- Selected Plan Summary Box --}}
                     <div class="p-3 rounded-3 mb-3 d-flex justify-content-between align-items-center" style="background: #F8FAFC; border: 1px dashed #CBD5E1;">
                         <div>
-                            <span class="text-muted small d-block">Selected Plan</span>
+                            <span class="text-muted small d-block">Target Plan</span>
                             <strong class="text-dark fs-6" id="modalPlanName">Starter Plan</strong>
+                            <small class="text-primary d-block fw-semibold" style="font-size: 11px;">
+                                <i class="bi bi-shield-check me-1"></i> 30 Days License Validity
+                            </small>
                         </div>
                         <div class="text-end">
                             <span class="text-muted small d-block">Payable Amount</span>
@@ -300,41 +333,127 @@
 
                     {{-- Step 1: Input Form --}}
                     <div id="paymentInputSection">
+                        {{-- Select Payment Method Cards (M-Pesa vs Paystack) --}}
                         <div class="mb-3">
-                            <label for="subscriberPhone" class="form-label fw-semibold text-dark small">
+                            <label class="form-label fw-bold text-uppercase text-muted" style="font-size: 11px; letter-spacing: 0.5px;">
+                                Select Payment Method <span class="text-danger">*</span>
+                            </label>
+                            <div class="row g-2">
+                                {{-- Card 1: M-Pesa STK Push --}}
+                                <div class="col-6">
+                                    <button type="button" 
+                                            class="w-100 p-2.5 rounded-3 border text-start transition d-flex align-items-center gap-2 position-relative" 
+                                            id="btnSelectMpesa"
+                                            onclick="selectGateway('mpesa')"
+                                            style="border: 2px solid #10B981 !important; background: #ECFDF5;">
+                                        <div class="rounded-2 p-1.5 d-flex align-items-center justify-content-center text-white shrink-0" 
+                                             style="width: 34px; height: 34px; background: #10B981;">
+                                            <i class="bi bi-phone-fill fs-6"></i>
+                                        </div>
+                                        <div class="min-w-0 flex-grow-1">
+                                            <div class="fw-bold text-dark text-truncate" style="font-size: 12px;">M-Pesa STK Push</div>
+                                            <div class="text-muted text-truncate" style="font-size: 10px;">Instant prompt on phone</div>
+                                        </div>
+                                    </button>
+                                </div>
+
+                                {{-- Card 2: Paystack --}}
+                                <div class="col-6">
+                                    <button type="button" 
+                                            class="w-100 p-2.5 rounded-3 border text-start transition d-flex align-items-center gap-2 position-relative" 
+                                            id="btnSelectPaystack"
+                                            onclick="selectGateway('paystack')"
+                                            style="border: 1px solid #E2E8F0; background: #FFFFFF;">
+                                        <div class="rounded-2 p-1.5 d-flex align-items-center justify-content-center text-white shrink-0" 
+                                             style="width: 34px; height: 34px; background: #06B6D4;">
+                                            <i class="bi bi-credit-card-2-front-fill fs-6"></i>
+                                        </div>
+                                        <div class="min-w-0 flex-grow-1">
+                                            <div class="fw-bold text-dark text-truncate" style="font-size: 12px;">Paystack</div>
+                                            <div class="text-muted text-truncate" style="font-size: 10px;">Cards, Bank & M-Pesa</div>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Section A: M-Pesa Input --}}
+                        <div id="mpesaFieldsSection" class="mb-3">
+                            <label for="subscriberPhone" class="form-label fw-semibold text-dark small mb-1">
                                 Safaricom M-Pesa Phone Number <span class="text-danger">*</span>
                             </label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light text-muted fw-bold">🇰🇪 +254</span>
                                 <input type="tel" 
-                                       class="form-control form-control-lg fs-6" 
+                                       class="form-control form-control-lg fs-6 font-monospace" 
                                        id="subscriberPhone" 
                                        placeholder="712345678" 
                                        value="{{ ltrim($user->phone ?? ($user->mobile ?? ''), '254') }}"
                                        autocomplete="tel">
                             </div>
-                            <small class="text-muted mt-1 d-block">An instant prompt will appear on this phone requesting your M-Pesa PIN.</small>
+                            <small class="text-muted mt-1 d-block" style="font-size: 11px;">
+                                <i class="bi bi-info-circle me-1"></i> An instant prompt will appear on this phone requesting your M-Pesa PIN.
+                            </small>
                         </div>
 
+                        {{-- Section B: Paystack Input --}}
+                        <div id="paystackFieldsSection" class="mb-3 d-none">
+                            <label for="subscriberEmail" class="form-label fw-semibold text-dark small mb-1">
+                                Payment Receipt Email <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group mb-2">
+                                <span class="input-group-text bg-light text-muted"><i class="bi bi-envelope-fill"></i></span>
+                                <input type="email" 
+                                       class="form-control form-control-lg fs-6" 
+                                       id="subscriberEmail" 
+                                       placeholder="admin@yourisp.com" 
+                                       value="{{ $user->email ?? '' }}"
+                                       autocomplete="email">
+                            </div>
+                            <div class="d-flex align-items-center justify-content-between p-2 rounded-2 border bg-light" style="font-size: 11px;">
+                                <span class="text-muted"><i class="bi bi-shield-check text-primary me-1"></i> Supported:</span>
+                                <span class="fw-semibold text-secondary">Visa • Mastercard • Apple Pay • Bank Transfer • M-Pesa</span>
+                            </div>
+                        </div>
+
+                        {{-- Error Alert --}}
                         <div id="paymentErrorAlert" class="alert alert-danger d-none py-2 small mb-3"></div>
 
-                        <button type="button" class="btn w-100 py-3 text-white fw-bold rounded-3 shadow-sm d-flex align-items-center justify-content-center gap-2" 
-                                id="btnTriggerStk" 
-                                style="background: #00A348; border-color: #00A348;" 
-                                onclick="triggerSubscriptionStk()">
-                            <span>Send M-Pesa STK Prompt</span>
-                            <i class="bi bi-arrow-right"></i>
-                        </button>
+                        {{-- Action Buttons --}}
+                        {{-- Button for M-Pesa --}}
+                        <div id="btnMpesaContainer">
+                            <button type="button" 
+                                    class="btn w-100 py-3 text-white fw-bold rounded-3 shadow-sm d-flex align-items-center justify-content-center gap-2" 
+                                    id="btnTriggerStk" 
+                                    style="background: #10B981; border-color: #10B981;" 
+                                    onclick="triggerSubscriptionStk()">
+                                <span>Send M-Pesa STK Prompt</span>
+                                <i class="bi bi-arrow-right"></i>
+                            </button>
+                        </div>
+
+                        {{-- Button for Paystack --}}
+                        <div id="btnPaystackContainer" class="d-none">
+                            <button type="button" 
+                                    class="btn w-100 py-3 text-white fw-bold rounded-3 shadow-sm d-flex align-items-center justify-content-center gap-2" 
+                                    id="btnTriggerPaystack" 
+                                    style="background: #06B6D4; border-color: #06B6D4;" 
+                                    onclick="triggerSubscriptionPaystack()">
+                                <i class="bi bi-lock-fill"></i>
+                                <span>Pay Securely with Paystack</span>
+                                <i class="bi bi-arrow-right"></i>
+                            </button>
+                        </div>
                     </div>
 
-                    {{-- Step 2: Live Waiting & Polling --}}
-                    <div id="paymentWaitingSection" class="text-center py-3 d-none">
+                    {{-- Step 2: Live Waiting & Polling (for M-Pesa) --}}
+                    <div id="paymentWaitingSection" class="text-center py-4 d-none">
                         <div class="spinner-border text-success mb-3" style="width: 3.5rem; height: 3.5rem;" role="status">
                             <span class="visually-hidden">Waiting for payment...</span>
                         </div>
                         <h5 class="fw-bold text-dark mb-1">Check Your Phone!</h5>
                         <p class="text-muted small px-3 mb-3">
-                            An M-Pesa prompt has been sent to <strong id="waitingPhoneNumber"></strong>.<br>
+                            An M-Pesa prompt has been sent to <strong id="waitingPhoneNumber" class="text-dark"></strong>.<br>
                             Please enter your <strong>M-Pesa PIN</strong> to complete your subscription.
                         </p>
                         <div class="badge bg-light text-secondary border px-3 py-2 small">
@@ -349,7 +468,7 @@
                         </div>
                         <h4 class="fw-bold text-dark mb-1">Subscription Activated!</h4>
                         <p class="text-muted small mb-3">
-                            Thank you! Your ISP software subscription has been successfully renewed.
+                            Thank you! Your ISP software subscription has been successfully renewed for 30 days.
                         </p>
                         <button type="button" class="btn btn-primary px-4 py-2 rounded-3" onclick="window.location.reload()">
                             Continue to Dashboard
@@ -357,9 +476,10 @@
                     </div>
                 </div>
 
+                {{-- Modal Footer --}}
                 <div class="modal-footer bg-light border-0 py-2 px-4 justify-content-between rounded-bottom-4">
-                    <small class="text-muted d-flex align-items-center gap-1">
-                        <i class="bi bi-shield-lock-fill text-success"></i> 256-Bit SSL Encrypted & Safaricom Verified
+                    <small class="text-muted d-flex align-items-center gap-1" style="font-size: 11px;">
+                        <i class="bi bi-shield-lock-fill text-success"></i> 256-Bit SSL Encrypted & Safaricom / Paystack Verified
                     </small>
                     <button type="button" class="btn btn-sm btn-link text-muted text-decoration-none" data-bs-dismiss="modal">Close</button>
                 </div>
@@ -368,17 +488,66 @@
     </div>
 
     @push('scripts')
+    {{-- Paystack Inline SDK --}}
+    <script src="https://js.paystack.co/v1/inline.js"></script>
+
     <script>
         let currentPlanSlug = '{{ $selectedPlan }}';
+        let currentPlanPrice = 400;
+        let selectedGateway = 'mpesa'; // 'mpesa' or 'paystack'
         let currentPollInterval = null;
         let countdownSeconds = 60;
         let countdownInterval = null;
 
+        function selectGateway(gw) {
+            selectedGateway = gw;
+            const btnMpesa = document.getElementById('btnSelectMpesa');
+            const btnPaystack = document.getElementById('btnSelectPaystack');
+            const mpesaFields = document.getElementById('mpesaFieldsSection');
+            const paystackFields = document.getElementById('paystackFieldsSection');
+            const btnMpesaContainer = document.getElementById('btnMpesaContainer');
+            const btnPaystackContainer = document.getElementById('btnPaystackContainer');
+            const iconBadge = document.getElementById('modalHeaderIconBadge');
+            const icon = document.getElementById('modalHeaderIcon');
+
+            if (gw === 'mpesa') {
+                btnMpesa.style.border = '2px solid #10B981';
+                btnMpesa.style.background = '#ECFDF5';
+                btnPaystack.style.border = '1px solid #E2E8F0';
+                btnPaystack.style.background = '#FFFFFF';
+
+                mpesaFields.classList.remove('d-none');
+                paystackFields.classList.add('d-none');
+                btnMpesaContainer.classList.remove('d-none');
+                btnPaystackContainer.classList.add('d-none');
+
+                iconBadge.style.background = 'linear-gradient(135deg, #10B981 0%, #059669 100%)';
+                icon.className = 'bi bi-phone-fill fs-5';
+            } else {
+                btnPaystack.style.border = '2px solid #06B6D4';
+                btnPaystack.style.background = '#ECFEFF';
+                btnMpesa.style.border = '1px solid #E2E8F0';
+                btnMpesa.style.background = '#FFFFFF';
+
+                mpesaFields.classList.add('d-none');
+                paystackFields.classList.remove('d-none');
+                btnMpesaContainer.classList.add('d-none');
+                btnPaystackContainer.classList.remove('d-none');
+
+                iconBadge.style.background = 'linear-gradient(135deg, #06B6D4 0%, #0284C7 100%)';
+                icon.className = 'bi bi-credit-card-2-front-fill fs-5';
+            }
+        }
+
         function openPaymentModal(slug, name, price) {
             currentPlanSlug = slug;
+            currentPlanPrice = Number(price);
             document.getElementById('modalPlanName').innerText = name + ' Plan';
             document.getElementById('modalPlanPrice').innerText = 'KES ' + Number(price).toLocaleString();
             
+            // Default to M-Pesa
+            selectGateway('mpesa');
+
             // Reset modal state
             document.getElementById('paymentInputSection').classList.remove('d-none');
             document.getElementById('paymentWaitingSection').classList.add('d-none');
@@ -404,6 +573,7 @@
             });
         @endif
 
+        // Trigger M-Pesa STK Push
         function triggerSubscriptionStk() {
             const phoneInput = document.getElementById('subscriberPhone');
             const errorAlert = document.getElementById('paymentErrorAlert');
@@ -418,7 +588,7 @@
 
             errorAlert.classList.add('d-none');
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Initiating M-Pesa...';
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Initiating M-Pesa STK...';
 
             fetch('{{ route('subscription.pay.mpesa') }}', {
                 method: 'POST',
@@ -456,6 +626,79 @@
             });
         }
 
+        // Trigger Paystack Checkout
+        function triggerSubscriptionPaystack() {
+            const emailInput = document.getElementById('subscriberEmail');
+            const errorAlert = document.getElementById('paymentErrorAlert');
+            const btn = document.getElementById('btnTriggerPaystack');
+
+            const email = emailInput.value.trim();
+            if (!email || !email.includes('@')) {
+                errorAlert.innerText = 'Please enter a valid email address for your payment receipt.';
+                errorAlert.classList.remove('d-none');
+                return;
+            }
+
+            errorAlert.classList.add('d-none');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Connecting to Paystack...';
+
+            fetch('{{ route('subscription.pay.paystack') }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({
+                    plan_slug: currentPlanSlug,
+                    email: email
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-lock-fill"></i><span>Pay Securely with Paystack</span><i class="bi bi-arrow-right"></i>';
+
+                if (data.status === 'success' && (data.access_code || data.authorization_url)) {
+                    // Dismiss modal before launching Paystack popup
+                    const modalEl = document.getElementById('subscriptionPaymentModal');
+                    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                    if (modalInstance) modalInstance.hide();
+
+                    if (window.PaystackPop && data.public_key) {
+                        const handler = window.PaystackPop.setup({
+                            key: data.public_key,
+                            email: data.email,
+                            amount: data.amount,
+                            currency: 'KES',
+                            ref: data.reference,
+                            callback: function(response) {
+                                const ref = (response && response.reference) ? response.reference : data.reference;
+                                window.location.href = '/subscription/paystack/verify/' + encodeURIComponent(ref);
+                            },
+                            onClose: function() {
+                                // User closed popup
+                            }
+                        });
+                        handler.openIframe();
+                    } else if (data.authorization_url) {
+                        window.location.href = data.authorization_url;
+                    } else {
+                        window.location.href = 'https://checkout.paystack.com/' + data.access_code;
+                    }
+                } else {
+                    errorAlert.innerText = data.message || 'Failed to initialize Paystack. Please try again.';
+                    errorAlert.classList.remove('d-none');
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-lock-fill"></i><span>Pay Securely with Paystack</span><i class="bi bi-arrow-right"></i>';
+                errorAlert.innerText = 'Network connection error. Please try again.';
+                errorAlert.classList.remove('d-none');
+            });
+        }
+
         function startStatusPolling(reference) {
             countdownSeconds = 60;
             document.getElementById('countdownTimer').innerText = countdownSeconds;
@@ -481,7 +724,7 @@
                     return;
                 }
 
-                fetch('/subscription/check-status/' + reference)
+                fetch('/subscription/check-status/' + encodeURIComponent(reference))
                     .then(res => res.json())
                     .then(res => {
                         if (res.status === 'completed') {
@@ -491,7 +734,7 @@
                             document.getElementById('paymentWaitingSection').classList.add('d-none');
                             document.getElementById('paymentSuccessSection').classList.remove('d-none');
 
-                            // Confetti effect or auto-reload in 3s
+                            // Auto-reload to reflect new limits
                             setTimeout(() => {
                                 window.location.reload();
                             }, 2500);

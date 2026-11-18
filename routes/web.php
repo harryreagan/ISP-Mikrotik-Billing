@@ -265,11 +265,14 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/subscription', [\App\Http\Controllers\TenantSubscriptionController::class, 'index'])->name('subscription.index');
     Route::get('/billing', fn() => redirect()->route('subscription.index'))->name('billing');
     Route::post('/subscription/pay/mpesa', [\App\Http\Controllers\TenantSubscriptionController::class, 'initiateMpesa'])->name('subscription.pay.mpesa');
+    Route::post('/subscription/pay/paystack', [\App\Http\Controllers\TenantSubscriptionController::class, 'initiatePaystack'])->name('subscription.pay.paystack');
+    Route::get('/subscription/paystack/verify/{reference}', [\App\Http\Controllers\TenantSubscriptionController::class, 'verifyPaystack'])->name('subscription.paystack.verify');
     Route::get('/subscription/check-status/{reference}', [\App\Http\Controllers\TenantSubscriptionController::class, 'checkStatus'])->name('subscription.check-status');
 });
 
-// Subscription Webhook Callback (PayHero / Mpesa)
+// Subscription Webhook Callbacks (PayHero / Mpesa / Paystack)
 Route::post('/api/subscription/callback', [\App\Http\Controllers\TenantSubscriptionController::class, 'webhookCallback'])->name('api.subscription.callback');
+Route::post('/api/subscription/paystack/webhook', [\App\Http\Controllers\TenantSubscriptionController::class, 'paystackWebhook'])->name('api.subscription.paystack.webhook');
 
 // Authentication & Verification Extensions (Email/Phone OTP, Password Reset & Google OAuth)
 Route::post('/forgot-password', [\App\Http\Controllers\Auth\CustomAuthController::class, 'handleForgotPassword'])->name('password.email');

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\TenantSubscriptionPayment;
 use App\Services\TenantSubscriptionService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -60,7 +61,40 @@ class TenantSubscriptionController extends Controller
     }
 
     /**
-     * Check STK push payment status
+     * Initiate Paystack Checkout for subscription
+     */
+    public function initiatePaystack(Request $request): JsonResponse
+    {
+        $request->validate([
+            'plan_slug' => 'required|string',
+            'email' => 'nullable|email',
+        ]);
+
+        $user = Auth::user();
+        $tenantId = (int) ($user->tenant_id ?? 1);
+        $email = $request->input('email') ?: ($user->email ?? 'admin@hsmart.co.ke');
+
+        $result = TenantSubscriptionService::initiatePaystack($tenantId, $request->plan_slug, $email);
+
+        return response()->json($result, ($result['status'] === 'success') ? 200 : 422);
+    }
+
+    /**
+     * Verify Paystack payment redirect
+     */
+    public function verifyPaystack(Request $request, string $reference): RedirectResponse
+    {
+        $result = TenantSubscriptionService::verifyPaystack($reference);
+
+        if ($result['status'] === 'completed') {
+            return redirect()->route('subscription.index')->with('success', 'Subscription activated successfully! Thank you for renewing your HSmart ISP license.');
+        }
+
+        return redirect()->route('subscription.index')->with('error', $result['message'] ?? 'Payment verification was unsuccessful. Please check with your bank.');
+    }
+
+    /**
+     * Check payment status (used for AJAX polling on M-Pesa & Paystack)
      */
     public function checkStatus(Request $request, string $reference): JsonResponse
     {
@@ -104,5 +138,24 @@ class TenantSubscriptionController extends Controller
         }
 
         return response()->json(['status' => 'acknowledged']);
+    }
+
+    /**
+     * Paystack Webhook Callback
+     */
+    public function paystackWebhook(Request $request): JsonResponse
+    {
+        $payload = $request->all();
+        $event = $payload['event'] ?? '';
+
+        if ($event === 'charge.success') {
+            $data = $payload['data'] ?? [];
+            $reference = $data['reference'] ?? null;
+            if ($reference) {
+                TenantSubscriptionService::verifyPaystack($reference);
+            }
+        }
+
+        return response()->json(['status' => 'ok']);
     }
 }
