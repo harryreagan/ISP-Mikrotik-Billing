@@ -39,6 +39,10 @@ Route::prefix('payment/daraja')->group(function () {
 Route::post('/payment/stk-push', [PayHeroPaymentController::class, 'initiatePortalPayment'])->middleware('throttle:30,1');
 Route::get('/payment/status', [PayHeroPaymentController::class, 'checkPortalStatus'])->middleware('throttle:120,1');
 
+// Returning User & Captive Portal Session Endpoints
+Route::post('/portal/returning-user', [\App\Http\Controllers\Portal\CaptivePortalApiController::class, 'returningUser'])->middleware('throttle:60,1');
+Route::get('/portal/check-session', [\App\Http\Controllers\Portal\CaptivePortalApiController::class, 'checkSession'])->middleware('throttle:120,1');
+
 // 3. PayHero (Webhook, STK Push & Polling)
 Route::prefix('payment/payhero')->group(function () {
     Route::post('/stk-push', [PayHeroPaymentController::class, 'initiatePortalPayment'])->middleware('throttle:30,1');

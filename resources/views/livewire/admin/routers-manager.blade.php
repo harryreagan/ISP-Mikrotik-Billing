@@ -247,6 +247,19 @@
                             </button>
 
                             <button type="button" 
+                                    wire:click="repairCaptivePortal({{ $router->id }})" 
+                                    wire:confirm="Repair and re-push the complete captive portal configuration (bridge, ports, WiFi, DHCP, DNS, NAT, and templates) to {{ $router->name }}?"
+                                    class="btn btn-outline-success btn-sm px-2" 
+                                    title="Repair Captive Portal & Bridging">
+                                <span wire:loading.remove wire:target="repairCaptivePortal({{ $router->id }})">
+                                    <i class="bi bi-tools me-1"></i>Repair Portal
+                                </span>
+                                <span wire:loading wire:target="repairCaptivePortal({{ $router->id }})">
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>Repairing...
+                                </span>
+                            </button>
+
+                            <button type="button" 
                                     wire:click="openPortalModal({{ $router->id }})" 
                                     class="btn btn-outline-info btn-sm px-2" 
                                     title="Captive portal & QR preview">
@@ -515,6 +528,22 @@
                                         <label class="form-label">PPPoE pool subnet</label>
                                         <input type="text" wire:model="portPppoePool" class="form-control font-monospace" placeholder="10.0.0.0/24" required>
                                         <div class="form-text small">IP pool allocated to authenticated PPPoE tunnels.</div>
+                                    </div>
+
+                                    {{-- Secondary Router (Tenda / TP-Link) AP Mode Callout --}}
+                                    <div class="col-12 mt-3">
+                                        <div class="alert alert-info border-info-subtle d-flex gap-3 mb-0" style="background: rgba(14, 165, 233, 0.08);">
+                                            <i class="bi bi-info-circle-fill text-info fs-5 mt-1"></i>
+                                            <div class="small">
+                                                <strong class="d-block mb-1 text-slate-900">Connecting a Secondary Router (Tenda / TP-Link) to {{ $portRoleHotspot ?: 'ether2' }}?</strong>
+                                                <ul class="mb-1 ps-3 text-slate-700">
+                                                    <li><strong>Step 1 (AP Mode / Bridge):</strong> In the Tenda settings, switch operating mode to <strong>Access Point (AP)</strong> mode, OR turn <strong>DHCP Server OFF</strong>.</li>
+                                                    <li><strong>Step 2 (LAN-to-LAN):</strong> Plug the Ethernet cable from MikroTik <code>{{ $portRoleHotspot ?: 'ether2' }}</code> into a <strong>LAN port</strong> on the Tenda (not the blue WAN port, unless Tenda is officially in AP Mode).</li>
+                                                    <li><strong>Step 3 (IP Assignment):</strong> Set Tenda LAN IP to <code>10.180.0.2</code> (outside the hotspot client pool).</li>
+                                                </ul>
+                                                <span class="text-danger-emphasis">⚠️ If Tenda's DHCP Server is left ON, phones receive 192.168.0.x IPs and the captive portal will never trigger!</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

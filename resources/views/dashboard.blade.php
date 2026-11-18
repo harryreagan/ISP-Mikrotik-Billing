@@ -6,12 +6,22 @@
         $userFirstName = explode(' ', trim($userName))[0];
     @endphp
 
-    {{-- Personalized Greeting Header --}}
+    {{-- Personalized Greeting Header & Year Selector --}}
     <x-ui.page-header :title="$greeting . ', ' . $userFirstName" :subtitle="__('Here is what is happening across your WiFi network and M-Pesa collections today.')">
         <x-slot:actions>
-            <x-ui.badge tone="success">
-                <i class="bi bi-circle-fill me-1" style="font-size: 6px;"></i> {{ __('System operational') }}
-            </x-ui.badge>
+            <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center bg-white dark:bg-slate-800 rounded px-2 py-1 border shadow-xs">
+                    <label class="small text-muted me-2 mb-0 fw-semibold"><i class="bi bi-calendar3 me-1"></i>Year:</label>
+                    <select class="form-select form-select-sm border-0 py-0 ps-1 pe-4 font-semibold text-slate-800" style="width: auto; cursor: pointer;" onchange="window.location.href='?year='+this.value">
+                        @foreach(($availableYears ?? [2024, 2025, 2026, 2027]) as $y)
+                            <option value="{{ $y }}" {{ ($selectedYear ?? now()->year) == $y ? 'selected' : '' }}>{{ $y }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <x-ui.badge tone="success">
+                    <i class="bi bi-circle-fill me-1" style="font-size: 6px;"></i> {{ __('System operational') }}
+                </x-ui.badge>
+            </div>
         </x-slot:actions>
     </x-ui.page-header>
 
@@ -26,50 +36,60 @@
         $progressPct = round(($completedCount / 5) * 100);
     @endphp
 
-    {{-- Modern Stat Cards Row (2 per row on mobile, 4 on xl) --}}
+    {{-- Modern Stat Cards Row (Reconciled from raw ledger) --}}
     <div class="row g-2 g-sm-3 mb-4">
-        <!-- Card 1: Active Users -->
+        <!-- Card 1: Total Global/Tenant Revenue -->
         <div class="col-6 col-xl-3">
-            <x-ui.stat-card :label="__('Active PPPoE users')" :value="($customersData['active'] ?? 0) . ' / ' . ($customersData['total'] ?? 0)" color="purple">
-                <x-slot:icon><i class="bi bi-people-fill"></i></x-slot:icon>
-                <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
-                    <span><i class="bi bi-person-plus-fill me-1"></i>{{ $customersData['recent'] ?? 0 }} {{ __('New this month') }}</span>
-                    <span><i class="bi bi-x-circle me-1"></i>{{ __('Inactive') }}</span>
-                </div>
-            </x-ui.stat-card>
-        </div>
-
-        <!-- Card 2: Today PPPoE Collection -->
-        <div class="col-6 col-xl-3">
-            <x-ui.stat-card :label="__('Today\'s PPPoE sales')" :value="'KES ' . number_format($billInformationData['today_paid_amount'] ?? 0, 0)" color="blue">
-                <x-slot:icon><i class="bi bi-wallet2"></i></x-slot:icon>
-                <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
-                    <span><i class="bi bi-calendar3 me-1"></i>{{ __('Total mo:') }} KES {{ number_format($billInformationData['paid_amount'] ?? 0, 0) }}</span>
-                    <span><i class="bi bi-arrow-up-right me-1"></i>{{ __('PPPoE only') }}</span>
-                </div>
-            </x-ui.stat-card>
-        </div>
-
-        <!-- Card 3: Today Hotspot Sales -->
-        <div class="col-6 col-xl-3">
-            <x-ui.stat-card :label="__('Today\'s hotspot sales')" :value="'KES ' . number_format($billInformationData['hotspot_today'] ?? 0, 0)" color="orange">
-                <x-slot:icon><i class="bi bi-wifi"></i></x-slot:icon>
-                <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
-                    <span><i class="bi bi-calendar3 me-1"></i>{{ __('Total mo:') }} KES {{ number_format($billInformationData['hotspot_total'] ?? 0, 0) }}</span>
-                    <span><i class="bi bi-arrow-up-right me-1"></i>{{ __('Hotspot only') }}</span>
-                </div>
-            </x-ui.stat-card>
-        </div>
-
-        <!-- Card 4: Total Revenue YTD -->
-        <div class="col-6 col-xl-3">
-            <x-ui.stat-card :label="__('Total global revenue')" :value="'KES ' . number_format(($billInformationData['paid_amount'] ?? 0) + ($billInformationData['hotspot_total'] ?? 0), 0)" color="green">
+            <x-ui.stat-card :label="(!empty($billInformationData['is_super_admin']) ? __('Total global revenue') : __('Total revenue')) . ' (' . ($selectedYear ?? now()->year) . ')'" :value="'KES ' . number_format($billInformationData['total_revenue'] ?? 0, 0)" color="green">
                 <x-slot:icon><i class="bi bi-graph-up-arrow"></i></x-slot:icon>
                 <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
-                    <span><i class="bi bi-exclamation-triangle-fill me-1"></i>{{ __('Pending due:') }} KES {{ number_format($billInformationData['due_amount'] ?? 0, 0) }}</span>
-                    <span>{{ __('Total arrears') }}</span>
+                    <span><i class="bi bi-check-circle-fill me-1 text-success"></i>{{ __('Reconciled ledger') }}</span>
+                    <span>{{ $selectedYear ?? now()->year }} YTD</span>
                 </div>
             </x-ui.stat-card>
+        </div>
+
+        <!-- Card 2: Hotspot Revenue -->
+        <div class="col-6 col-xl-3">
+            <x-ui.stat-card :label="__('Hotspot revenue')" :value="'KES ' . number_format($billInformationData['hotspot_total'] ?? 0, 0)" color="orange">
+                <x-slot:icon><i class="bi bi-wifi"></i></x-slot:icon>
+                <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
+                    <span><i class="bi bi-calendar3 me-1"></i>{{ __('Today:') }} KES {{ number_format($billInformationData['hotspot_today'] ?? 0, 0) }}</span>
+                    <span><i class="bi bi-arrow-up-right me-1"></i>{{ __('Hotspot') }}</span>
+                </div>
+            </x-ui.stat-card>
+        </div>
+
+        <!-- Card 3: PPPoE Collections -->
+        <div class="col-6 col-xl-3">
+            <x-ui.stat-card :label="__('PPPoE revenue')" :value="'KES ' . number_format($billInformationData['paid_amount'] ?? 0, 0)" color="blue">
+                <x-slot:icon><i class="bi bi-wallet2"></i></x-slot:icon>
+                <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
+                    <span><i class="bi bi-calendar3 me-1"></i>{{ __('Today:') }} KES {{ number_format($billInformationData['today_paid_amount'] ?? 0, 0) }}</span>
+                    <span><i class="bi bi-arrow-up-right me-1"></i>{{ __('PPPoE') }}</span>
+                </div>
+            </x-ui.stat-card>
+        </div>
+
+        <!-- Card 4: Platform Subscriptions (Super Admin) OR Arrears/Due (Tenant) -->
+        <div class="col-6 col-xl-3">
+            @if(!empty($billInformationData['is_super_admin']))
+                <x-ui.stat-card :label="__('Platform subscriptions')" :value="'KES ' . number_format($billInformationData['subscription_revenue'] ?? 0, 0)" color="purple">
+                    <x-slot:icon><i class="bi bi-building-check"></i></x-slot:icon>
+                    <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
+                        <span><i class="bi bi-award-fill me-1"></i>{{ __('Tenant plans') }}</span>
+                        <span>{{ __('Platform') }}</span>
+                    </div>
+                </x-ui.stat-card>
+            @else
+                <x-ui.stat-card :label="__('Pending due / arrears')" :value="'KES ' . number_format($billInformationData['due_amount'] ?? 0, 0)" color="purple">
+                    <x-slot:icon><i class="bi bi-exclamation-triangle-fill"></i></x-slot:icon>
+                    <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
+                        <span><i class="bi bi-people me-1"></i>{{ ($customersData['active'] ?? 0) . ' PPPoE users' }}</span>
+                        <span>{{ __('Arrears') }}</span>
+                    </div>
+                </x-ui.stat-card>
+            @endif
         </div>
     </div>
 
@@ -527,6 +547,75 @@
         <div class="col-12 col-md-12 col-lg-12 col-xxxl-12 d-flex flex-fill">
             <x-ui.card :title="__('Income & revenue overview')" class="w-100 d-flex flex-column" style="min-height: 460px;">
                 <div id="income_revenue"></div>
+
+                {{-- Reconciled Month-by-Month Ledger Table --}}
+                @if(isset($revenueReport) && !empty($revenueReport['months']))
+                <div class="mt-4 pt-3 border-top">
+                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                        <div>
+                            <h6 class="fw-bold mb-0 text-dark">
+                                <i class="bi bi-journal-check text-primary me-1"></i>
+                                {{ __('Reconciled Revenue Ledger (:year)', ['year' => $selectedYear ?? now()->year]) }}
+                            </h6>
+                            <small class="text-muted">{{ __('Verified single source of truth from raw successful transactions & collections') }}</small>
+                        </div>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1.5 rounded-pill">
+                            <i class="bi bi-shield-check me-1"></i>{{ __('100% Reconciled') }}
+                        </span>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0 text-nowrap" style="font-size: 0.85rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">{{ __('Month') }}</th>
+                                    <th class="text-end">{{ __('Hotspot Revenue') }}</th>
+                                    <th class="text-end">{{ __('PPPoE Revenue') }}</th>
+                                    @if(!empty($revenueReport['summary']['is_super_admin']))
+                                        <th class="text-end">{{ __('Subscriptions') }}</th>
+                                    @endif
+                                    <th class="text-end pe-3">{{ __('Total') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($revenueReport['months'] as $m)
+                                <tr>
+                                    <td class="ps-3 fw-medium text-dark">
+                                        <span class="d-inline-block rounded-circle bg-primary me-2" style="width: 6px; height: 6px; vertical-align: middle;"></span>
+                                        {{ __($m['name']) }}
+                                    </td>
+                                    <td class="text-end text-muted font-monospace">
+                                        {{ number_format($m['hotspot'], 2) }}
+                                    </td>
+                                    <td class="text-end text-muted font-monospace">
+                                        {{ number_format($m['pppoe'], 2) }}
+                                    </td>
+                                    @if(!empty($revenueReport['summary']['is_super_admin']))
+                                        <td class="text-end text-muted font-monospace">
+                                            {{ number_format($m['subscription'] ?? 0, 2) }}
+                                        </td>
+                                    @endif
+                                    <td class="text-end pe-3 fw-semibold text-dark font-monospace">
+                                        KES {{ number_format($m['total'], 2) }}
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot class="table-light border-top border-2">
+                                <tr class="fw-bold">
+                                    <td class="ps-3 text-uppercase text-dark">{{ __('Annual Total') }}</td>
+                                    <td class="text-end text-primary font-monospace">KES {{ number_format($revenueReport['summary']['hotspot'], 2) }}</td>
+                                    <td class="text-end text-info font-monospace">KES {{ number_format($revenueReport['summary']['pppoe'], 2) }}</td>
+                                    @if(!empty($revenueReport['summary']['is_super_admin']))
+                                        <td class="text-end text-warning font-monospace">KES {{ number_format($revenueReport['summary']['subscription'] ?? 0, 2) }}</td>
+                                    @endif
+                                    <td class="text-end pe-3 text-success font-monospace fs-6">KES {{ number_format($revenueReport['summary']['total'], 2) }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+                @endif
             </x-ui.card>
         </div>
     </div>

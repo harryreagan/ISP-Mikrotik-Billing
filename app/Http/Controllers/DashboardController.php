@@ -24,8 +24,17 @@ class DashboardController extends Controller
         }
 
         $results = [];
-        $currentYear = Carbon::now()->year;
-        $previousYear = Carbon::now()->subYear()->year;
+        $selectedYear = (int) (request('year') ?: Carbon::now()->year);
+        $currentYear = $selectedYear;
+        $previousYear = $currentYear - 1;
+        $availableYears = [2024, 2025, 2026, 2027];
+
+        $user = auth()->user();
+        $isSuperAdmin = ($user && in_array(strtolower($user->role ?? ''), ['superadmin', 'super_admin'])) || ($user && empty($user->tenant_id));
+        $scopedTenantId = $isSuperAdmin ? null : (int) ($user->tenant_id ?: 1);
+
+        // Fetch unified, reconciled revenue from IspRevenueService (single source of truth)
+        $revenueReport = \App\Services\IspRevenueService::getRevenueReport($scopedTenantId, $selectedYear);
 
         // Default resilient data structures
         $customersData = [
@@ -165,15 +174,19 @@ class DashboardController extends Controller
                 }
 
                 $billInformationData = [
-                    'monthly_rent' => (float) ($billingStats->monthly_rent ?? 0),
-                    'previous_due' => -1 * (float) ($billingStats->previous_due_active ?? 0),
-                    'advance' => (float) ($billingStats->advance ?? 0),
-                    'paid_amount' => (float) ($billingStats->paid_amount ?? 0),
-                    'today_paid_amount' => (float) $todayPaid,
-                    'hotspot_total' => $hotspotTotal,
-                    'hotspot_today' => $hotspotToday,
-                    'due_amount' => -1 * (float) ($billingStats->due_amount_active ?? 0),
-                    'by_status' => $billingByStatus,
+                    'monthly_rent'         => (float) ($billingStats->monthly_rent ?? 0),
+                    'previous_due'         => -1 * (float) ($billingStats->previous_due_active ?? 0),
+                    'advance'              => (float) ($billingStats->advance ?? 0),
+                    'paid_amount'          => $revenueReport['pppoe_revenue'],
+                    'today_paid_amount'    => $revenueReport['today_pppoe'],
+                    'hotspot_total'        => $revenueReport['hotspot_revenue'],
+                    'hotspot_today'        => $revenueReport['today_hotspot'],
+                    'subscription_revenue' => $revenueReport['subscription_revenue'],
+                    'total_revenue'        => $revenueReport['total_revenue'],
+                    'due_amount'           => -1 * (float) ($billingStats->due_amount_active ?? 0),
+                    'by_status'            => $billingByStatus,
+                    'year'                 => $selectedYear,
+                    'is_super_admin'       => $isSuperAdmin,
                 ];
             } elseif (Schema::hasTable('payment_transactions')) {
                 $totalPaid = (float) DB::table('payment_transactions')->sum('amount');
@@ -208,47 +221,19 @@ class DashboardController extends Controller
             }
         } catch (\Throwable $e) {}
 
-        // 4. Monthly Results Initialization
+        // 4. Monthly Results Initialization (strictly reconciled from raw payment ledgers)
         for ($month = 1; $month <= 12; $month++) {
+            $mTot = (float) ($revenueReport['monthly'][$month]['total'] ?? 0.0);
             $results[$month] = [
                 'cashflow_previous_year' => 0.0,
-                'income_current_year' => 0.0,
-                'revenue_difference' => 0.0,
+                'income_current_year'    => $mTot,
+                'revenue_difference'     => $mTot,
+                'hotspot'                => (float) ($revenueReport['monthly'][$month]['hotspot'] ?? 0.0),
+                'pppoe'                  => (float) ($revenueReport['monthly'][$month]['pppoe'] ?? 0.0),
+                'subscriptions'          => (float) ($revenueReport['monthly'][$month]['subscriptions'] ?? 0.0),
+                'name'                   => $revenueReport['monthly'][$month]['name'] ?? "Month {$month}",
             ];
         }
-
-        try {
-            if (Schema::hasTable('collection_summaries')) {
-                $isSqlite = config('database.default') === 'sqlite';
-                $monthExpr = $isSqlite ? "CAST(strftime('%m', collection_date) AS INTEGER)" : 'MONTH(collection_date)';
-                $collectionsCurrentYear = CollectionSummary::whereYear('collection_date', $currentYear)
-                    ->selectRaw("{$monthExpr} as month, SUM(collection_amount) as total")
-                    ->groupBy('month')
-                    ->pluck('total', 'month')
-                    ->toArray();
-
-                foreach ($collectionsCurrentYear as $m => $tot) {
-                    if (isset($results[$m])) {
-                        $results[$m]['income_current_year'] = (float) $tot;
-                        $results[$m]['revenue_difference'] = (float) $tot;
-                    }
-                }
-            } elseif (Schema::hasTable('payment_transactions')) {
-                $monthlyPayments = DB::table('payment_transactions')
-                    ->whereYear('created_at', $currentYear)
-                    ->selectRaw('MONTH(created_at) as month, SUM(amount) as total')
-                    ->groupBy('month')
-                    ->pluck('total', 'month')
-                    ->toArray();
-
-                foreach ($monthlyPayments as $m => $tot) {
-                    if (isset($results[$m])) {
-                        $results[$m]['income_current_year'] = (float) $tot;
-                        $results[$m]['revenue_difference'] = (float) $tot;
-                    }
-                }
-            }
-        } catch (\Throwable $e) {}
 
         $systemOverview = [];
 
@@ -387,6 +372,6 @@ class DashboardController extends Controller
             }
         } catch (\Throwable $e) {}
 
-        return view('dashboard', compact('results', 'customersData', 'billInformationData', 'systemOverview', 'resellerData'));
+        return view('dashboard', compact('results', 'customersData', 'billInformationData', 'systemOverview', 'resellerData', 'revenueReport', 'selectedYear', 'availableYears'));
     }
 }

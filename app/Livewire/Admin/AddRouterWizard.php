@@ -612,21 +612,21 @@ ROUTERSCRIPT;
         }
 
         // 3. Hotspot Configuration (if hotspot ports assigned)
-        $hsBridgeName = 'bridge-hotspot';
+        $hsBridgeName = 'hs-bridge';
         try {
             if (!empty($hotspotPorts)) {
-                // Check if bridge-hotspot exists or legacy hs-bridge
+                // Check if hs-bridge exists or legacy bridge-hotspot
                 $existingBridge = $api->executeCommand('/interface/bridge/print', [], ['name' => $hsBridgeName]);
                 if (empty($existingBridge) || !is_array($existingBridge)) {
-                    $existingBridgeLegacy = $api->executeCommand('/interface/bridge/print', [], ['name' => 'hs-bridge']);
+                    $existingBridgeLegacy = $api->executeCommand('/interface/bridge/print', [], ['name' => 'bridge-hotspot']);
                     if (!empty($existingBridgeLegacy) && is_array($existingBridgeLegacy)) {
-                        $hsBridgeName = 'hs-bridge';
+                        $hsBridgeName = 'bridge-hotspot';
                     } else {
                         $api->executeCommand('/interface/bridge/add', ['name' => $hsBridgeName, 'comment' => 'HSmart Hotspot Bridge']);
                     }
                 }
 
-                // Add ports to bridge
+                // Add configured hotspot ports to bridge
                 foreach ($hotspotPorts as $hPort) {
                     $existingPort = $api->executeCommand('/interface/bridge/port/print', [], ['bridge' => $hsBridgeName, 'interface' => $hPort]);
                     if (empty($existingPort) || !is_array($existingPort)) {
@@ -634,38 +634,76 @@ ROUTERSCRIPT;
                     }
                 }
 
-                // IP Address on Bridge
+                // Auto-bridge built-in Wireless interfaces (wlan1, wlan2, wifi1, wifi2) so internal Wi-Fi works seamlessly
+                try {
+                    $allIfaces = $api->executeCommand('/interface/print');
+                    if (is_array($allIfaces)) {
+                        foreach ($allIfaces as $i) {
+                            $iName = $i['name'] ?? '';
+                            $iType = $i['type'] ?? '';
+                            if (in_array($iType, ['wlan', 'wifi']) || str_starts_with($iName, 'wlan') || str_starts_with($iName, 'wifi')) {
+                                try {
+                                    $api->executeCommand('/interface/set', ['disabled' => 'no'], ['.id' => $i['.id']]);
+                                } catch (\Throwable $e) {}
+                                $existingWlan = $api->executeCommand('/interface/bridge/port/print', [], ['bridge' => $hsBridgeName, 'interface' => $iName]);
+                                if (empty($existingWlan) || !is_array($existingWlan)) {
+                                    $api->executeCommand('/interface/bridge/port/add', ['bridge' => $hsBridgeName, 'interface' => $iName, 'comment' => 'hsmart-wifi-port']);
+                                }
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {}
+
+                // IP Address on Bridge (10.180.0.1/22 - generous pool avoiding WireGuard 10.10.x collision)
                 $existingIp = $api->executeCommand('/ip/address/print', [], ['interface' => $hsBridgeName]);
                 if (empty($existingIp) || !is_array($existingIp)) {
-                    $api->executeCommand('/ip/address/add', ['address' => '10.10.0.1/22', 'network' => '10.10.0.0', 'interface' => $hsBridgeName, 'comment' => 'HSmart Hotspot Subnet']);
+                    $api->executeCommand('/ip/address/add', ['address' => '10.180.0.1/22', 'network' => '10.180.0.0', 'interface' => $hsBridgeName, 'comment' => 'HSmart Hotspot Subnet']);
                 }
 
-                // IP Pool
-                $existingPool = $api->executeCommand('/ip/pool/print', [], ['name' => 'hs-pool']);
+                // IP Pool (1,014 usable addresses to prevent randomized MAC pool exhaustion)
+                $existingPool = $api->executeCommand('/ip/pool/print', [], ['name' => 'hs-pool-10']);
                 if (empty($existingPool) || !is_array($existingPool)) {
-                    $api->executeCommand('/ip/pool/add', ['name' => 'hs-pool', 'ranges' => '10.10.0.10-10.10.3.250']);
+                    $api->executeCommand('/ip/pool/add', ['name' => 'hs-pool-10', 'ranges' => '10.180.0.10-10.180.3.254']);
                 }
 
                 // DHCP Server & Network
-                $existingDhcpSrv = $api->executeCommand('/ip/dhcp-server/print', [], ['name' => 'hs-dhcp']);
+                $existingDhcpSrv = $api->executeCommand('/ip/dhcp-server/print', [], ['name' => 'hs-dhcp-10']);
                 if (empty($existingDhcpSrv) || !is_array($existingDhcpSrv)) {
-                    $api->executeCommand('/ip/dhcp-server/add', ['name' => 'hs-dhcp', 'interface' => $hsBridgeName, 'address-pool' => 'hs-pool', 'disabled' => 'no']);
+                    $api->executeCommand('/ip/dhcp-server/add', ['name' => 'hs-dhcp-10', 'interface' => $hsBridgeName, 'address-pool' => 'hs-pool-10', 'lease-time' => '1h', 'disabled' => 'no']);
                 }
 
-                $existingNet = $api->executeCommand('/ip/dhcp-server/network/print', [], ['address' => '10.10.0.0/22']);
+                $existingNet = $api->executeCommand('/ip/dhcp-server/network/print', [], ['address' => '10.180.0.0/22']);
                 if (empty($existingNet) || !is_array($existingNet)) {
-                    $api->executeCommand('/ip/dhcp-server/network/add', ['address' => '10.10.0.0/22', 'gateway' => '10.10.0.1', 'dns-server' => '8.8.8.8,1.1.1.1']);
+                    $api->executeCommand('/ip/dhcp-server/network/add', ['address' => '10.180.0.0/22', 'gateway' => '10.180.0.1', 'dns-server' => '10.180.0.1,1.1.1.1,8.8.8.8']);
                 }
 
                 // Hotspot Profile & Server
-                $existingHsProf = $api->executeCommand('/ip/hotspot/profile/print', [], ['name' => 'hsmart-profile']);
+                $existingHsProf = $api->executeCommand('/ip/hotspot/profile/print', [], ['name' => 'hsmart-hsprof']);
                 if (empty($existingHsProf) || !is_array($existingHsProf)) {
-                    $api->executeCommand('/ip/hotspot/profile/add', ['name' => 'hsmart-profile', 'hotspot-address' => '10.10.0.1', 'dns-name' => 'wifi.login', 'login-by' => 'http-chap,http-pap']);
+                    $api->executeCommand('/ip/hotspot/profile/add', ['name' => 'hsmart-hsprof', 'hotspot-address' => '10.180.0.1', 'dns-name' => 'hotspot.hsmart.lan', 'login-by' => 'http-chap,http-pap,cookie,mac-cookie']);
                 }
 
-                $existingHsSrv = $api->executeCommand('/ip/hotspot/print', [], ['name' => 'hs-server']);
+                $existingHsSrv = $api->executeCommand('/ip/hotspot/print', [], ['name' => 'hsmart-hotspot']);
                 if (empty($existingHsSrv) || !is_array($existingHsSrv)) {
-                    $api->executeCommand('/ip/hotspot/add', ['name' => 'hs-server', 'interface' => $hsBridgeName, 'profile' => 'hsmart-profile', 'address-pool' => 'hs-pool', 'disabled' => 'no']);
+                    $api->executeCommand('/ip/hotspot/add', ['name' => 'hsmart-hotspot', 'interface' => $hsBridgeName, 'profile' => 'hsmart-hsprof', 'address-pool' => 'hs-pool-10', 'disabled' => 'no']);
+                }
+
+                // NAT Masquerade
+                $existingNat = $api->executeCommand('/ip/firewall/nat/print', [], ['comment' => 'hsmart-hotspot-masq']);
+                if (empty($existingNat) || !is_array($existingNat)) {
+                    $api->executeCommand('/ip/firewall/nat/add', ['chain' => 'srcnat', 'action' => 'masquerade', 'src-address' => '10.180.0.0/22', 'comment' => 'hsmart-hotspot-masq']);
+                }
+
+                // Walled Garden for Payments
+                $wgDomains = ['*.hsmart.co.ke', 'isp.hsmart.co.ke', 'pos.hsmart.co.ke', '*.payhero.co.ke', 'payhero.co.ke', '*.safaricom.co.ke', 'safaricom.co.ke', 'daraja.safaricom.co.ke', '*.kopokopo.com', 'kopokopo.com', 'api.kopokopo.com'];
+                $existingWg = $api->executeCommand('/ip/hotspot/walled-garden/print');
+                $wgHosts = is_array($existingWg) ? array_column($existingWg, 'dst-host') : [];
+                foreach ($wgDomains as $dom) {
+                    if (!in_array($dom, $wgHosts)) {
+                        try {
+                            $api->executeCommand('/ip/hotspot/walled-garden/add', ['dst-host' => $dom, 'action' => 'allow']);
+                        } catch (\Throwable $e) {}
+                    }
                 }
 
                 $this->checklist['hotspot']['status'] = 'done';

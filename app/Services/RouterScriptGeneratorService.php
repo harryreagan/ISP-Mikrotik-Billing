@@ -119,9 +119,13 @@ class RouterScriptGeneratorService
         $lines[] = ":do { /ip service set api port=8728 } on-error={};";
         $lines[] = "";
 
-        // 5. DNS Resolvers
+        // 5. DNS Resolvers & Captive Detection Domain Support
         $lines[] = "# --- 5. DNS Resolvers ---";
         $lines[] = ":do { /ip dns set allow-remote-requests=yes servers=1.1.1.1,8.8.8.8,1.0.0.1 } on-error={};";
+        $lines[] = ":do {";
+        $lines[] = "    :if ([:len [/ip dns static find name=\"hotspot.hsmart.lan\"]] = 0) do={ /ip dns static add name=\"hotspot.hsmart.lan\" address=10.180.0.1 comment=\"HSmart Hotspot Portal\" };";
+        $lines[] = "    :if ([:len [/ip dns static find name=\"wifi.login\"]] = 0) do={ /ip dns static add name=\"wifi.login\" address=10.180.0.1 comment=\"HSmart Hotspot Portal Alias\" };";
+        $lines[] = "} on-error={};";
         $lines[] = "";
 
         // 6. Automated Hotspot, Built-In Wi-Fi Bridge & Captive Portal Provisioning
@@ -134,14 +138,21 @@ class RouterScriptGeneratorService
         $lines[] = "    :do { :if ([:len [/interface list find name=LAN]] > 0 && [:len [/interface list member find list=LAN interface=hs-bridge]] = 0) do={ /interface list member add list=LAN interface=hs-bridge } } on-error={};";
         $lines[] = "    :if ([:len [/interface find name=ether2]] > 0) do={";
         $lines[] = "        :if ([:len [/interface bridge port find interface=ether2]] = 0) do={";
-        $lines[] = "            /interface bridge port add bridge=hs-bridge interface=ether2";
+        $lines[] = "            /interface bridge port add bridge=hs-bridge interface=ether2 comment=\"hsmart-hotspot-port\"";
         $lines[] = "        } else={";
         $lines[] = "            /interface bridge port set [find interface=ether2] bridge=hs-bridge disabled=no";
         $lines[] = "        }";
         $lines[] = "    }";
+        $lines[] = "    :if ([:len [/interface find name=ether3]] > 0) do={";
+        $lines[] = "        :if ([:len [/interface bridge port find interface=ether3]] = 0) do={";
+        $lines[] = "            /interface bridge port add bridge=hs-bridge interface=ether3 comment=\"hsmart-hotspot-port\"";
+        $lines[] = "        } else={";
+        $lines[] = "            /interface bridge port set [find interface=ether3] bridge=hs-bridge disabled=no";
+        $lines[] = "        }";
+        $lines[] = "    }";
         $lines[] = "    :if ([:len [/interface find name=ether4]] > 0) do={";
         $lines[] = "        :if ([:len [/interface bridge port find interface=ether4]] = 0) do={";
-        $lines[] = "            /interface bridge port add bridge=hs-bridge interface=ether4";
+        $lines[] = "            /interface bridge port add bridge=hs-bridge interface=ether4 comment=\"hsmart-hotspot-port\"";
         $lines[] = "        } else={";
         $lines[] = "            /interface bridge port set [find interface=ether4] bridge=hs-bridge disabled=no";
         $lines[] = "        }";
@@ -192,30 +203,44 @@ class RouterScriptGeneratorService
             $lines[] = "} on-error={};";
         }
         $lines[] = "";
+        // Determine Hotspot Subnet & Pool (Generous /22 pool: 1,014 IPs to prevent randomized MAC pool exhaustion)
+        $hsIp = '10.180.0.1';
+        $hsNet = '10.180.0.0/22';
+        $hsPoolRanges = '10.180.0.10-10.180.3.254';
+
         $lines[] = ":do {";
         $lines[] = "    :if ([:len [/ip address find comment=\"hsmart-hotspot\"]] = 0) do={";
-        $lines[] = "        /ip address add address=10.5.50.1/24 interface=hs-bridge comment=\"hsmart-hotspot\"";
+        $lines[] = "        /ip address add address={$hsIp}/22 interface=hs-bridge comment=\"hsmart-hotspot\"";
         $lines[] = "    } else={";
-        $lines[] = "        /ip address set [find comment=\"hsmart-hotspot\"] address=10.5.50.1/24 interface=hs-bridge disabled=no";
+        $lines[] = "        /ip address set [find comment=\"hsmart-hotspot\"] address={$hsIp}/22 interface=hs-bridge disabled=no";
         $lines[] = "    }";
         $lines[] = "    :if ([:len [/ip pool find name=hs-pool-10]] = 0) do={";
-        $lines[] = "        /ip pool add name=hs-pool-10 ranges=10.5.50.10-10.5.50.254";
+        $lines[] = "        /ip pool add name=hs-pool-10 ranges={$hsPoolRanges}";
+        $lines[] = "    } else={";
+        $lines[] = "        /ip pool set [find name=hs-pool-10] ranges={$hsPoolRanges}";
         $lines[] = "    }";
-        $lines[] = "    :if ([:len [/ip dhcp-server network find address=\"10.5.50.0/24\"]] = 0) do={";
-        $lines[] = "        /ip dhcp-server network add address=10.5.50.0/24 gateway=10.5.50.1 dns-server=10.5.50.1,8.8.8.8 comment=\"hsmart-hotspot\"";
+        $lines[] = "    :if ([:len [/ip dhcp-server network find address=\"{$hsNet}\"]] = 0) do={";
+        $lines[] = "        /ip dhcp-server network add address={$hsNet} gateway={$hsIp} dns-server={$hsIp},1.1.1.1,8.8.8.8 comment=\"hsmart-hotspot\"";
+        $lines[] = "    } else={";
+        $lines[] = "        /ip dhcp-server network set [find address=\"{$hsNet}\"] gateway={$hsIp} dns-server={$hsIp},1.1.1.1,8.8.8.8";
         $lines[] = "    }";
         $lines[] = "    :if ([:len [/ip dhcp-server find name=hs-dhcp-10]] = 0) do={";
         $lines[] = "        /ip dhcp-server add name=hs-dhcp-10 interface=hs-bridge address-pool=hs-pool-10 lease-time=1h disabled=no";
         $lines[] = "    } else={";
-        $lines[] = "        /ip dhcp-server set [find name=hs-dhcp-10] interface=hs-bridge address-pool=hs-pool-10 disabled=no";
+        $lines[] = "        /ip dhcp-server set [find name=hs-dhcp-10] interface=hs-bridge address-pool=hs-pool-10 lease-time=1h disabled=no";
+        $lines[] = "    }";
+        $lines[] = "    :if ([:len [/ip dhcp-server alert find interface=hs-bridge]] = 0) do={";
+        $lines[] = "        /ip dhcp-server alert add interface=hs-bridge valid-server=hs-dhcp-10 disabled=no alert-timeout=1m comment=\"hsmart-rogue-dhcp-alert\"";
         $lines[] = "    }";
         $lines[] = "    :if ([:len [/ip firewall nat find comment=\"hsmart-hotspot-masq\"]] = 0) do={";
-        $lines[] = "        /ip firewall nat add chain=srcnat action=masquerade src-address=10.5.50.0/24 comment=\"hsmart-hotspot-masq\"";
+        $lines[] = "        /ip firewall nat add chain=srcnat action=masquerade src-address={$hsNet} comment=\"hsmart-hotspot-masq\"";
+        $lines[] = "    } else={";
+        $lines[] = "        /ip firewall nat set [find comment=\"hsmart-hotspot-masq\"] src-address={$hsNet} action=masquerade";
         $lines[] = "    }";
         $lines[] = "    :if ([:len [/ip hotspot profile find name=hsmart-hsprof]] = 0) do={";
-        $lines[] = "        /ip hotspot profile add name=hsmart-hsprof hotspot-address=10.5.50.1 dns-name=hotspot.hsmart.lan html-directory=hotspot login-by=http-pap,http-chap,cookie,mac-cookie";
+        $lines[] = "        /ip hotspot profile add name=hsmart-hsprof hotspot-address={$hsIp} dns-name=hotspot.hsmart.lan html-directory=hotspot login-by=http-pap,http-chap,cookie,mac-cookie";
         $lines[] = "    } else={";
-        $lines[] = "        /ip hotspot profile set [find name=hsmart-hsprof] hotspot-address=10.5.50.1 dns-name=hotspot.hsmart.lan html-directory=hotspot login-by=http-pap,http-chap,cookie,mac-cookie";
+        $lines[] = "        /ip hotspot profile set [find name=hsmart-hsprof] hotspot-address={$hsIp} dns-name=hotspot.hsmart.lan html-directory=hotspot login-by=http-pap,http-chap,cookie,mac-cookie";
         $lines[] = "    }";
         $lines[] = "    :if ([:len [/ip hotspot find name=hsmart-hotspot]] = 0) do={";
         $lines[] = "        /ip hotspot add name=hsmart-hotspot interface=hs-bridge profile=hsmart-hsprof address-pool=hs-pool-10 addresses-per-mac=10 disabled=no";
@@ -224,12 +249,19 @@ class RouterScriptGeneratorService
         $lines[] = "    }";
         $lines[] = "} on-error={};";
         $lines[] = "";
-        $lines[] = "# --- Walled Garden & Secondary AP (Tenda/TP-Link) ICMP Bypass ---";
+        $lines[] = "# --- Walled Garden & Payment Gateway Access (PayHero, Safaricom, KopoKopo) ---";
         $lines[] = ":do {";
         $lines[] = "    :if ([:len [/ip hotspot walled-garden find dst-host=\"*.hsmart.co.ke\"]] = 0) do={ /ip hotspot walled-garden add dst-host=\"*.hsmart.co.ke\" action=allow };";
         $lines[] = "    :if ([:len [/ip hotspot walled-garden find dst-host=\"isp.hsmart.co.ke\"]] = 0) do={ /ip hotspot walled-garden add dst-host=\"isp.hsmart.co.ke\" action=allow };";
+        $lines[] = "    :if ([:len [/ip hotspot walled-garden find dst-host=\"pos.hsmart.co.ke\"]] = 0) do={ /ip hotspot walled-garden add dst-host=\"pos.hsmart.co.ke\" action=allow };";
         $lines[] = "    :if ([:len [/ip hotspot walled-garden find dst-host=\"*.payhero.co.ke\"]] = 0) do={ /ip hotspot walled-garden add dst-host=\"*.payhero.co.ke\" action=allow };";
+        $lines[] = "    :if ([:len [/ip hotspot walled-garden find dst-host=\"payhero.co.ke\"]] = 0) do={ /ip hotspot walled-garden add dst-host=\"payhero.co.ke\" action=allow };";
         $lines[] = "    :if ([:len [/ip hotspot walled-garden find dst-host=\"*.safaricom.co.ke\"]] = 0) do={ /ip hotspot walled-garden add dst-host=\"*.safaricom.co.ke\" action=allow };";
+        $lines[] = "    :if ([:len [/ip hotspot walled-garden find dst-host=\"safaricom.co.ke\"]] = 0) do={ /ip hotspot walled-garden add dst-host=\"safaricom.co.ke\" action=allow };";
+        $lines[] = "    :if ([:len [/ip hotspot walled-garden find dst-host=\"daraja.safaricom.co.ke\"]] = 0) do={ /ip hotspot walled-garden add dst-host=\"daraja.safaricom.co.ke\" action=allow };";
+        $lines[] = "    :if ([:len [/ip hotspot walled-garden find dst-host=\"*.kopokopo.com\"]] = 0) do={ /ip hotspot walled-garden add dst-host=\"*.kopokopo.com\" action=allow };";
+        $lines[] = "    :if ([:len [/ip hotspot walled-garden find dst-host=\"kopokopo.com\"]] = 0) do={ /ip hotspot walled-garden add dst-host=\"kopokopo.com\" action=allow };";
+        $lines[] = "    :if ([:len [/ip hotspot walled-garden find dst-host=\"api.kopokopo.com\"]] = 0) do={ /ip hotspot walled-garden add dst-host=\"api.kopokopo.com\" action=allow };";
         $lines[] = "    :if ([:len [/ip hotspot walled-garden ip find dst-address=\"{$serverHost}\"]] = 0) do={ /ip hotspot walled-garden ip add dst-address=\"{$serverHost}\" action=accept comment=\"hsmart-cloud-ip\" };";
         $lines[] = "    :if ([:len [/ip hotspot walled-garden ip find comment=\"hsmart-allow-ap-icmp-check\"]] = 0) do={ /ip hotspot walled-garden ip add protocol=icmp action=accept comment=\"hsmart-allow-ap-icmp-check\" };";
         $lines[] = "    :if ([:len [/ip firewall filter find comment=\"hsmart-ap-icmp-allow\"]] = 0) do={ /ip firewall filter add chain=pre-hotspot protocol=icmp action=accept comment=\"hsmart-ap-icmp-allow\" };";

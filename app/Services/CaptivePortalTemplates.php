@@ -385,23 +385,62 @@ function normalizeKenyanPhone(phone) {
 }
 
 function handleVoucherSubmit(e) {
+    e.preventDefault();
     const codeInput = document.getElementById('voucherCodeInput');
     const passInput = document.getElementById('voucherPassInput');
     const form = document.getElementById('voucherLoginForm');
+    const submitBtn = document.getElementById('voucherSubmitBtn');
+
     if (!codeInput || !codeInput.value.trim()) {
-        e.preventDefault();
-        showStatus('Please enter a valid Voucher or M-Pesa Receipt Code.', 'error');
+        showStatus('Please enter your Mobile Number, Voucher, or M-Pesa Receipt Code.', 'error');
         return false;
     }
-    const code = codeInput.value.trim().toUpperCase();
-    codeInput.value = code;
-    if (passInput) passInput.value = code;
+    const rawCode = codeInput.value.trim();
+    if (submitBtn) submitBtn.disabled = true;
+    showStatus('Verifying credentials...', 'success');
 
-    const currentAction = form.getAttribute('action') || '';
-    if (currentAction.startsWith('$(') || !currentAction) {
-        form.setAttribute('action', linkLoginOnly);
-    }
-    return true;
+    const payload = {
+        code: rawCode,
+        mac: clientMac,
+        ip: clientIp,
+        router_id: '{$routerId}',
+        tenant_id: '{$tenantId}'
+    };
+
+    fetch(apiBase + '/api/portal/returning-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (submitBtn) submitBtn.disabled = false;
+        if (res && res.status === 'active') {
+            autoConnectHotspot(res.username || res.voucher_code, res.password || res.username || res.voucher_code);
+        } else if (res && res.status === 'expired') {
+            showStatus('⚠️ ' + (res.message || 'Package expired. Please select a plan to renew.'), 'error');
+        } else {
+            codeInput.value = rawCode.toUpperCase();
+            if (passInput) passInput.value = rawCode.toUpperCase();
+            const currentAction = form.getAttribute('action') || '';
+            if (currentAction.startsWith('$(') || !currentAction) {
+                form.setAttribute('action', linkLoginOnly);
+            }
+            form.submit();
+        }
+    })
+    .catch(() => {
+        if (submitBtn) submitBtn.disabled = false;
+        codeInput.value = rawCode.toUpperCase();
+        if (passInput) passInput.value = rawCode.toUpperCase();
+        const currentAction = form.getAttribute('action') || '';
+        if (currentAction.startsWith('$(') || !currentAction) {
+            form.setAttribute('action', linkLoginOnly);
+        }
+        form.submit();
+    });
+
+    return false;
 }
 
 function autoConnectHotspot(voucherCode, password) {
@@ -457,7 +496,7 @@ function startPaymentPolling(checkoutId, merchantRef, phone) {
             tenant_id: '{$tenantId}',
             router_id: '{$routerId}'
         });
-        fetch(apiBase + '/api/payment/daraja/status?' + q.toString(), {
+        fetch(apiBase + '/api/payment/status?' + q.toString(), {
             headers: { 'Accept': 'application/json' }
         })
         .then(r => r.json())
@@ -506,7 +545,7 @@ function handleMpesaPayment(e) {
         ip: clientIp
     };
 
-    fetch(apiBase + '/api/payment/daraja/stk-push', {
+    fetch(apiBase + '/api/payment/stk-push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify(payload)
@@ -554,6 +593,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (act.startsWith('$(')) {
             form.setAttribute('action', linkLoginOnly);
         }
+    }
+
+    // Auto-reconnect returning users via MAC session lookup
+    if (clientMac) {
+        fetch(apiBase + '/api/portal/check-session?mac=' + encodeURIComponent(clientMac) + '&tenant_id={$tenantId}&router_id={$routerId}', {
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res && res.status === 'active') {
+                showStatus('Welcome back! Reconnecting your device...', 'success');
+                autoConnectHotspot(res.username || res.voucher_code, res.password || res.username || res.voucher_code);
+            }
+        })
+        .catch(() => {});
     }
 });
 </script>

@@ -40,6 +40,7 @@ Schedule::call(function () {
 
 Schedule::command('isp:lifecycle-automations')->everyMinute()->withoutOverlapping();
 Schedule::command('isp:check-router-offline-alerts')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('isp:check-portal-health')->everyFifteenMinutes()->withoutOverlapping();
 
 Schedule::call(function () {
     Artisan::call('app:expire-realtime-hotspot-users');
