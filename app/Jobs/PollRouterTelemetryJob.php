@@ -46,8 +46,8 @@ class PollRouterTelemetryJob implements ShouldQueue
         }
 
         $port = (int) ($router->api_port ?: 8728);
-        $user = $router->username ?: 'admin';
-        $pass = $router->password ?: '';
+        $user = $router->api_user ?: ($router->username ?: 'admin');
+        $pass = $this->decryptRouterPassword($router->api_password ?: $router->password);
 
         try {
             $api = new MikrotikApiService($host, $port, $user, $pass, 3);
@@ -109,15 +109,24 @@ class PollRouterTelemetryJob implements ShouldQueue
                     'created_at'     => now(),
                 ]);
 
-                // 7. Resolve any pending offline alert
-                DB::table('isp_router_alerts')
+                // 7. Resolve any pending offline alert and notify recovery
+                $existingAlert = DB::table('isp_router_alerts')
                     ->where('router_id', $router->id)
                     ->where('alert_type', 'offline')
                     ->where('is_resolved', false)
-                    ->update([
-                        'is_resolved' => true,
-                        'resolved_at' => now(),
-                    ]);
+                    ->first();
+
+                if ($existingAlert) {
+                    DB::table('isp_router_alerts')
+                        ->where('id', $existingAlert->id)
+                        ->update([
+                            'is_resolved' => true,
+                            'resolved_at' => now(),
+                            'updated_at'  => now(),
+                        ]);
+
+                    IspNotificationService::notifyAdminRouterRestored($router);
+                }
 
                 // 8. High CPU alert check (> 90%)
                 if ($cpuLoad >= 90) {
@@ -129,6 +138,28 @@ class PollRouterTelemetryJob implements ShouldQueue
         } catch (\Throwable $e) {
             $this->handleRouterOffline($router, $e->getMessage());
         }
+    }
+
+    protected function decryptRouterPassword(?string $encryptedVal): string
+    {
+        if (empty($encryptedVal)) return '';
+        $keys = [
+            'base64:OsvBUcJog9u3L7RHpAXOV3lAVumKIyCIOscxYwKXufQ=',
+            'base64:NSLTh+nKIi546KF1WfENeIVjjBvu0SSvE2kgyiFu7CE=',
+            'base64:motZaNhPAm6uv5uffwL6kbrJdtOu3qgrdgjtXarDoaU=',
+            'base64:CGygtTkIhnvb+mwr8Mv5j5DjDkgmbq9ej3mmKwHcS5g=',
+        ];
+        try {
+            return \Illuminate\Support\Facades\Crypt::decryptString($encryptedVal);
+        } catch (\Throwable $e) {}
+        foreach ($keys as $k) {
+            try {
+                $rawKey = base64_decode(substr($k, 7));
+                $enc = new \Illuminate\Encryption\Encrypter($rawKey, 'AES-256-CBC');
+                return $enc->decryptString($encryptedVal);
+            } catch (\Throwable $e) {}
+        }
+        return $encryptedVal;
     }
 
     protected function handleRouterOffline(Router $router, string $reason): void
@@ -149,49 +180,59 @@ class PollRouterTelemetryJob implements ShouldQueue
             ->where('is_resolved', false)
             ->first();
 
-        if ($existing) {
-            // Deduplicate: Don't alert more than once every 30 minutes
-            $lastAlerted = strtotime($existing->last_alerted_at);
-            if ((time() - $lastAlerted) < 1800) {
-                return;
+        if ($type === 'offline') {
+            if (!$existing) {
+                // 1st Alert: Immediate notification
+                DB::table('isp_router_alerts')->insert([
+                    'tenant_id'       => $router->tenant_id ?: 1,
+                    'router_id'       => $router->id,
+                    'alert_type'      => 'offline',
+                    'message'         => $message,
+                    'last_alerted_at' => now(),
+                    'alert_count'     => 1,
+                    'is_resolved'     => false,
+                    'created_at'      => now(),
+                    'updated_at'      => now(),
+                ]);
+
+                IspNotificationService::notifyAdminRouterOffline($router, 0);
+            } elseif ($existing->alert_count == 1) {
+                // 2nd Alert: 12-Hour Escalation Reminder
+                $hoursDown = \Carbon\Carbon::parse($existing->created_at)->diffInHours(now());
+                if ($hoursDown >= 12 && \Carbon\Carbon::parse($existing->last_alerted_at)->lte(now()->subHours(6))) {
+                    DB::table('isp_router_alerts')->where('id', $existing->id)->update([
+                        'alert_count'     => 2,
+                        'last_alerted_at' => now(),
+                        'message'         => "Router {$router->name} has been offline for 12+ hours since " . $existing->created_at,
+                        'updated_at'      => now(),
+                    ]);
+
+                    IspNotificationService::notifyAdminRouterOffline12hReminder($router, \Carbon\Carbon::parse($existing->created_at)->format('H:i, d M'));
+                }
             }
-
-            DB::table('isp_router_alerts')->where('id', $existing->id)->update([
-                'last_alerted_at' => now(),
-                'alert_count'     => $existing->alert_count + 1,
-            ]);
         } else {
-            DB::table('isp_router_alerts')->insert([
-                'tenant_id'       => $router->tenant_id ?: 1,
-                'router_id'       => $router->id,
-                'alert_type'      => $type,
-                'message'         => $message,
-                'last_alerted_at' => now(),
-                'alert_count'     => 1,
-                'is_resolved'     => false,
-                'created_at'      => now(),
-                'updated_at'      => now(),
-            ]);
-        }
-
-        // Notify ISP Admin via Part 1 notifications
-        $adminUser = DB::table('users')
-            ->where('tenant_id', $router->tenant_id)
-            ->where('role', 'admin')
-            ->first();
-
-        if ($adminUser) {
-            IspNotificationService::notify(
-                $router->tenant_id ?: 1,
-                'router_offline_alert',
-                [
-                    'router'       => $router->name,
-                    'downtime'     => now()->format('H:i'),
-                    'active_users' => 0,
-                ],
-                $adminUser->phone ?: $adminUser->mobile,
-                $adminUser->email
-            );
+            // General alerts (e.g. high_cpu)
+            if ($existing) {
+                if ((time() - strtotime($existing->last_alerted_at)) < 3600) {
+                    return;
+                }
+                DB::table('isp_router_alerts')->where('id', $existing->id)->update([
+                    'last_alerted_at' => now(),
+                    'alert_count'     => $existing->alert_count + 1,
+                ]);
+            } else {
+                DB::table('isp_router_alerts')->insert([
+                    'tenant_id'       => $router->tenant_id ?: 1,
+                    'router_id'       => $router->id,
+                    'alert_type'      => $type,
+                    'message'         => $message,
+                    'last_alerted_at' => now(),
+                    'alert_count'     => 1,
+                    'is_resolved'     => false,
+                    'created_at'      => now(),
+                    'updated_at'      => now(),
+                ]);
+            }
         }
     }
 }

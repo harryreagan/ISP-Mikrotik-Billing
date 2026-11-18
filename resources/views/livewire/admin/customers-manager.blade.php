@@ -137,7 +137,7 @@
                             $secret = $customer->pppUser;
                             $bill = $billings[$customer->customer_unique_id] ?? null;
                             $isSuspended = in_array($customer->status, ['disable', 'suspended', 'inactive']);
-                            $isExpired = $bill && $bill->auto_disable_date && Carbon::parse($bill->auto_disable_date)->isPast();
+                            $isExpired = $bill && $bill->auto_disable_date && \Carbon\Carbon::parse($bill->auto_disable_date)->isPast();
                             $dueAmount = $bill ? (float) ($bill->total_due_amount ?: $bill->due_amount) : 0;
                             $rent = $bill ? (float) $bill->monthly_rent : (float) ($customer->package->price ?? 0);
                         @endphp
@@ -203,7 +203,7 @@
                             {{-- Expiry / Due Date --}}
                             <td>
                                 @if($bill && $bill->auto_disable_date)
-                                    @php $exp = Carbon::parse($bill->auto_disable_date); @endphp
+                                    @php $exp = \Carbon\Carbon::parse($bill->auto_disable_date); @endphp
                                     <div class="small">
                                         <div class="fw-medium text-dark">{{ $exp->format('d M Y') }}</div>
                                         <div class="small {{ $exp->isPast() ? 'text-danger fw-semibold' : 'text-muted' }}">

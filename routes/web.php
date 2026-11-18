@@ -322,6 +322,8 @@ Route::middleware([
         Route::get('/admin/router-wizard', fn() => redirect()->route('admin.add-router'))->name('router-wizard');
         Route::get('/admin/sms-email', \App\Livewire\Admin\SmsEmailHub::class)->name('admin.sms-email');
         Route::get('/admin/sms-gateways', fn() => redirect()->route('admin.sms-email', ['tab' => 'gateways']))->name('admin.sms-gateways');
+        Route::get('/admin/notifications', \App\Livewire\Admin\NotificationSettingsManager::class)->name('admin.notifications');
+        Route::get('/notification-settings', fn() => redirect()->route('admin.notifications'))->name('notification-settings');
         Route::get('/sms', fn() => redirect()->route('admin.sms-email'))->name('sms-setup');
         Route::get('/payment-gateways', fn() => redirect()->route('admin.payment-gateways'));
         Route::get('/admin/portal-customizer', \App\Livewire\Admin\CaptivePortalCustomizer::class)->name('admin.portal-customizer');

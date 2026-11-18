@@ -37,6 +37,7 @@ Schedule::call(function () {
 })->name('poll-router-logs')->everyMinute()->withoutOverlapping();
 
 Schedule::command('isp:lifecycle-automations')->everyMinute()->withoutOverlapping();
+Schedule::command('isp:check-router-offline-alerts')->everyFiveMinutes()->withoutOverlapping();
 
 Schedule::call(function () {
     Artisan::call('app:expire-realtime-hotspot-users');

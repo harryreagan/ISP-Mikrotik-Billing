@@ -317,6 +317,14 @@
                     </div>
                 </a>
 
+                {{-- Notification & Alert Settings --}}
+                <a wire:navigate.hover wire:current="active" class="nav-link {{ request()->routeIs('admin.notifications') ? 'active' : '' }}" href="{{ route('admin.notifications') }}" role="button">
+                    <div class="d-flex align-items-center">
+                        <span class="nav-link-icon"><i class="bi bi-bell"></i></span>
+                        <span class="nav-link-text ps-1">{{ __('Notification Settings') }}</span>
+                    </div>
+                </a>
+
                 {{-- Reseller Setup --}}
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.resellers.index') }}" role="button">
                     <div class="d-flex align-items-center">
