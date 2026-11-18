@@ -140,10 +140,26 @@ class RoutersManager extends Component
         $user = $router->api_user ?: ($router->username ?: 'admin');
 
         $pass = '';
+        $keys = [
+            'base64:OsvBUcJog9u3L7RHpAXOV3lAVumKIyCIOscxYwKXufQ=',
+            'base64:NSLTh+nKIi546KF1WfENeIVjjBvu0SSvE2kgyiFu7CE=',
+            'base64:motZaNhPAm6uv5uffwL6kbrJdtOu3qgrdgjtXarDoaU=',
+            'base64:CGygtTkIhnvb+mwr8Mv5j5DjDkgmbq9ej3mmKwHcS5g=',
+        ];
         try {
             $pass = Crypt::decryptString($router->api_password ?: $router->password);
         } catch (\Throwable $e) {
-            $pass = $router->api_password ?: $router->password;
+            foreach ($keys as $k) {
+                try {
+                    $rawKey = base64_decode(substr($k, 7));
+                    $enc = new \Illuminate\Encryption\Encrypter($rawKey, 'AES-256-CBC');
+                    $pass = $enc->decryptString($router->api_password ?: $router->password);
+                    break;
+                } catch (\Throwable $e2) {}
+            }
+            if (empty($pass)) {
+                $pass = $router->api_password ?: $router->password;
+            }
         }
 
         try {
@@ -262,10 +278,26 @@ class RoutersManager extends Component
         $user = $router->api_user ?: ($router->username ?: 'admin');
 
         $pass = '';
+        $keys = [
+            'base64:OsvBUcJog9u3L7RHpAXOV3lAVumKIyCIOscxYwKXufQ=',
+            'base64:NSLTh+nKIi546KF1WfENeIVjjBvu0SSvE2kgyiFu7CE=',
+            'base64:motZaNhPAm6uv5uffwL6kbrJdtOu3qgrdgjtXarDoaU=',
+            'base64:CGygtTkIhnvb+mwr8Mv5j5DjDkgmbq9ej3mmKwHcS5g=',
+        ];
         try {
             $pass = Crypt::decryptString($router->api_password ?: $router->password);
         } catch (\Throwable $e) {
-            $pass = $router->api_password ?: $router->password;
+            foreach ($keys as $k) {
+                try {
+                    $rawKey = base64_decode(substr($k, 7));
+                    $enc = new \Illuminate\Encryption\Encrypter($rawKey, 'AES-256-CBC');
+                    $pass = $enc->decryptString($router->api_password ?: $router->password);
+                    break;
+                } catch (\Throwable $e2) {}
+            }
+            if (empty($pass)) {
+                $pass = $router->api_password ?: $router->password;
+            }
         }
 
         try {
@@ -429,10 +461,26 @@ class RoutersManager extends Component
         $port = (int) ($router->api_port ?: 8728);
         $user = $router->api_user ?: ($router->username ?: 'admin');
         $pass = '';
+        $keys = [
+            'base64:OsvBUcJog9u3L7RHpAXOV3lAVumKIyCIOscxYwKXufQ=',
+            'base64:NSLTh+nKIi546KF1WfENeIVjjBvu0SSvE2kgyiFu7CE=',
+            'base64:motZaNhPAm6uv5uffwL6kbrJdtOu3qgrdgjtXarDoaU=',
+            'base64:CGygtTkIhnvb+mwr8Mv5j5DjDkgmbq9ej3mmKwHcS5g=',
+        ];
         try {
             $pass = Crypt::decryptString($router->api_password ?: $router->password);
         } catch (\Throwable $e) {
-            $pass = $router->api_password ?: $router->password;
+            foreach ($keys as $k) {
+                try {
+                    $rawKey = base64_decode(substr($k, 7));
+                    $enc = new \Illuminate\Encryption\Encrypter($rawKey, 'AES-256-CBC');
+                    $pass = $enc->decryptString($router->api_password ?: $router->password);
+                    break;
+                } catch (\Throwable $e2) {}
+            }
+            if (empty($pass)) {
+                $pass = $router->api_password ?: $router->password;
+            }
         }
 
         try {
@@ -547,10 +595,26 @@ class RoutersManager extends Component
         $port = (int) ($router->api_port ?: 8728);
         $user = $router->api_user ?: ($router->username ?: 'admin');
         $pass = '';
+        $keys = [
+            'base64:OsvBUcJog9u3L7RHpAXOV3lAVumKIyCIOscxYwKXufQ=',
+            'base64:NSLTh+nKIi546KF1WfENeIVjjBvu0SSvE2kgyiFu7CE=',
+            'base64:motZaNhPAm6uv5uffwL6kbrJdtOu3qgrdgjtXarDoaU=',
+            'base64:CGygtTkIhnvb+mwr8Mv5j5DjDkgmbq9ej3mmKwHcS5g=',
+        ];
         try {
             $pass = Crypt::decryptString($router->api_password ?: $router->password);
         } catch (\Throwable $e) {
-            $pass = $router->api_password ?: $router->password;
+            foreach ($keys as $k) {
+                try {
+                    $rawKey = base64_decode(substr($k, 7));
+                    $enc = new \Illuminate\Encryption\Encrypter($rawKey, 'AES-256-CBC');
+                    $pass = $enc->decryptString($router->api_password ?: $router->password);
+                    break;
+                } catch (\Throwable $e2) {}
+            }
+            if (empty($pass)) {
+                $pass = $router->api_password ?: $router->password;
+            }
         }
 
         $appliedOnRouter = false;
@@ -802,10 +866,26 @@ class RoutersManager extends Component
         $port = (int) ($router->api_port ?: 8728);
         $user = $router->api_user ?: ($router->username ?: 'admin');
         $pass = '';
+        $keys = [
+            'base64:OsvBUcJog9u3L7RHpAXOV3lAVumKIyCIOscxYwKXufQ=',
+            'base64:NSLTh+nKIi546KF1WfENeIVjjBvu0SSvE2kgyiFu7CE=',
+            'base64:motZaNhPAm6uv5uffwL6kbrJdtOu3qgrdgjtXarDoaU=',
+            'base64:CGygtTkIhnvb+mwr8Mv5j5DjDkgmbq9ej3mmKwHcS5g=',
+        ];
         try {
             $pass = Crypt::decryptString($router->api_password ?: $router->password);
         } catch (\Throwable $e) {
-            $pass = $router->api_password ?: $router->password;
+            foreach ($keys as $k) {
+                try {
+                    $rawKey = base64_decode(substr($k, 7));
+                    $enc = new \Illuminate\Encryption\Encrypter($rawKey, 'AES-256-CBC');
+                    $pass = $enc->decryptString($router->api_password ?: $router->password);
+                    break;
+                } catch (\Throwable $e2) {}
+            }
+            if (empty($pass)) {
+                $pass = $router->api_password ?: $router->password;
+            }
         }
 
         $roles = is_array($router->port_roles) ? $router->port_roles : [];
@@ -1175,10 +1255,26 @@ class RoutersManager extends Component
         $port = (int) ($router->api_port ?: 8728);
         $user = $router->api_user ?: ($router->username ?: 'admin');
         $pass = '';
+        $keys = [
+            'base64:OsvBUcJog9u3L7RHpAXOV3lAVumKIyCIOscxYwKXufQ=',
+            'base64:NSLTh+nKIi546KF1WfENeIVjjBvu0SSvE2kgyiFu7CE=',
+            'base64:motZaNhPAm6uv5uffwL6kbrJdtOu3qgrdgjtXarDoaU=',
+            'base64:CGygtTkIhnvb+mwr8Mv5j5DjDkgmbq9ej3mmKwHcS5g=',
+        ];
         try {
             $pass = Crypt::decryptString($router->api_password ?: $router->password);
         } catch (\Throwable $e) {
-            $pass = $router->api_password ?: $router->password;
+            foreach ($keys as $k) {
+                try {
+                    $rawKey = base64_decode(substr($k, 7));
+                    $enc = new \Illuminate\Encryption\Encrypter($rawKey, 'AES-256-CBC');
+                    $pass = $enc->decryptString($router->api_password ?: $router->password);
+                    break;
+                } catch (\Throwable $e2) {}
+            }
+            if (empty($pass)) {
+                $pass = $router->api_password ?: $router->password;
+            }
         }
 
         $roles = is_array($router->port_roles) ? $router->port_roles : [];

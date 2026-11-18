@@ -2,6 +2,10 @@
     {{-- Page Header --}}
     <x-ui.page-header title="Customers" subtitle="Manage PPPoE and hotspot subscribers, track online sessions, billing cycles, and send payment reminders.">
         <x-slot:actions>
+            <button type="button" wire:click="syncFromRouter" wire:loading.attr="disabled" class="btn btn-outline-primary d-inline-flex align-items-center gap-1.5 px-3 py-2 me-2">
+                <span wire:loading.remove wire:target="syncFromRouter"><i class="bi bi-arrow-repeat"></i> Sync from MikroTik</span>
+                <span wire:loading wire:target="syncFromRouter"><span class="spinner-border spinner-border-sm me-1"></span> Syncing Clients...</span>
+            </button>
             <x-ui.button variant="primary" wire:click="openCreateModal">
                 <i class="bi bi-person-plus-fill"></i> New customer
             </x-ui.button>
@@ -102,6 +106,9 @@
                 <button type="button" wire:click="$set('filterType', 'active')" class="btn btn-sm {{ $currentFilterType === 'active' ? 'btn-primary' : 'btn-outline-secondary' }}">
                     Active
                 </button>
+                <button type="button" wire:click="$set('filterType', 'online')" class="btn btn-sm {{ $currentFilterType === 'online' ? 'btn-success text-white' : 'btn-outline-secondary' }}">
+                    <span class="d-inline-block rounded-circle bg-success me-1" style="width: 6px; height: 6px;"></span> Online
+                </button>
                 <button type="button" wire:click="$set('filterType', 'suspended')" class="btn btn-sm {{ $currentFilterType === 'suspended' ? 'btn-danger text-white' : 'btn-outline-secondary' }}">
                     Suspended
                 </button>
@@ -151,13 +158,13 @@
                             {{-- Service Type & Package --}}
                             <td>
                                 <div>
-                                    @if($customer->service_type === 'hotspot')
-                                        <x-ui.badge tone="info" class="mb-1">Hotspot</x-ui.badge>
+                                    @if($customer->service_type === 'hotspot' || ($secret && $secret->service === 'hotspot'))
+                                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle mb-1"><i class="bi bi-wifi me-1"></i>Hotspot</span>
                                     @else
-                                        <x-ui.badge tone="neutral" class="mb-1">PPPoE</x-ui.badge>
+                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle mb-1"><i class="bi bi-ethernet me-1"></i>PPPoE</span>
                                     @endif
                                     <div class="small fw-medium text-dark text-truncate" style="max-width: 140px;">
-                                        {{ $customer->package->name ?? ($customer->package_name ?: 'Default') }}
+                                        {{ $customer->package->name ?? ($customer->package_name ?: 'Standard Package') }}
                                     </div>
                                     <small class="text-muted">{{ $rent > 0 ? 'KES ' . number_format($rent, 0) : '—' }}</small>
                                 </div>
@@ -170,7 +177,12 @@
                                         <i class="bi bi-router me-1 text-muted"></i>{{ $secret?->router_name ?: 'Main Gateway' }}
                                     </div>
                                     <div class="font-monospace text-muted" style="font-size: 0.75rem;">{{ $secret?->username ?: 'user_' . $customer->id }}</div>
-                                    <div class="font-monospace text-secondary" style="font-size: 11px;">{{ $secret?->caller_id ?: ($secret?->ppp_remote_ip ?: 'DHCP') }}</div>
+                                    @if(!empty($secret?->caller_id))
+                                        <div class="font-monospace text-secondary" style="font-size: 10px;" title="MAC Address"><i class="bi bi-hdd-network me-0.5"></i>{{ $secret->caller_id }}</div>
+                                    @endif
+                                    @if(!empty($secret?->ppp_remote_ip))
+                                        <div class="font-monospace text-success fw-medium" style="font-size: 11px;" title="Assigned IP"><i class="bi bi-broadcast me-0.5"></i>{{ $secret->ppp_remote_ip }}</div>
+                                    @endif
                                 </div>
                             </td>
 
@@ -181,7 +193,10 @@
                                 @elseif($isExpired)
                                     <x-ui.badge tone="warning"><i class="bi bi-clock me-1"></i>Expired</x-ui.badge>
                                 @else
-                                    <x-ui.badge tone="success"><i class="bi bi-check-circle-fill me-1"></i>Active</x-ui.badge>
+                                    <span class="badge bg-success text-white"><i class="bi bi-check-circle-fill me-1"></i>Active</span>
+                                    @if(!empty($secret?->ppp_remote_ip) || !empty($secret?->caller_id))
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle ms-1" style="font-size: 10px;">🟢 Online</span>
+                                    @endif
                                 @endif
                             </td>
 
@@ -268,10 +283,16 @@
                     @empty
                         <tr>
                             <td colspan="7" class="p-0">
-                                <x-ui.empty-state icon="bi-people" title="No customers found" description="Add customers or adjust your filter query.">
-                                    <x-ui.button variant="primary" wire:click="openCreateModal">
-                                        <i class="bi bi-plus-lg"></i> Add new customer
-                                    </x-ui.button>
+                                <x-ui.empty-state icon="bi-people" title="No customers found" description="Add customers or click Sync from MikroTik to import live connected clients.">
+                                    <div class="d-flex align-items-center justify-content-center gap-2 mt-2">
+                                        <button type="button" wire:click="syncFromRouter" wire:loading.attr="disabled" class="btn btn-outline-primary d-inline-flex align-items-center gap-2 px-3 py-2">
+                                            <span wire:loading.remove wire:target="syncFromRouter"><i class="bi bi-arrow-repeat"></i> Sync from MikroTik</span>
+                                            <span wire:loading wire:target="syncFromRouter"><span class="spinner-border spinner-border-sm me-1"></span> Syncing Router Clients...</span>
+                                        </button>
+                                        <x-ui.button variant="primary" wire:click="openCreateModal">
+                                            <i class="bi bi-plus-lg"></i> Add new customer
+                                        </x-ui.button>
+                                    </div>
                                 </x-ui.empty-state>
                             </td>
                         </tr>

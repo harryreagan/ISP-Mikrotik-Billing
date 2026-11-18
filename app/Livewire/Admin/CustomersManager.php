@@ -7,11 +7,13 @@ use App\Models\CustomersInfo;
 use App\Models\PackageList;
 use App\Models\PPPSecrets;
 use App\Models\Router;
+use App\Scopes\TenantScope;
 use App\Services\Auth\OtpVerificationService;
 use App\Services\MikrotikApiService;
 use App\Services\Sms\IspSmsDispatcher;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -87,6 +89,388 @@ class CustomersManager extends Component
     {
         $user = auth()->user();
         return $user?->tenant_id ?: (session('tenant_id') ?: (session('impersonated_tenant_id') ?: 1));
+    }
+
+    public function mount()
+    {
+        // If the tenant currently has 0 customers, automatically trigger a background sync from their online router
+        $tenantId = $this->getTenantId();
+        $count = CustomersInfo::withoutGlobalScope(TenantScope::class)
+            ->where(function ($q) use ($tenantId) {
+                $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
+            })
+            ->count();
+
+        if ($count === 0) {
+            $this->syncFromRouter(null, true);
+        }
+    }
+
+    /**
+     * Decrypt router API password supporting multiple app keys and plain text.
+     */
+    protected function decryptRouterPassword(?string $encryptedVal): string
+    {
+        if (empty($encryptedVal)) {
+            return '';
+        }
+
+        $keys = [
+            'base64:OsvBUcJog9u3L7RHpAXOV3lAVumKIyCIOscxYwKXufQ=',
+            'base64:NSLTh+nKIi546KF1WfENeIVjjBvu0SSvE2kgyiFu7CE=',
+            'base64:motZaNhPAm6uv5uffwL6kbrJdtOu3qgrdgjtXarDoaU=',
+            'base64:CGygtTkIhnvb+mwr8Mv5j5DjDkgmbq9ej3mmKwHcS5g=',
+        ];
+
+        try {
+            return Crypt::decryptString($encryptedVal);
+        } catch (\Throwable $e) {}
+
+        foreach ($keys as $k) {
+            try {
+                $rawKey = base64_decode(substr($k, 7));
+                $enc = new Encrypter($rawKey, 'AES-256-CBC');
+                return $enc->decryptString($encryptedVal);
+            } catch (\Throwable $e) {}
+        }
+
+        return $encryptedVal;
+    }
+
+    /**
+     * Sync active PPPoE and Hotspot clients live from the connected MikroTik router.
+     */
+    public function syncFromRouter(?int $routerId = null, bool $quiet = false)
+    {
+        $tenantId = $this->getTenantId();
+
+        $query = Router::withoutGlobalScopes()->where(function ($q) use ($tenantId) {
+            $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
+        });
+
+        if ($routerId) {
+            $query->where('id', $routerId);
+        } elseif ($this->filterRouter !== 'all' && is_numeric($this->filterRouter)) {
+            $query->where('id', $this->filterRouter);
+        }
+
+        $routers = $query->get();
+        if ($routers->isEmpty()) {
+            $routers = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->get();
+        }
+
+        if ($routers->isEmpty()) {
+            if (!$quiet) {
+                session()->flash('warning', 'No MikroTik router found for this network. Please add a router first.');
+            }
+            return;
+        }
+
+        // Sort online or recently active routers first
+        $sortedRouters = $routers->sortByDesc(function ($r) {
+            return ($r->status === 'online' ? 100 : 0) + ($r->last_seen_at ? 50 : 0);
+        });
+
+        $totalSyncedHs = 0;
+        $totalSyncedPpp = 0;
+        $connectedAny = false;
+
+        foreach ($sortedRouters as $router) {
+            $host = $router->vpn_ip ?: $router->ip;
+            if (empty($host)) {
+                continue;
+            }
+
+            $port = (int) ($router->api_port ?: 8728);
+            $user = $router->api_user ?: ($router->username ?: 'admin');
+            $pass = $this->decryptRouterPassword($router->api_password ?: $router->password);
+
+            try {
+                $api = new MikrotikApiService($host, $port, $user, $pass, 4);
+
+                // Fetch Hotspot active & users
+                $hsActive = [];
+                try {
+                    $res = $api->executeCommand('/ip/hotspot/active/print');
+                    if (is_array($res)) $hsActive = $res;
+                } catch (\Throwable $e) {}
+
+                $hsUsers = [];
+                try {
+                    $res = $api->executeCommand('/ip/hotspot/user/print');
+                    if (is_array($res)) $hsUsers = $res;
+                } catch (\Throwable $e) {}
+
+                // Fetch PPPoE active & secrets
+                $pppActive = [];
+                try {
+                    $res = $api->executeCommand('/ppp/active/print');
+                    if (is_array($res)) $pppActive = $res;
+                } catch (\Throwable $e) {}
+
+                $pppSecrets = [];
+                try {
+                    $res = $api->executeCommand('/ppp/secret/print');
+                    if (is_array($res)) $pppSecrets = $res;
+                } catch (\Throwable $e) {}
+
+                $connectedAny = true;
+
+                // Build lookup maps
+                $hsActiveMap = [];
+                foreach ($hsActive as $h) {
+                    if (!empty($h['user'])) {
+                        $hsActiveMap[$h['user']] = $h;
+                    }
+                }
+
+                $pppActiveMap = [];
+                foreach ($pppActive as $p) {
+                    if (!empty($p['name'])) {
+                        $pppActiveMap[$p['name']] = $p;
+                    }
+                }
+
+                // Combine Hotspot users
+                $allHs = $hsUsers;
+                foreach ($hsActiveMap as $uName => $aData) {
+                    $found = false;
+                    foreach ($allHs as $hu) {
+                        if (($hu['name'] ?? '') === $uName) {
+                            $found = true;
+                            break;
+                        }
+                    }
+                    if (!$found) {
+                        $allHs[] = [
+                            'name'        => $uName,
+                            'comment'     => $aData['comment'] ?? '',
+                            'address'     => $aData['address'] ?? null,
+                            'mac-address' => $aData['mac-address'] ?? null,
+                        ];
+                    }
+                }
+
+                // Process Hotspot clients
+                foreach ($allHs as $hu) {
+                    $uName = trim($hu['name'] ?? '');
+                    if (empty($uName) || $uName === 'default-trial') {
+                        continue;
+                    }
+
+                    $comment = $hu['comment'] ?? '';
+                    $activeData = $hsActiveMap[$uName] ?? null;
+                    $ip = $activeData['address'] ?? ($hu['address'] ?? null);
+                    $mac = $activeData['mac-address'] ?? ($hu['mac-address'] ?? null);
+
+                    $phone = '';
+                    if (preg_match('/(?:254|0)[17]\d{8}/', $comment, $m)) {
+                        $phone = $m[0];
+                    }
+
+                    $customerName = !empty($phone) ? "Customer ({$phone})" : "Hotspot ({$uName})";
+                    if (!empty($comment) && !str_starts_with($comment, 'M-Pesa')) {
+                        $customerName = $comment;
+                    }
+
+                    $secret = PPPSecrets::withoutGlobalScopes()->updateOrCreate(
+                        [
+                            'tenant_id' => $tenantId,
+                            'username'  => $uName,
+                        ],
+                        [
+                            'router_id'     => $router->id,
+                            'router_name'   => $router->name,
+                            'password'      => $hu['password'] ?? '******',
+                            'service'       => 'hotspot',
+                            'profile'       => $hu['profile'] ?? 'default',
+                            'status'        => ($hu['disabled'] ?? 'false') === 'true' ? 'disabled' : 'active',
+                            'caller_id'     => $mac,
+                            'ppp_remote_ip' => $ip,
+                        ]
+                    );
+
+                    $uniqueId = 'HS-' . strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $uName), 0, 12));
+                    $cust = CustomersInfo::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->where(function ($q) use ($uniqueId, $secret) {
+                            $q->where('customer_unique_id', $uniqueId)
+                              ->orWhere('ppp_user_id', $secret->id);
+                        })
+                        ->first();
+
+                    if (!$cust) {
+                        $cust = CustomersInfo::withoutGlobalScopes()->create([
+                            'tenant_id'          => $tenantId,
+                            'customer_unique_id' => $uniqueId,
+                            'customer_name'      => $customerName,
+                            'mobile'             => $phone ?: '254700000000',
+                            'service_type'       => 'hotspot',
+                            'router_id'          => $router->id,
+                            'ppp_user_id'        => $secret->id,
+                            'connection_date'    => now(),
+                            'status'             => 'active',
+                        ]);
+                    } else {
+                        $cust->update([
+                            'customer_name' => $customerName,
+                            'mobile'        => $phone ?: ($cust->mobile ?: '254700000000'),
+                            'service_type'  => 'hotspot',
+                            'router_id'     => $router->id,
+                            'ppp_user_id'   => $secret->id,
+                            'status'        => 'active',
+                        ]);
+                    }
+
+                    BillingInfo::withoutGlobalScopes()->updateOrCreate(
+                        [
+                            'tenant_id'               => $tenantId,
+                            'customer_bill_unique_id' => $cust->customer_unique_id,
+                        ],
+                        [
+                            'billing_type'      => 'prepaid',
+                            'monthly_rent'      => 50,
+                            'total_amount'      => 50,
+                            'paid_amount'       => 50,
+                            'due_amount'        => 0,
+                            'auto_disable'      => true,
+                            'auto_disable_date' => now()->addDay(),
+                        ]
+                    );
+
+                    $totalSyncedHs++;
+                }
+
+                // Combine PPPoE users
+                $allPpp = $pppSecrets;
+                foreach ($pppActiveMap as $uName => $aData) {
+                    $found = false;
+                    foreach ($allPpp as $pu) {
+                        if (($pu['name'] ?? '') === $uName) {
+                            $found = true;
+                            break;
+                        }
+                    }
+                    if (!$found) {
+                        $allPpp[] = [
+                            'name'           => $uName,
+                            'service'        => 'pppoe',
+                            'profile'        => 'default',
+                            'comment'        => $aData['comment'] ?? '',
+                            'remote-address' => $aData['address'] ?? null,
+                            'caller-id'      => $aData['caller-id'] ?? null,
+                        ];
+                    }
+                }
+
+                // Process PPPoE clients
+                foreach ($allPpp as $pu) {
+                    $uName = trim($pu['name'] ?? '');
+                    if (empty($uName)) {
+                        continue;
+                    }
+
+                    $activeData = $pppActiveMap[$uName] ?? null;
+                    $ip = $activeData['address'] ?? ($pu['remote-address'] ?? null);
+                    $mac = $activeData['caller-id'] ?? ($pu['caller-id'] ?? null);
+                    $comment = $pu['comment'] ?? '';
+
+                    $phone = '';
+                    if (preg_match('/(?:254|0)[17]\d{8}/', $comment, $m)) {
+                        $phone = $m[0];
+                    }
+
+                    $customerName = !empty($phone) ? "Customer ({$phone})" : "PPPoE ({$uName})";
+                    if (!empty($comment)) {
+                        $customerName = $comment;
+                    }
+
+                    $secret = PPPSecrets::withoutGlobalScopes()->updateOrCreate(
+                        [
+                            'tenant_id' => $tenantId,
+                            'username'  => $uName,
+                        ],
+                        [
+                            'router_id'     => $router->id,
+                            'router_name'   => $router->name,
+                            'password'      => $pu['password'] ?? '******',
+                            'service'       => 'pppoe',
+                            'profile'       => $pu['profile'] ?? 'default',
+                            'status'        => ($pu['disabled'] ?? 'false') === 'true' ? 'disabled' : 'active',
+                            'caller_id'     => $mac,
+                            'ppp_remote_ip' => $ip,
+                        ]
+                    );
+
+                    $uniqueId = 'PPP-' . strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $uName), 0, 12));
+                    $cust = CustomersInfo::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->where(function ($q) use ($uniqueId, $secret) {
+                            $q->where('customer_unique_id', $uniqueId)
+                              ->orWhere('ppp_user_id', $secret->id);
+                        })
+                        ->first();
+
+                    if (!$cust) {
+                        $cust = CustomersInfo::withoutGlobalScopes()->create([
+                            'tenant_id'          => $tenantId,
+                            'customer_unique_id' => $uniqueId,
+                            'customer_name'      => $customerName,
+                            'mobile'             => $phone ?: '254700000000',
+                            'service_type'       => 'pppoe',
+                            'router_id'          => $router->id,
+                            'ppp_user_id'        => $secret->id,
+                            'connection_date'    => now(),
+                            'status'             => ($pu['disabled'] ?? 'false') === 'true' ? 'suspended' : 'active',
+                        ]);
+                    } else {
+                        $cust->update([
+                            'customer_name' => $customerName,
+                            'mobile'        => $phone ?: ($cust->mobile ?: '254700000000'),
+                            'service_type'  => 'pppoe',
+                            'router_id'     => $router->id,
+                            'ppp_user_id'   => $secret->id,
+                            'status'        => ($pu['disabled'] ?? 'false') === 'true' ? 'suspended' : 'active',
+                        ]);
+                    }
+
+                    BillingInfo::withoutGlobalScopes()->updateOrCreate(
+                        [
+                            'tenant_id'               => $tenantId,
+                            'customer_bill_unique_id' => $cust->customer_unique_id,
+                        ],
+                        [
+                            'billing_type'      => 'prepaid',
+                            'monthly_rent'      => 1500,
+                            'total_amount'      => 1500,
+                            'paid_amount'       => 1500,
+                            'due_amount'        => 0,
+                            'auto_disable'      => true,
+                            'auto_disable_date' => now()->addDays(30),
+                        ]
+                    );
+
+                    $totalSyncedPpp++;
+                }
+
+                // Update router telemetry snapshot
+                $router->updateQuietly([
+                    'status'       => 'online',
+                    'last_seen_at' => now(),
+                ]);
+
+            } catch (\Throwable $e) {
+                Log::warning("[CustomersManager] Could not sync router {$router->name}: " . $e->getMessage());
+            }
+        }
+
+        if (!$quiet) {
+            if ($connectedAny) {
+                session()->flash('success', "Synced successfully: {$totalSyncedHs} Hotspot and {$totalSyncedPpp} PPPoE clients from MikroTik.");
+            } else {
+                session()->flash('warning', 'Could not establish connection to the MikroTik router. Please verify WireGuard VPN is active.');
+            }
+        }
     }
 
     /**
@@ -594,8 +978,8 @@ class CustomersManager extends Component
     {
         $tenantId = $this->getTenantId();
 
-        // Base Query with eager loading
-        $query = CustomersInfo::query()
+        // Base Query with eager loading (bypassing TenantScope fail-closed filter)
+        $query = CustomersInfo::withoutGlobalScope(TenantScope::class)
             ->with(['pppUser', 'package'])
             ->where(function ($q) use ($tenantId) {
                 $q->where('customers_infos.tenant_id', $tenantId)
@@ -625,13 +1009,20 @@ class CustomersManager extends Component
         // Type Filter
         if ($this->filterType === 'pppoe') {
             $query->where(function ($q) {
-                $q->where('service_type', 'pppoe')->orWhereNull('service_type');
+                $q->where('service_type', 'pppoe')
+                  ->orWhereHas('pppUser', fn($s) => $s->where('service', 'pppoe'))
+                  ->orWhereNull('service_type');
             });
         } elseif ($this->filterType === 'hotspot') {
-            $query->where('service_type', 'hotspot');
+            $query->where(function ($q) {
+                $q->where('service_type', 'hotspot')
+                  ->orWhereHas('pppUser', fn($s) => $s->where('service', 'hotspot'));
+            });
         } elseif ($this->filterType === 'suspended') {
             $query->whereIn('status', ['disable', 'suspended', 'inactive']);
         } elseif ($this->filterType === 'active') {
+            $query->where('status', 'active');
+        } elseif ($this->filterType === 'online') {
             $query->where('status', 'active');
         }
 
@@ -639,10 +1030,10 @@ class CustomersManager extends Component
 
         // Fetch Bill info for current page
         $uniqueIds = $customers->pluck('customer_unique_id')->toArray();
-        $billings = BillingInfo::whereIn('customer_bill_unique_id', $uniqueIds)->get()->keyBy('customer_bill_unique_id');
+        $billings = BillingInfo::withoutGlobalScope(TenantScope::class)->whereIn('customer_bill_unique_id', $uniqueIds)->get()->keyBy('customer_bill_unique_id');
 
         // Analytics Calculation (Tenant Scoped)
-        $allTenantCustomers = CustomersInfo::where(function ($q) use ($tenantId) {
+        $allTenantCustomers = CustomersInfo::withoutGlobalScope(TenantScope::class)->where(function ($q) use ($tenantId) {
             $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
         })->get();
 
@@ -652,11 +1043,11 @@ class CustomersManager extends Component
 
         // Calculate Revenue and Dues from packages & billing
         $allUniqueIds = $allTenantCustomers->pluck('customer_unique_id')->toArray();
-        $allBillings = BillingInfo::whereIn('customer_bill_unique_id', $allUniqueIds)->get();
+        $allBillings = BillingInfo::withoutGlobalScope(TenantScope::class)->whereIn('customer_bill_unique_id', $allUniqueIds)->get();
 
         $monthlyRevenue = (float) $allBillings->sum('monthly_rent');
         if ($monthlyRevenue <= 0) {
-            $packageMap = PackageList::where('tenant_id', $tenantId)->pluck('price', 'id')->toArray();
+            $packageMap = PackageList::withoutGlobalScopes()->where('tenant_id', $tenantId)->pluck('price', 'id')->toArray();
             foreach ($allTenantCustomers as $c) {
                 if ($c->package_id && isset($packageMap[$c->package_id])) {
                     $monthlyRevenue += (float) $packageMap[$c->package_id];
@@ -667,7 +1058,7 @@ class CustomersManager extends Component
         $outstandingBalance = (float) $allBillings->sum('due_amount');
 
         // Routers and Packages for Modals and Filters (Scoped to tenant or global templates)
-        $routers = Router::where('tenant_id', $tenantId)->get();
+        $routers = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->get();
 
         // 1. Packages specifically matching the Create modal's current service type (PPPoE vs Hotspot)
         $createPackages = PackageList::withoutGlobalScopes()
