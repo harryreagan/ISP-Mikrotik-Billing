@@ -301,14 +301,17 @@ class CaptivePortalApiController extends Controller
             $api = new MikrotikApiService($host, $port, $user, $pass, 3);
             $existing = $api->executeCommand('/ip/hotspot/user/print', [], ['name' => $username]);
 
-            $uptimeLimit = "{$durationHours}h";
+            $durationInfo = \App\Services\MikrotikDuration::parse($durationHours, 'hours');
+            $uptimeLimit = $durationInfo['mikrotik'];
+            $expiresAt = now()->timezone('Africa/Nairobi')->addSeconds($durationInfo['seconds']);
+
             if (empty($existing) || !is_array($existing)) {
                 $api->executeCommand('/ip/hotspot/user/add', [
                     'name'         => $username,
                     'password'     => $username,
                     'profile'      => 'default',
                     'limit-uptime' => $uptimeLimit,
-                    'comment'      => 'HSmart Hotspot Voucher (' . now()->toIso8601String() . ')',
+                    'comment'      => 'HSmart Hotspot exp:' . $expiresAt->toDateTimeString(),
                 ]);
             }
         } catch (\Throwable $e) {

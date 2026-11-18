@@ -221,9 +221,16 @@ class MikrotikController extends Controller
      */
     public function routerList(?string $routerName = null, ?string $apiCmd = null, ?string $sshCmd = null, array $apiParams = [], bool $showErrorFlash = true): array
     {
-        $query = RouterList::where('action', 'connected');
+        $query = RouterList::where(function ($q) {
+            $q->where('action', 'connected')
+              ->orWhere('status', 'online')
+              ->orWhereNotNull('vpn_ip');
+        });
         if ($routerName) {
-            $query->where('router_name', $routerName);
+            $query->where(function ($q) use ($routerName) {
+                $q->where('router_name', $routerName)
+                  ->orWhere('name', $routerName);
+            });
         }
 
         $results = [];
@@ -490,9 +497,16 @@ class MikrotikController extends Controller
 
     protected function forEachRouter(callable $callback, ?string $routerName = null): array
     {
-        $query = RouterList::where('action', 'connected');
+        $query = RouterList::where(function ($q) {
+            $q->where('action', 'connected')
+              ->orWhere('status', 'online')
+              ->orWhereNotNull('vpn_ip');
+        });
         if ($routerName) {
-            $query->where('router_name', $routerName);
+            $query->where(function ($q) use ($routerName) {
+                $q->where('router_name', $routerName)
+                  ->orWhere('name', $routerName);
+            });
         }
 
         $results = [];

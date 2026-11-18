@@ -38,7 +38,7 @@ class ProcessIspLifecycleAutomations extends Command
 
         // 3. PPPoE & Static Customer Expiry & MikroTik Disable
         try {
-            ScheduledTasksController::autoDisableUser();
+            app(ScheduledTasksController::class)->userDisable();
             $this->line("  [3/4] PPPoE & static subscriber expiry checked and enforced.");
         } catch (\Throwable $e) {
             Log::warning("[Lifecycle] PPPoE auto-disable error: " . $e->getMessage());

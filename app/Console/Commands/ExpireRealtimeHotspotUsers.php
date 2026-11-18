@@ -3,150 +3,201 @@
 namespace App\Console\Commands;
 
 use App\Http\Controllers\MikrotikController;
+use App\Models\HotspotSale;
 use App\Models\HotspotVoucher;
-use App\Models\RouterList;
+use App\Models\Router;
+use App\Services\MikrotikApiService;
+use App\Services\MikrotikDuration;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 
 class ExpireRealtimeHotspotUsers extends Command
 {
     protected $signature = 'app:expire-realtime-hotspot-users';
 
-    protected $description = 'Check and disable/remove hotspot users whose realtime validity has expired. Runs as a backup to the MikroTik on-login scheduler.';
+    protected $description = 'Audit and forcefully terminate expired hotspot and voucher sessions on all online routers.';
 
     public function handle(): void
     {
-        $ctrl = app(MikrotikController::class);
-
         $tenants = \App\Models\Tenant::where('is_active', 1)->pluck('id');
         if ($tenants->isEmpty()) {
             $tenants = collect([1]);
         }
 
-        foreach ($tenants as $tenantId) {
-            \App\Services\Tenant\TenantContext::runWithTenant((int) $tenantId, function () use ($ctrl) {
-                // 1. Sync voucher usage for active routers of this tenant
-                $routers = RouterList::where('action', 'connected')->orWhere('status', 'online')->get();
-                foreach ($routers as $router) {
-                    $this->syncRouterVouchers($router->router_name ?: $router->name, $ctrl);
-                }
+        // 1. Fetch all online or connected routers
+        $routers = Router::withoutGlobalScopes()
+            ->where(function ($q) {
+                $q->where('status', 'online')
+                  ->orWhere('action', 'connected')
+                  ->orWhereNotNull('vpn_ip');
+            })
+            ->get();
 
-                // 2. Get all realtime vouchers that have expired in DB for this tenant
-                $vouchers = HotspotVoucher::realtimeExpired()->get();
-                if ($vouchers->isEmpty()) {
-                    return;
-                }
-
-                $expiredCount = 0;
-                $grouped = $vouchers->groupBy('router_name');
-
-                foreach ($grouped as $routerName => $routerVouchers) {
-                    $router = RouterList::where(function ($q) use ($routerName) {
-                        $q->where('router_name', $routerName)->orWhere('name', $routerName);
-                    })->where(function ($q) {
-                        $q->where('action', 'connected')->orWhere('status', 'online');
-                    })->first();
-
-                    if (! $router) {
-                        continue;
-                    }
-
-                    foreach ($routerVouchers as $v) {
-                        if (! $v->isRealtimeExpired()) {
-                            continue;
-                        }
-
-                        try {
-                            $ctrl->disableHotspotUser($routerName, $v->username);
-                            try {
-                                $ctrl->disconnectHotspotUser($routerName, $v->username);
-                            } catch (\Exception $e) {}
-                            $ctrl->removeHotspotExpiryScheduler($routerName, $v->username);
-                            $v->update(['status' => 'expired']);
-                            $expiredCount++;
-                        } catch (\Throwable $e) {
-                            Log::warning("[ExpireRealtimeHotspotUsers] Failed to expire voucher {$v->username}: " . $e->getMessage());
-                        }
-                    }
-                }
-            });
+        if ($routers->isEmpty()) {
+            return;
         }
+
+        foreach ($routers as $router) {
+            $this->auditAndExpireRouterSessions($router);
+        }
+
+        // 2. Mark database records expired
+        $now = now();
+        HotspotVoucher::where('status', 'used')
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '<=', $now)
+            ->update(['status' => 'expired']);
+
+        HotspotSale::where('status', 'completed')
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '<=', $now)
+            ->update(['status' => 'expired']);
     }
 
-    private function syncRouterVouchers(string $routerName, MikrotikController $ctrl): void
+    /**
+     * Inspect active hotspot sessions on a router and kick any whose time or quota is exhausted.
+     */
+    protected function auditAndExpireRouterSessions(Router $router): void
     {
-        try {
-            // Fetch active sessions
-            $sessions = $ctrl->getHotspotActiveSessions($routerName);
-            if (is_array($sessions)) {
-                $activeUsernames = array_column($sessions, 'user');
+        $host = $router->vpn_ip ?: $router->ip;
+        if (!$host) return;
 
-                // Mark unused vouchers with active sessions as "used"
-                $unusedActive = HotspotVoucher::forRouter($routerName)
-                    ->where('status', 'unused')
-                    ->whereIn('username', $activeUsernames)
-                    ->get();
+        $port = (int) ($router->api_port ?: 8728);
+        $user = $router->api_user ?: ($router->username ?: 'admin');
+        $pass = '';
 
-                foreach ($unusedActive as $v) {
-                    $session = collect($sessions)->firstWhere('user', $v->username);
-                    $this->markVoucherAsUsedInConsole($v, $session, $routerName);
-                }
-            }
-
-            // Fetch all hotspot users from router
-            $routerUsers = $ctrl->getHotspotUsers($routerName);
-            $dbVouchers = HotspotVoucher::forRouter($routerName)
-                ->where('status', 'unused')
-                ->get();
-
-            foreach ($dbVouchers as $v) {
-                $rUser = collect($routerUsers)->firstWhere('name', $v->username);
-                if ($rUser) {
-                    $uptime = $rUser['uptime'] ?? '0s';
-                    if ($uptime !== '0s' && ! empty($uptime)) {
-                        $this->markVoucherAsUsedInConsole($v, $rUser, $routerName);
-                    }
-                }
-            }
-        } catch (\Exception $e) {
-            Log::error("Console voucher sync failed for router {$routerName}: " . $e->getMessage());
-        }
-    }
-
-    private function markVoucherAsUsedInConsole(HotspotVoucher $v, $rUser, string $routerName): void
-    {
-        try {
-            \App\Models\HotspotSale::create([
-                'router_name' => $routerName,
-                'voucher_code' => $v->code,
-                'profile' => $v->profile,
-                'username' => $v->username,
-                'amount' => $v->price,
-                'payment_method' => 'voucher',
-                'note' => 'Auto-synced from router usage (Console)',
-                'sale_date' => now()->toDateString(),
-                'sold_by' => $v->created_by,
-            ]);
-        } catch (\Exception $saleEx) {
-            // Ignore duplicate sale record if any, continue to update status
-        }
-
-        $updateData = [
-            'status' => 'used',
-            'used_by' => $v->username,
-            'used_at' => now(),
-            'mac_address' => $rUser['mac-address'] ?? $rUser['mac_address'] ?? null,
+        $keys = [
+            'base64:OsvBUcJog9u3L7RHpAXOV3lAVumKIyCIOscxYwKXufQ=',
+            'base64:NSLTh+nKIi546KF1WfENeIVjjBvu0SSvE2kgyiFu7CE=',
+            'base64:motZaNhPAm6uv5uffwL6kbrJdtOu3qgrdgjtXarDoaU=',
+            'base64:CGygtTkIhnvb+mwr8Mv5j5DjDkgmbq9ej3mmKwHcS5g=',
         ];
-
-        if ($v->validity_type === 'realtime' && ! $v->first_login_at) {
-            $updateData['first_login_at'] = now();
-            if ($v->validity_duration) {
-                $updateData['expires_at'] = now()->addSeconds(
-                    HotspotVoucher::parseMikrotikDuration($v->validity_duration)
-                );
+        try {
+            $pass = Crypt::decryptString($router->api_password ?: $router->password);
+        } catch (\Throwable $e) {
+            foreach ($keys as $k) {
+                try {
+                    $rawKey = base64_decode(substr($k, 7));
+                    $enc = new \Illuminate\Encryption\Encrypter($rawKey, 'AES-256-CBC');
+                    $pass = $enc->decryptString($router->api_password ?: $router->password);
+                    break;
+                } catch (\Throwable $e2) {}
+            }
+            if (empty($pass)) {
+                $pass = $router->api_password ?: $router->password;
             }
         }
 
-        $v->update($updateData);
+        try {
+            $api = new MikrotikApiService($host, $port, $user, $pass, 4);
+
+            // Fetch live active hotspot sessions
+            $activeSessions = $api->executeCommand('/ip/hotspot/active/print');
+            if (!is_array($activeSessions) || empty($activeSessions)) {
+                return;
+            }
+
+            // Fetch hotspot users to inspect limit-uptime and comments
+            $hotspotUsers = $api->executeCommand('/ip/hotspot/user/print');
+            $userMap = [];
+            if (is_array($hotspotUsers)) {
+                foreach ($hotspotUsers as $hu) {
+                    $uName = strtolower(trim($hu['name'] ?? ''));
+                    if ($uName) {
+                        $userMap[$uName] = $hu;
+                    }
+                }
+            }
+
+            $now = Carbon::now('Africa/Nairobi');
+
+            foreach ($activeSessions as $session) {
+                $sessionId = $session['.id'] ?? null;
+                $username  = trim($session['user'] ?? '');
+                $uKey      = strtolower($username);
+                $uptimeStr = $session['uptime'] ?? '0s';
+
+                $shouldDisconnect = false;
+                $reason = '';
+
+                // 1. Check user profile and limit-uptime on RouterOS
+                $routerUser = $userMap[$uKey] ?? null;
+                if ($routerUser) {
+                    // Check limit-uptime vs session uptime
+                    $limitUptime = $routerUser['limit-uptime'] ?? null;
+                    if (!empty($limitUptime)) {
+                        $limitSec = MikrotikDuration::parse($limitUptime)['seconds'];
+                        $uptimeSec = MikrotikDuration::parse($uptimeStr)['seconds'];
+                        if ($limitSec > 0 && $uptimeSec >= $limitSec) {
+                            $shouldDisconnect = true;
+                            $reason = "Uptime limit reached ({$uptimeStr} >= {$limitUptime})";
+                        }
+                    }
+
+                    // Check comment for explicit expiration timestamp (exp:YYYY-MM-DD HH:MM:SS)
+                    $comment = $routerUser['comment'] ?? '';
+                    if (!$shouldDisconnect && preg_match('/exp:([0-9]{4}-[0-9]{2}-[0-9]{2}\s+[0-9]{2}:[0-9]{2}:[0-9]{2})/', $comment, $m)) {
+                        try {
+                            $expTime = Carbon::parse($m[1], 'Africa/Nairobi');
+                            if ($now->greaterThanOrEqualTo($expTime)) {
+                                $shouldDisconnect = true;
+                                $reason = "Validity window expired at " . $expTime->toDateTimeString();
+                            }
+                        } catch (\Throwable $ignored) {}
+                    }
+
+                    // Check data limit
+                    $limitBytes = (int) ($routerUser['limit-bytes-total'] ?? 0);
+                    $bytesIn = (int) ($session['bytes-in'] ?? 0);
+                    $bytesOut = (int) ($session['bytes-out'] ?? 0);
+                    $totalBytes = $bytesIn + $bytesOut;
+                    if (!$shouldDisconnect && $limitBytes > 0 && $totalBytes >= $limitBytes) {
+                        $shouldDisconnect = true;
+                        $reason = "Data quota exhausted ({$totalBytes} >= {$limitBytes})";
+                    }
+                }
+
+                // 2. Check Database records (HotspotVoucher or HotspotSale)
+                if (!$shouldDisconnect) {
+                    $dbVoucher = HotspotVoucher::where('username', $username)->first();
+                    if ($dbVoucher && $dbVoucher->expires_at && $now->greaterThanOrEqualTo($dbVoucher->expires_at)) {
+                        $shouldDisconnect = true;
+                        $reason = "DB voucher expired at " . $dbVoucher->expires_at;
+                    }
+
+                    if (!$shouldDisconnect) {
+                        $dbSale = HotspotSale::where(function ($q) use ($username) {
+                            $q->where('voucher_code', $username)
+                              ->orWhere('username', $username);
+                        })->whereNotNull('expires_at')->first();
+
+                        if ($dbSale && $now->greaterThanOrEqualTo($dbSale->expires_at)) {
+                            $shouldDisconnect = true;
+                            $reason = "DB sale expired at " . $dbSale->expires_at;
+                        }
+                    }
+                }
+
+                // 3. Forcefully disconnect expired session
+                if ($shouldDisconnect && $sessionId) {
+                    try {
+                        $api->executeCommand('/ip/hotspot/active/remove', ['.id' => $sessionId]);
+                        Log::info("[ExpireHotspot] Forcefully kicked active user '{$username}' from router {$router->name}. Reason: {$reason}");
+
+                        // Also remove or disable the user from router so they cannot reconnect without paying
+                        if ($routerUser && !empty($routerUser['.id'])) {
+                            $api->executeCommand('/ip/hotspot/user/remove', ['.id' => $routerUser['.id']]);
+                        }
+                    } catch (\Throwable $kickEx) {
+                        Log::warning("[ExpireHotspot] Could not kick user {$username}: " . $kickEx->getMessage());
+                    }
+                }
+            }
+
+        } catch (\Throwable $e) {
+            Log::warning("[ExpireRealtimeHotspotUsers] Router {$router->name} audit failed: " . $e->getMessage());
+        }
     }
 }

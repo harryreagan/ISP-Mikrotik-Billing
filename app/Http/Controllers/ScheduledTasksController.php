@@ -533,13 +533,17 @@ class ScheduledTasksController extends Controller
                 }
 
                 if ($shouldDisable && $pppUser && $pppUser->username) {
-                    $router = RouterList::where('router_name', $pppUser->router_name)->first();
+                    $rName = $pppUser->router_name;
+                    $router = \App\Models\Router::where(function ($q) use ($rName) {
+                        $q->where('name', $rName)->orWhere('router_name', $rName);
+                    })->first() ?: RouterList::where('router_name', $rName)->first();
                     if ($router) {
+                        $targetRouterName = $router->name ?: ($router->router_name ?: $rName);
                         try {
                             // Use centralized redirection logic (Profile=Expired + Kick Session)
                             $disableStatus = app(MikrotikController::class)->disablePPPSecret(
                                 $customer->customer_unique_id,
-                                $router->router_name,
+                                $targetRouterName,
                                 $pppUser->username,
                                 false
                             );

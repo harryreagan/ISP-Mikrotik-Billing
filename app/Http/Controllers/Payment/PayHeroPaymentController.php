@@ -393,27 +393,33 @@ class PayHeroPaymentController extends Controller
         $clientIp  = $meta['ip'] ?? null;
         $clientMac = $meta['mac'] ?? null;
 
-        $limitUptime = '1d';
+        $durationInfo = \App\Services\MikrotikDuration::parse('1h');
+        $limitBytes = null;
         if ($packageId) {
             $pkg = PackageList::withoutGlobalScopes()->find($packageId);
-            if ($pkg && !empty($pkg->validity)) {
-                $v = strtolower(trim($pkg->validity));
-                if (str_contains($v, 'hour')) {
-                    $hrs = (int) filter_var($v, FILTER_SANITIZE_NUMBER_INT) ?: 1;
-                    $limitUptime = "{$hrs}h";
-                } elseif (str_contains($v, 'day')) {
-                    $days = (int) filter_var($v, FILTER_SANITIZE_NUMBER_INT) ?: 1;
-                    $limitUptime = "{$days}d";
-                } elseif (str_contains($v, 'week')) {
-                    $wks = (int) filter_var($v, FILTER_SANITIZE_NUMBER_INT) ?: 1;
-                    $limitUptime = ($wks * 7) . "d";
-                } elseif (str_contains($v, 'month')) {
-                    $limitUptime = '30d';
+            if ($pkg) {
+                $durationVal = !empty($pkg->duration) ? $pkg->duration : (!empty($pkg->validity) ? $pkg->validity : '1h');
+                $durationUnit = !empty($pkg->duration_unit) ? $pkg->duration_unit : null;
+                $durationInfo = \App\Services\MikrotikDuration::parse($durationVal, $durationUnit);
+
+                if (!empty($pkg->volume) && is_numeric($pkg->volume) && $pkg->volume > 0) {
+                    $unit = strtolower($pkg->volume_unit ?? 'mb');
+                    $bytes = (int) $pkg->volume;
+                    if ($unit === 'gb') $bytes *= 1073741824;
+                    elseif ($unit === 'mb') $bytes *= 1048576;
+                    elseif ($unit === 'kb') $bytes *= 1024;
+                    $limitBytes = $bytes;
                 }
             }
         }
+        $limitUptime = $durationInfo['mikrotik'];
+        $expiresAt = now()->timezone('Africa/Nairobi')->addSeconds($durationInfo['seconds']);
 
-        $routersQuery = \App\Models\Router::withoutGlobalScopes()->where('status', 'online');
+        $routersQuery = \App\Models\Router::withoutGlobalScopes()->where(function ($q) {
+            $q->where('status', 'online')
+              ->orWhere('action', 'connected')
+              ->orWhereNotNull('vpn_ip');
+        });
         if ($routerId) {
             $routersQuery->where('id', $routerId);
         } else {
@@ -448,12 +454,16 @@ class PayHeroPaymentController extends Controller
                     }
                 }
                 if (!$exists) {
-                    $api->executeCommand('/ip/hotspot/user/add', [
+                    $userPayload = [
                         'name'         => $code,
                         'password'     => $code,
                         'limit-uptime' => $limitUptime,
-                        'comment'      => 'M-Pesa ' . ($stkTx->phone ?: ''),
-                    ]);
+                        'comment'      => 'M-Pesa ' . ($stkTx->phone ?: '') . ' exp:' . $expiresAt->toDateTimeString(),
+                    ];
+                    if ($limitBytes) {
+                        $userPayload['limit-bytes-total'] = (string) $limitBytes;
+                    }
+                    $api->executeCommand('/ip/hotspot/user/add', $userPayload);
                 }
 
                 // 2. Directly authorize the client session on MikroTik if valid IP is known (instant internet even if popup closes)

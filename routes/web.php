@@ -320,6 +320,8 @@ Route::middleware([
         Route::get('/admin/routers', \App\Livewire\Admin\RoutersManager::class)->name('admin.routers');
         Route::get('/mikrotik', \App\Livewire\Admin\RoutersManager::class)->name('mikrotik-sync');
         Route::get('/routers', \App\Livewire\Admin\RoutersManager::class)->name('mikrotik');
+        Route::get('/admin/migration', \App\Livewire\Admin\ZeroDowntimeMigration::class)->name('admin.migration');
+        Route::get('/migration', fn() => redirect()->route('admin.migration'))->name('migration');
         Route::get('/admin/packages', \App\Livewire\Admin\PackagesManager::class)->name('admin.packages');
         Route::get('/packages-list', fn() => redirect()->route('admin.packages'))->name('packages');
         Route::get('/packages', fn() => redirect()->route('admin.packages'))->name('package-list-setup');

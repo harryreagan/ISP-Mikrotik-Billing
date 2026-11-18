@@ -2,6 +2,9 @@
     {{-- Header --}}
     <x-ui.page-header title="Routers" subtitle="Monitor online status, live CPU/RAM telemetry, connected subscribers, and manage router fleet.">
         <x-slot:actions>
+            <a href="{{ route('admin.migration') }}" class="btn btn-outline-primary btn-sm me-2">
+                <i class="bi bi-box-arrow-in-down-right me-1"></i> {{ __('Live Migration') }}
+            </a>
             <x-ui.button variant="primary" :href="route('admin.add-router')">
                 <i class="bi bi-plus-lg"></i> Add router
             </x-ui.button>
