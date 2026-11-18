@@ -68,11 +68,14 @@ class UnifiedTransactionsHub extends Component
 
     public function mount(): void
     {
-        // Permission check
         $user = auth()->user();
+        if (! $user) {
+            return;
+        }
+
         $isAdmin = in_array(strtolower($user->role ?? ''), ['admin', 'superadmin', 'super_admin'])
-            || (method_exists($user, 'hasAnyRole') && $user->hasAnyRole(['Admin', 'Super Admin']))
-            || (method_exists($user, 'hasRole') && $user->hasRole('Reseller'));
+            || (is_object($user) && method_exists($user, 'hasAnyRole') && $user->hasAnyRole(['Admin', 'Super Admin']))
+            || (is_object($user) && method_exists($user, 'hasRole') && $user->hasRole('Reseller'));
 
         if (! $isAdmin && ! hasAccess(['Super Admin'], ['payment-collection', 'payment-collection-edit', 'payment-collection-invoice', 'amount-collection'])) {
             abort(403, 'Unauthorized action.');
@@ -112,7 +115,11 @@ class UnifiedTransactionsHub extends Component
     // ── Scope helper for tenant & reseller isolation ──
     private function getTenantId(): ?int
     {
-        $tenantId = auth()->user()->tenant_id ?? null;
+        $user = auth()->user();
+        if (! $user) {
+            return null;
+        }
+        $tenantId = $user->tenant_id ?? null;
         return ($tenantId && $tenantId > 1) ? $tenantId : null;
     }
 
@@ -121,7 +128,7 @@ class UnifiedTransactionsHub extends Component
         $user = auth()->user();
         $query = CustomersInfo::query();
 
-        if ($user->hasRole('Reseller') && $user->reseller) {
+        if ($user && method_exists($user, 'hasRole') && $user->hasRole('Reseller') && $user->reseller) {
             $query->where('reseller_id', $user->reseller->id);
         } elseif ($tenantId = $this->getTenantId()) {
             $query->where('tenant_id', $tenantId);
@@ -479,7 +486,7 @@ class UnifiedTransactionsHub extends Component
                 'customer_collection_unique_id' => $uniqueId,
                 'collection_date' => Carbon::now(),
                 'collection_amount' => $paid,
-                'collected_by' => auth()->user()->email,
+                'collected_by' => auth()->user()?->email ?? 'admin',
                 'payment_type' => 'Cash',
                 'payment_method' => 'Cash',
                 'payment_status' => 'paid',
