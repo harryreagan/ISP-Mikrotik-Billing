@@ -1,4 +1,20 @@
-<!-- HSmart HQ Live Chat Desk (Identical to Retail Live Chat) -->
+@auth
+@if(!request()->is('/') && !request()->routeIs('landing*'))
+@php
+    $chatUser = auth()->user();
+    $currentTenantId = (string) (\App\Services\Tenant\TenantContext::getTenantId() ?: ($chatUser->tenant_id ?: (session('tenant_id') ?: 1)));
+    $currentTenant = \App\Models\Tenant::find($currentTenantId);
+    $tenantName = $currentTenant?->name ?: ($chatUser->tenant?->name ?: ($chatUser->name ?: 'My ISP'));
+
+    $isSuperAdmin = in_array(strtolower($chatUser->role ?? ''), ['admin', 'superadmin', 'super_admin'])
+        || ($chatUser->tenant_id === null || $chatUser->tenant_id == 1);
+
+    $allTenants = ($isSuperAdmin && \Illuminate\Support\Facades\Schema::hasTable('tenants'))
+        ? \App\Models\Tenant::select('id', 'name')->orderBy('id')->get()
+        : collect();
+@endphp
+
+<!-- HSmart HQ Live Chat Desk (Multi-Tenant) -->
 <div id="hsmart-live-chat-root" class="print:hidden">
     <!-- Floating Trigger Button (Compact, Elegant, Pulsating) -->
     <button
@@ -76,13 +92,24 @@
 
         <!-- TAB CONTENT: LIVE CHAT -->
         <div id="isp-tab-chat-content" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #f8fafc;">
-            <!-- Sub-bar: Direct Channel -->
-            <div style="background: #f1f5f9; padding: 6px 16px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; font-size: 10.5px; color: #475569; font-weight: 600;">
+            <!-- Sub-bar: Direct Channel with Multi-Tenant Selector -->
+            <div style="background: #f1f5f9; padding: 6px 14px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; font-size: 10.5px; color: #475569; font-weight: 600;">
                 <span style="display: flex; align-items: center; gap: 6px;">
                     <span style="width: 6px; height: 6px; border-radius: 9999px; background: #10b981;"></span>
-                    <span>Direct Channel to Super Admin Harry</span>
+                    <span>Channel:</span>
                 </span>
-                <span style="color: #64748b; font-family: monospace;">Tenant #{{ auth()->user()?->tenant_id ?? '1' }}</span>
+                @if($isSuperAdmin && $allTenants->count() > 1)
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <span style="color: #64748b; font-size: 9.5px;">Tenant:</span>
+                        <select id="isp-chat-tenant-selector" onchange="changeIspChatTenant(this.value)" style="font-size: 10.5px; padding: 2px 6px; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; max-width: 170px; font-weight: 700; color: #1e293b;">
+                            @foreach($allTenants as $t)
+                                <option value="{{ $t->id }}" {{ (string)$currentTenantId === (string)$t->id ? 'selected' : '' }}>#{{ $t->id }} {{ $t->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @else
+                    <span style="color: #059669; font-family: monospace; font-weight: 700;">#{{ $currentTenantId }} {{ $tenantName }}</span>
+                @endif
             </div>
 
             <!-- Messages Stream Container -->
@@ -113,12 +140,12 @@
                             💳 Need help with M-Pesa STK push
                         </button>
                         <button type="button" onclick="sendQuickMessage('🌐 Assistance with PPPoE & Hotspot speed plans')" style="background: #ffffff; border: 1px solid #e2e8f0; padding: 7px 12px; border-radius: 10px; font-size: 11.5px; text-align: left; color: #334155; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
-                            🌐 PPPoE & Hotspot speed plans
+                            🌐 Assistance with PPPoE & Hotspot plans
                         </button>
                     </div>
                 </div>
 
-                <!-- Messages Output List -->
+                <!-- Messages List -->
                 <div id="isp-messages-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
             </div>
 
@@ -127,26 +154,26 @@
                 <input
                     type="text"
                     id="isp-chat-input"
+                    placeholder="Type message to HQ Support..."
                     autocomplete="off"
-                    required
-                    placeholder="Type your message to HQ..."
-                    style="flex: 1; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 14px; font-size: 12.5px; outline: none; background: #f8fafc; color: #0f172a; box-sizing: border-box;"
+                    style="flex: 1; border: 1px solid #cbd5e1; border-radius: 14px; padding: 9px 14px; font-size: 12.5px; outline: none; background: #f8fafc; transition: all 0.2s ease;"
+                    onfocus="this.style.background='#ffffff'; this.style.borderColor='#10b981';"
+                    onblur="this.style.background='#f8fafc'; this.style.borderColor='#cbd5e1';"
                 />
                 <button
                     type="submit"
                     id="isp-chat-send-btn"
-                    style="background: linear-gradient(135deg, #059669, #0f766e); color: #ffffff; border: none; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.3); flex-shrink: 0;"
-                    title="Send Message"
+                    style="background: #059669; color: #ffffff; border: none; border-radius: 12px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; flex-shrink: 0;"
                 >
-                    <svg style="width: 17px; height: 17px; transform: rotate(45deg); margin-right: 2px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    <svg style="width: 16px; height: 16px; transform: rotate(45deg); margin-left: -2px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                     </svg>
                 </button>
             </form>
         </div>
 
         <!-- TAB CONTENT: TICKETS & CONTACTS -->
-        <div id="isp-tab-tickets-content" style="display: none; flex: 1; flex-direction: column; padding: 16px; overflow-y: auto; background: #ffffff;">
+        <div id="isp-tab-tickets-content" style="display: none; flex: 1; flex-direction: column; overflow-y: auto; padding: 16px; background: #ffffff;">
             <!-- Direct WhatsApp Banner -->
             <a href="https://wa.me/254790014720?text=Hello%20Harry,%20I%20am%20managing%20ISP%20Billing%20and%20need%20assistance." target="_blank" rel="noopener noreferrer" style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 14px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; text-decoration: none; margin-bottom: 14px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -220,6 +247,17 @@ let ispChatPollTimer = null;
 let ispUnreadPollTimer = null;
 let ispChatActiveTab = 'chat';
 let ispKnownMessagesCount = 0;
+let currentIspChatTenantId = '{{ $currentTenantId }}';
+
+function changeIspChatTenant(tenantId) {
+    currentIspChatTenantId = tenantId;
+    ispKnownMessagesCount = 0;
+    const loading = document.getElementById('isp-chat-loading');
+    if (loading) loading.style.display = 'flex';
+    const list = document.getElementById('isp-messages-list');
+    if (list) list.innerHTML = '';
+    fetchIspMessages(true);
+}
 
 function toggleIspLiveChat() {
     const drawer = document.getElementById('hsmart-chat-drawer');
@@ -314,7 +352,7 @@ async function fetchIspMessages(initial = false) {
     const list = document.getElementById('isp-messages-list');
 
     try {
-        const res = await fetch('/api/live-chat/messages', {
+        const res = await fetch('/api/live-chat/messages?tenant_id=' + encodeURIComponent(currentIspChatTenantId), {
             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
         });
         const data = await res.json();
@@ -448,7 +486,7 @@ async function submitIspLiveChatMessage(event) {
                 'X-CSRF-TOKEN': token,
                 'Accept': 'application/json'
             },
-            body: JSON.stringify({ message: messageText })
+            body: JSON.stringify({ message: messageText, tenant_id: currentIspChatTenantId })
         });
         const data = await res.json();
         if (data.success) {
@@ -460,7 +498,7 @@ async function submitIspLiveChatMessage(event) {
 async function fetchIspUnreadCount() {
     if (ispChatOpen) return;
     try {
-        const res = await fetch('/api/live-chat/unread-count', {
+        const res = await fetch('/api/live-chat/unread-count?tenant_id=' + encodeURIComponent(currentIspChatTenantId), {
             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
         });
         const data = await res.json();
@@ -498,3 +536,5 @@ setInterval(fetchIspUnreadCount, 35000);
 // Initial unread fetch after 3 seconds
 setTimeout(fetchIspUnreadCount, 3000);
 </script>
+@endif
+@endauth
