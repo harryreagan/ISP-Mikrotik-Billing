@@ -51,3 +51,4 @@ class CheckPortalHealthCommand extends Command
         return 0;
     }
 }
+

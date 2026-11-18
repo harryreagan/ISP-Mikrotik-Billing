@@ -40,7 +40,13 @@ class IspRevenueService
                 ->whereRaw("{$yearExpr} = ?", [$year]);
 
             if (!$isSuperAdmin && Schema::hasColumn('hotspot_sales', 'tenant_id')) {
-                $hsQuery->where('tenant_id', $tenantId);
+                if ($tenantId == 1) {
+                    $hsQuery->where(function ($q) {
+                        $q->where('tenant_id', 1)->orWhereNull('tenant_id');
+                    });
+                } else {
+                    $hsQuery->where('tenant_id', $tenantId);
+                }
             }
 
             // Group by month
@@ -66,7 +72,13 @@ class IspRevenueService
                       ->orWhereDate('created_at', $todayDate);
                 });
             if (!$isSuperAdmin && Schema::hasColumn('hotspot_sales', 'tenant_id')) {
-                $todayHsQuery->where('tenant_id', $tenantId);
+                if ($tenantId == 1) {
+                    $todayHsQuery->where(function ($q) {
+                        $q->where('tenant_id', 1)->orWhereNull('tenant_id');
+                    });
+                } else {
+                    $todayHsQuery->where('tenant_id', $tenantId);
+                }
             }
             $todayHotspot = round((float) $todayHsQuery->sum('amount'), 2);
         }
@@ -85,8 +97,28 @@ class IspRevenueService
                 ->where('collection_amount', '>', 0)
                 ->whereRaw("{$yearExpr} = ?", [$year]);
 
-            if (!$isSuperAdmin && Schema::hasColumn('collection_summaries', 'tenant_id')) {
-                $colQuery->where('tenant_id', $tenantId);
+            if (!$isSuperAdmin) {
+                if (Schema::hasColumn('collection_summaries', 'tenant_id')) {
+                    if ($tenantId == 1) {
+                        $colQuery->where(function ($q) {
+                            $q->where('collection_summaries.tenant_id', 1)->orWhereNull('collection_summaries.tenant_id');
+                        });
+                    } else {
+                        $colQuery->where('collection_summaries.tenant_id', $tenantId);
+                    }
+                } elseif (Schema::hasTable('customers_infos')) {
+                    $colQuery->join('customers_infos', function ($join) {
+                        $join->on('collection_summaries.customer_collection_unique_id', '=', 'customers_infos.customer_unique_id')
+                             ->orOn('collection_summaries.customer_collection_unique_id', '=', 'customers_infos.mobile');
+                    });
+                    if ($tenantId == 1) {
+                        $colQuery->where(function ($q) {
+                            $q->where('customers_infos.tenant_id', 1)->orWhereNull('customers_infos.tenant_id');
+                        });
+                    } else {
+                        $colQuery->where('customers_infos.tenant_id', $tenantId);
+                    }
+                }
             }
 
             $colMonthly = (clone $colQuery)
@@ -110,8 +142,28 @@ class IspRevenueService
                     $q->whereDate('collection_date', $todayDate)
                       ->orWhereDate('created_at', $todayDate);
                 });
-            if (!$isSuperAdmin && Schema::hasColumn('collection_summaries', 'tenant_id')) {
-                $todayColQuery->where('tenant_id', $tenantId);
+            if (!$isSuperAdmin) {
+                if (Schema::hasColumn('collection_summaries', 'tenant_id')) {
+                    if ($tenantId == 1) {
+                        $todayColQuery->where(function ($q) {
+                            $q->where('collection_summaries.tenant_id', 1)->orWhereNull('collection_summaries.tenant_id');
+                        });
+                    } else {
+                        $todayColQuery->where('collection_summaries.tenant_id', $tenantId);
+                    }
+                } elseif (Schema::hasTable('customers_infos')) {
+                    $todayColQuery->join('customers_infos', function ($join) {
+                        $join->on('collection_summaries.customer_collection_unique_id', '=', 'customers_infos.customer_unique_id')
+                             ->orOn('collection_summaries.customer_collection_unique_id', '=', 'customers_infos.mobile');
+                    });
+                    if ($tenantId == 1) {
+                        $todayColQuery->where(function ($q) {
+                            $q->where('customers_infos.tenant_id', 1)->orWhereNull('customers_infos.tenant_id');
+                        });
+                    } else {
+                        $todayColQuery->where('customers_infos.tenant_id', $tenantId);
+                    }
+                }
             }
             $todayPppoe = round((float) $todayColQuery->sum('collection_amount'), 2);
         }
@@ -221,3 +273,4 @@ class IspRevenueService
         ];
     }
 }
+

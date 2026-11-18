@@ -215,3 +215,4 @@ class IspCaptivePortalAndRevenueTest extends TestCase
         $this->assertEquals(0, $exitCode);
     }
 }
+

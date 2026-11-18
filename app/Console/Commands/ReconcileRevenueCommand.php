@@ -120,3 +120,4 @@ class ReconcileRevenueCommand extends Command
         $this->table($headers, $rows);
     }
 }
+

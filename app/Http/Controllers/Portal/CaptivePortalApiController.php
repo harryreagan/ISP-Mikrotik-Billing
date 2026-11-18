@@ -316,3 +316,4 @@ class CaptivePortalApiController extends Controller
         }
     }
 }
+

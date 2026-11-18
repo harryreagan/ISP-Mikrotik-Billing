@@ -154,11 +154,17 @@ Route::match(['get', 'post'], '/captive-portal/preview', function(\Illuminate\Ht
 
     // 5. Hostname / subdomain resolution
     if (!$tenantId) {
-        $host = $request->getHost();
-        $tenant = \App\Models\Tenant::where('domain', $host)->orWhere('slug', explode('.', $host)[0])->first();
-        if ($tenant) {
-            $tenantId = (int) $tenant->id;
-        }
+        try {
+            $host = $request->getHost();
+            $sub = explode('.', $host)[0];
+            $tenant = \App\Models\Tenant::where(function ($q) use ($host, $sub) {
+                $q->where('custom_domain', $host)
+                  ->orWhere('subdomain', $sub);
+            })->first();
+            if ($tenant) {
+                $tenantId = (int) $tenant->id;
+            }
+        } catch (\Throwable $e) {}
     }
 
     // Default fallback
