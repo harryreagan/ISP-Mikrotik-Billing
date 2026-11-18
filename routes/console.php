@@ -36,6 +36,10 @@ Schedule::call(function () {
     Artisan::call('app:poll-router-logs');
 })->name('poll-router-logs')->everyMinute()->withoutOverlapping();
 
+Artisan::starting(function ($artisan) {
+    $artisan->resolveCommands([\App\Console\Commands\CheckRouterOfflineAlertsCommand::class]);
+});
+
 Schedule::command('isp:lifecycle-automations')->everyMinute()->withoutOverlapping();
 Schedule::command('isp:check-router-offline-alerts')->everyFiveMinutes()->withoutOverlapping();
 
