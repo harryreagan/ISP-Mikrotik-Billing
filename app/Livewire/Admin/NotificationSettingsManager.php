@@ -210,6 +210,15 @@ class NotificationSettingsManager extends Component
             'customerEvents'   => $customerEvents,
             'defaultTemplates' => $defaultTemplates,
             'recentLogs'       => $recentLogs,
+            'activeTab'        => $this->activeTab,
+            'owner_phone'      => $this->owner_phone,
+            'owner_email'      => $this->owner_email,
+            'owner_whatsapp'   => $this->owner_whatsapp,
+            'events'           => $this->events,
+            'test_event'       => $this->test_event,
+            'test_channel'     => $this->test_channel,
+            'test_result'      => $this->test_result,
+            'test_status_type' => $this->test_status_type,
         ])->layout('layouts.app');
     }
 }
