@@ -159,3 +159,4 @@ class ZeroDowntimeMigration extends Component
         ])->layout('layouts.app');
     }
 }
+

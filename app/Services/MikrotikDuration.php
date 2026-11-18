@@ -139,3 +139,4 @@ class MikrotikDuration
         return "{$d} " . ($d === 1 ? 'Day' : 'Days');
     }
 }
+

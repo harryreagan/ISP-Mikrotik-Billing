@@ -36,18 +36,8 @@
                         <div class="bg-white dark__bg-1000 rounded-3 py-2">
                             <img class="img-dropdown" src="{{ asset('images/authentication-corner.png') }}" width="60"
                                 alt="" />
-                            @can('payment-collection')
-                                <a wire:navigate.hover wire:current="active" class="dropdown-item link-600 fw-medium"
-                                    href="{{ route('payment-collection') }}">{{ __('Payment Collection') }}</a>
-                            @endcan
-                            @can('payment-collection-edit')
-                                <a wire:navigate.hover wire:current="active" class="dropdown-item link-600 fw-medium"
-                                    href="{{ route('collection-edit') }}">{{ __('Collection Edit') }}</a>
-                            @endcan
-                            @can('payment-collection-invoice')
-                                <a wire:navigate.hover wire:current="active" class="dropdown-item link-600 fw-medium"
-                                    href="{{ route('payment-invoice') }}">{{ __('Payment Invoice') }}</a>
-                            @endcan
+                            <a wire:navigate.hover wire:current="active" class="dropdown-item link-600 fw-medium"
+                                href="{{ route('payment-collection') }}">{{ __('Payments & Statements') }}</a>
                             @canany(['payment-collection-report', 'collection-list', 'without-collection-list',
                                 'amount-collection'])
                                 <a wire:navigate.hover wire:current="active" class="dropdown-item link-600 fw-medium"
@@ -168,19 +158,7 @@
                         <img class="img-dropdown" src="{{ asset('images/authentication-corner.png') }}"
                             width="60" alt="" />
                         <a wire:navigate.hover wire:current="active" class="dropdown-item link-600 fw-medium"
-                            href="{{ route('payment-collection') }}">{{ __('Payment Collection') }}</a>
-                        <a wire:navigate.hover wire:current="active" class="dropdown-item link-600 fw-medium"
-                            href="{{ route('collection-edit') }}">
-                            {{ __('Collection Edit') }}
-                        </a>
-                        <a wire:navigate.hover wire:current="active" class="dropdown-item link-600 fw-medium"
-                            href="{{ route('payment-invoice') }}">
-                            {{ __('Payment Invoice') }}
-                        </a>
-                        <a wire:navigate.hover wire:current="active" class="dropdown-item link-600 fw-medium"
-                            href="{{ route('admin.unmatched-payments') }}">
-                            {{ __('Unmatched Payments') }}
-                        </a>
+                            href="{{ route('admin.transactions') }}">{{ __('Payments & Statements Hub') }}</a>
                         <a wire:navigate.hover wire:current="active" class="dropdown-item link-600 fw-medium"
                             href="{{ route('admin.payment-gateways') }}">
                             {{ __('Payment Gateways') }}

@@ -86,3 +86,4 @@ RSC;
         $this->assertEquals('30m', $voucher30m->validity_duration);
     }
 }
+

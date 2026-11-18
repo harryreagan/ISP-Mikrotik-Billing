@@ -358,10 +358,11 @@ Route::middleware([
         Route::get('/address', AddressSetup::class)->name('address-setup');
         Route::get('/create-customer', NewCustomer::class)->name('new-customer');
 
-        // payment routes
-        Route::get('/payment-collection', PaymentCollection::class)->name('payment-collection');
-        Route::get('/payment-collection-edit', CollectionEdit::class)->name('collection-edit');
-        Route::get('/payment-invoice', Invoice::class)->name('payment-invoice');
+        // payment routes (Unified Payments & Statements Hub)
+        Route::get('/payment-collection', \App\Livewire\Admin\UnifiedTransactionsHub::class)->name('payment-collection');
+        Route::get('/payment-collection-edit', \App\Livewire\Admin\UnifiedTransactionsHub::class)->name('collection-edit');
+        Route::get('/payment-invoice', \App\Livewire\Admin\UnifiedTransactionsHub::class)->name('payment-invoice');
+        Route::get('/transactions', \App\Livewire\Admin\UnifiedTransactionsHub::class)->name('transactions.hub');
 
         // all report
         Route::get('/customer-summary', CustomerSummary::class)->name('customer-summary');
@@ -421,9 +422,10 @@ Route::middleware([
             // Reseller Vouchers Audit
             Route::get('vouchers', AdminVoucherList::class)->name('vouchers');
 
-            // Kenyan Payment Gateways & Unmatched Payments
+            // Kenyan Payment Gateways & Unified Transactions / Unmatched Payments
             Route::get('payment-gateways', \App\Livewire\Admin\PaymentGatewaysManager::class)->name('payment-gateways');
-            Route::get('unmatched-payments', \App\Livewire\Admin\UnmatchedPayments::class)->name('unmatched-payments');
+            Route::get('unmatched-payments', \App\Livewire\Admin\UnifiedTransactionsHub::class)->name('unmatched-payments');
+            Route::get('transactions', \App\Livewire\Admin\UnifiedTransactionsHub::class)->name('transactions');
 
             // Package purchase requests
             Route::get('purchase-requests', ManagePurchaseRequests::class)->name('purchase-requests');

@@ -45,15 +45,19 @@ class ExpireRealtimeHotspotUsers extends Command
 
         // 2. Mark database records expired
         $now = now();
-        HotspotVoucher::where('status', 'used')
-            ->whereNotNull('expires_at')
-            ->where('expires_at', '<=', $now)
-            ->update(['status' => 'expired']);
+        if (\Illuminate\Support\Facades\Schema::hasColumn('hotspot_vouchers', 'expires_at')) {
+            HotspotVoucher::where('status', 'used')
+                ->whereNotNull('expires_at')
+                ->where('expires_at', '<=', $now)
+                ->update(['status' => 'expired']);
+        }
 
-        HotspotSale::where('status', 'completed')
-            ->whereNotNull('expires_at')
-            ->where('expires_at', '<=', $now)
-            ->update(['status' => 'expired']);
+        if (\Illuminate\Support\Facades\Schema::hasColumn('hotspot_sales', 'status') && \Illuminate\Support\Facades\Schema::hasColumn('hotspot_sales', 'expires_at')) {
+            HotspotSale::where('status', 'completed')
+                ->whereNotNull('expires_at')
+                ->where('expires_at', '<=', $now)
+                ->update(['status' => 'expired']);
+        }
     }
 
     /**
@@ -167,7 +171,7 @@ class ExpireRealtimeHotspotUsers extends Command
                         $reason = "DB voucher expired at " . $dbVoucher->expires_at;
                     }
 
-                    if (!$shouldDisconnect) {
+                    if (!$shouldDisconnect && \Illuminate\Support\Facades\Schema::hasColumn('hotspot_sales', 'expires_at')) {
                         $dbSale = HotspotSale::where(function ($q) use ($username) {
                             $q->where('voucher_code', $username)
                               ->orWhere('username', $username);

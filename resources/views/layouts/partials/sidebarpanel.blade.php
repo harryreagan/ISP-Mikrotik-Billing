@@ -49,33 +49,13 @@
                     <div class="row navbar-vertical-label-wrapper mt-3 mb-1">
                         <div class="col-auto navbar-vertical-label">{{ __('Finance') }}</div>
                     </div>
-                    @can('payment-collection')
-                        <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('payment-collection') }}"
-                            role="button">
-                            <div class="d-flex align-items-center">
-                                <span class="nav-link-icon"><i class="bi bi-cash-coin"></i></span>
-                                <span class="nav-link-text ps-1">{{ __('Payment Collection') }}</span>
-                            </div>
-                        </a>
-                    @endcan
-                    @can('payment-collection-edit')
-                        <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('collection-edit') }}"
-                            role="button">
-                            <div class="d-flex align-items-center">
-                                <span class="nav-link-icon"><i class="bi bi-pencil-square"></i></span>
-                                <span class="nav-link-text ps-1">{{ __('Collection Edit') }}</span>
-                            </div>
-                        </a>
-                    @endcan
-                    @can('payment-collection-invoice')
-                        <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('payment-invoice') }}"
-                            role="button">
-                            <div class="d-flex align-items-center">
-                                <span class="nav-link-icon"><i class="bi bi-receipt"></i></span>
-                                <span class="nav-link-text ps-1">{{ __('Payment Invoice') }}</span>
-                            </div>
-                        </a>
-                    @endcan
+                    <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('payment-collection') }}"
+                        role="button">
+                        <div class="d-flex align-items-center">
+                            <span class="nav-link-icon"><i class="bi bi-receipt-cutoff text-primary"></i></span>
+                            <span class="nav-link-text ps-1 fw-semibold">{{ __('Payments & Statements') }}</span>
+                        </div>
+                    </a>
                     @canany(['payment-collection-report', 'collection-list', 'without-collection-list',
                         'amount-collection'])
                         <a wire:navigate.hover wire:current="active" class="nav-link"
@@ -240,41 +220,21 @@
                     <div class="col-auto navbar-vertical-label">{{ __('Finance') }}</div>
                 </div>
 
-                <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('payment-collection') }}" role="button">
-                    <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-cash-coin"></i></span>
-                        <span class="nav-link-text ps-1">{{ __('Payment Collection') }}</span>
-                    </div>
-                </a>
+                @php
+                    $pendingUnmatchedCount = 0;
+                    try {
+                        if (\Illuminate\Support\Facades\Schema::hasTable('unmatched_payments')) {
+                            $pendingUnmatchedCount = \App\Models\UnmatchedPayment::where('status', 'pending')->count();
+                        }
+                    } catch (\Throwable $e) {}
+                @endphp
 
-                <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('collection-edit') }}" role="button">
+                <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.transactions') }}" role="button">
                     <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-pencil-square"></i></span>
-                        <span class="nav-link-text ps-1">{{ __('Collection Edit') }}</span>
-                    </div>
-                </a>
-
-                <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('payment-invoice') }}" role="button">
-                    <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-receipt"></i></span>
-                        <span class="nav-link-text ps-1">{{ __('Payment Invoice') }}</span>
-                    </div>
-                </a>
-
-                <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.unmatched-payments') }}" role="button">
-                    <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-patch-question"></i></span>
-                        <span class="nav-link-text ps-1">{{ __('Unmatched Payments') }}</span>
-                        @php
-                            $pendingUnmatchedCount = 0;
-                            try {
-                                if (\Illuminate\Support\Facades\Schema::hasTable('unmatched_payments')) {
-                                    $pendingUnmatchedCount = \App\Models\UnmatchedPayment::where('status', 'pending')->count();
-                                }
-                            } catch (\Throwable $e) {}
-                        @endphp
+                        <span class="nav-link-icon"><i class="bi bi-receipt-cutoff text-primary"></i></span>
+                        <span class="nav-link-text ps-1 fw-semibold">{{ __('Payments & Statements') }}</span>
                         @if($pendingUnmatchedCount > 0)
-                            <span class="badge rounded-pill ms-auto bg-warning">{{ $pendingUnmatchedCount }}</span>
+                            <span class="badge rounded-pill ms-auto bg-warning text-dark font-monospace" title="{{ $pendingUnmatchedCount }} unmatched deposits">{{ $pendingUnmatchedCount }}</span>
                         @endif
                     </div>
                 </a>
