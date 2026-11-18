@@ -49,3 +49,4 @@ class RouterPendingActivation extends Model
         return $this->belongsTo(HotspotSale::class, 'hotspot_sale_id');
     }
 }
+

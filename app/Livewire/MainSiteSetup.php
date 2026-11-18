@@ -110,7 +110,7 @@ class MainSiteSetup extends Component implements HasActions, HasForms
             'site_whatsapp' => MainSiteData::getValue('site_whatsapp'),
 
             // Billing & Invoicing
-            'site_currency' => MainSiteData::getValue('site_currency', 'BDT'),
+            'site_currency' => MainSiteData::getValue('site_currency', 'KES'),
             'site_invoice_prefix' => MainSiteData::getValue('site_invoice_prefix', 'INV-'),
             'customer_id_prefix' => MainSiteData::getValue('customer_id_prefix', 'FCNET'),
             'site_invoice_logo' => MainSiteData::getValue('site_invoice_logo'),

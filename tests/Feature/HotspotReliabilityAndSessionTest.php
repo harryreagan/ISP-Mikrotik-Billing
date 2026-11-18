@@ -175,3 +175,4 @@ class HotspotReliabilityAndSessionTest extends TestCase
         $this->assertNotEquals(500, $jsonResp->getStatusCode());
     }
 }
+

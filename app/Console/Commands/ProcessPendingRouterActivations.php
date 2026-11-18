@@ -20,3 +20,4 @@ class ProcessPendingRouterActivations extends Command
         return Command::SUCCESS;
     }
 }
+

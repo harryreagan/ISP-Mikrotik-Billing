@@ -36,7 +36,12 @@ if (! function_exists('siteUrlSettings')) {
                 return $runtimeCache[$cacheKey];
             }
 
-            return $runtimeCache[$cacheKey] = \App\Models\MainSiteData::getValue($key);
+            $val = \App\Models\MainSiteData::getValue($key);
+            if (($key === 'site_currency' || $key === 'currency_symbol' || $key === 'site_currency_symbol') && (empty($val) || strtoupper($val) === 'BDT' || $val === '৳')) {
+                $val = 'KES';
+            }
+
+            return $runtimeCache[$cacheKey] = $val;
         } catch (\Throwable $e) {
             return null;
         }

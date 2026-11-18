@@ -150,3 +150,4 @@ class AuditExpiredSessionsCommand extends Command
         return Command::SUCCESS;
     }
 }
+
