@@ -36,7 +36,7 @@
         <!-- Brand Title: Hidden on screens < md, small & truncated on md+ -->
         <div class="d-none d-md-flex align-items-center text-truncate me-2" style="max-width: 220px;">
             <a href="{{ route('dashboard') }}" class="text-decoration-none text-truncate d-flex align-items-center gap-1.5" style="max-width: 220px;">
-                <span class="fw-semibold text-truncate" style="font-size: 0.875rem; color: #0f172a; max-width: 220px;">{{ $topBrandName }}</span>
+                <span class="fw-semibold text-truncate" style="font-size: 0.875rem; color: var(--text-primary, #0f172a); max-width: 220px;">{{ $topBrandName }}</span>
             </a>
         </div>
 
@@ -45,11 +45,11 @@
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-0 py-0 align-items-center" style="font-size: 0.8125rem; font-weight: 500;">
                     <li class="breadcrumb-item d-flex align-items-center text-truncate">
-                        <a href="{{ route('dashboard') }}" class="text-secondary text-decoration-none d-flex align-items-center gap-1 text-truncate" style="color: #64748b;">
-                            <span class="bi bi-house-door-fill" style="color: #94a3b8; font-size: 13px;"></span>
+                        <a href="{{ route('dashboard') }}" class="text-secondary text-decoration-none d-flex align-items-center gap-1 text-truncate" style="color: var(--text-secondary, #64748b);">
+                            <span class="bi bi-house-door-fill" style="color: var(--text-secondary, #94a3b8); font-size: 13px;"></span>
                         </a>
                     </li>
-                    <li class="breadcrumb-item active text-dark fw-bold text-truncate" aria-current="page" style="color: #0f172a;">
+                    <li class="breadcrumb-item active fw-bold text-truncate" aria-current="page" style="color: var(--text-primary, #0f172a);">
                         {{ $header ?? __('Dashboard') }}
                     </li>
                 </ol>
@@ -76,7 +76,7 @@
 
         <div class="d-none d-md-flex align-items-center text-truncate me-2" style="max-width: 220px;">
             <a href="{{ route('dashboard') }}" class="text-decoration-none text-truncate d-flex align-items-center gap-1.5" style="max-width: 220px;">
-                <span class="fw-semibold text-truncate" style="font-size: 0.875rem; color: #0f172a; max-width: 220px;">{{ $topBrandName }}</span>
+                <span class="fw-semibold text-truncate" style="font-size: 0.875rem; color: var(--text-primary, #0f172a); max-width: 220px;">{{ $topBrandName }}</span>
             </a>
         </div>
     </div>

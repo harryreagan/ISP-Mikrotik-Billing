@@ -192,6 +192,7 @@
             display: flex !important;
             align-items: center !important;
             border-bottom: 1px solid var(--border-ring) !important;
+            background: var(--surface) !important;
         }
 
         .navbar-vertical-collapsed .navbar-vertical .navbar-brand {
@@ -311,11 +312,27 @@
             font-weight: 600 !important;
         }
 
+        html.dark .navbar-vertical .nav-link.active,
+        html.dark .mobile-sidebar-drawer .nav-link.active,
+        [data-bs-theme="dark"] .navbar-vertical .nav-link.active,
+        [data-bs-theme="dark"] .mobile-sidebar-drawer .nav-link.active {
+            background: rgba(249, 115, 22, 0.16) !important;
+            color: #f97316 !important;
+            font-weight: 600 !important;
+        }
+
         .navbar-vertical .nav-link.active .nav-link-icon,
         .navbar-vertical .nav-link.active i,
         .mobile-sidebar-drawer .nav-link.active .nav-link-icon,
         .mobile-sidebar-drawer .nav-link.active i {
             color: #ea580c !important;
+        }
+
+        html.dark .navbar-vertical .nav-link.active .nav-link-icon,
+        html.dark .navbar-vertical .nav-link.active i,
+        [data-bs-theme="dark"] .navbar-vertical .nav-link.active .nav-link-icon,
+        [data-bs-theme="dark"] .navbar-vertical .nav-link.active i {
+            color: #f97316 !important;
         }
 
         /* Top Bar Styling: Flat White, Thin 1px Bottom Border, Touch Cleanly */
@@ -403,8 +420,16 @@
                 min-width: 16rem !important;
                 max-width: 16rem !important;
                 z-index: 1025 !important;
-                background: #ffffff !important;
+                background: var(--surface, #ffffff) !important;
                 border-right: 1px solid var(--border-ring) !important;
+                box-shadow: 1px 0 0 rgba(0, 0, 0, 0.04), 4px 0 20px rgba(15, 23, 42, 0.03) !important;
+            }
+
+            html.dark .navbar-vertical,
+            [data-bs-theme="dark"] .navbar-vertical {
+                background: var(--surface, #171b2e) !important;
+                border-right: 1px solid var(--border-ring, rgba(51, 65, 85, 0.6)) !important;
+                box-shadow: 1px 0 0 rgba(255, 255, 255, 0.06), 6px 0 28px rgba(0, 0, 0, 0.4) !important;
             }
 
             .content,

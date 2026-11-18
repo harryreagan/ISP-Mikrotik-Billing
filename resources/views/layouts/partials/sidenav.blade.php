@@ -8,7 +8,7 @@
             </button>
             <a class="navbar-brand me-1 me-sm-3" href="{{ route('dashboard') }}">
                 <div class="d-flex align-items-center">
-                    <x-hsmart-logo color="dark" height="34px" />
+                    <x-hsmart-logo color="auto" height="34px" />
                 </div>
             </a>
             @include('layouts.partials.searchbar')
@@ -31,7 +31,7 @@
     </button>
     <a class="navbar-brand me-1 me-sm-3" href="{{ route('dashboard') }}">
         <div class="d-flex align-items-center">
-            <x-hsmart-logo color="dark" height="34px" />
+            <x-hsmart-logo color="auto" height="34px" />
         </div>
     </a>
     <div class="collapse navbar-collapse scrollbar" id="navbarStandard">
@@ -48,9 +48,9 @@
             document.querySelector('.navbar-vertical').classList.add(`navbar-${navbarStyle}`);
         }
     </script>
-    <div class="d-flex align-items-center justify-content-between px-3 border-bottom border-200" style="height: 64px;">
+    <div class="d-flex align-items-center justify-content-between px-3 border-bottom border-200" style="height: 64px; background: var(--surface);">
         <a class="navbar-brand m-0 p-0 text-decoration-none d-flex align-items-center" href="{{ route('dashboard') }}" style="text-decoration: none;">
-            <x-hsmart-logo color="dark" height="40px" />
+            <x-hsmart-logo color="auto" height="40px" />
         </a>
     </div>
     <div class="collapse navbar-collapse" id="navbarVerticalCollapse">
@@ -64,15 +64,15 @@
 <div id="mobileDrawerBackdrop" class="mobile-drawer-backdrop" onclick="window.closeMobileDrawer && window.closeMobileDrawer(event)" aria-hidden="true" style="display: none;"></div>
 
 <div id="mobileSidebarDrawer" class="mobile-sidebar-drawer" aria-label="Mobile Navigation" role="dialog" aria-modal="true" style="display: none;">
-    <div class="mobile-drawer-header d-flex align-items-center justify-content-between px-3 border-bottom" style="height: 64px; flex-shrink: 0; background: #ffffff;">
+    <div class="mobile-drawer-header d-flex align-items-center justify-content-between px-3 border-bottom" style="height: 64px; flex-shrink: 0; background: var(--surface);">
         <a class="navbar-brand m-0 p-0 text-decoration-none d-flex align-items-center" href="{{ route('dashboard') }}">
-            <x-hsmart-logo color="dark" height="36px" />
+            <x-hsmart-logo color="auto" height="36px" />
         </a>
         <button type="button" class="btn btn-sm btn-link text-secondary p-1 text-decoration-none" id="mobileDrawerCloseBtn" onclick="window.closeMobileDrawer && window.closeMobileDrawer(event)" aria-label="Close menu" style="font-size: 1.25rem; width: 36px; height: 36px; display: inline-grid; place-items: center; border-radius: 8px;">
             <i class="bi bi-x-lg"></i>
         </button>
     </div>
-    <div class="mobile-drawer-body scrollbar" style="flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding-bottom: 2.5rem; background: #ffffff;">
+    <div class="mobile-drawer-body scrollbar" style="flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding-bottom: 2.5rem; background: var(--surface);">
         @include('layouts.partials.sidebarpanel')
     </div>
 </div>

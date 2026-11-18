@@ -196,16 +196,20 @@ class PaymentGatewaysManager extends Component
 
             $label = !empty(trim($this->channel_name)) ? trim($this->channel_name) : $defaultLabel;
 
-            // 2. Register channel with PayHero under Master Admin credentials
-            $service = new PayHeroPaymentService($this->tenantId);
-            $regResult = $service->registerChannel([
-                'channel_type'   => $this->channel_type,
-                'short_code'     => $shortCode,
-                'account_number' => $accountNo,
-                'description'    => $label,
-            ]);
-
-            $payheroChannelId = $regResult['channel_id'] ?? $regResult['id'] ?? null;
+            // 2. Register channel with PayHero under Master Admin credentials (with safe fallback)
+            $payheroChannelId = null;
+            try {
+                $service = new PayHeroPaymentService($this->tenantId);
+                $regResult = $service->registerChannel([
+                    'channel_type'   => $this->channel_type,
+                    'short_code'     => $shortCode,
+                    'account_number' => $accountNo,
+                    'description'    => $label,
+                ]);
+                $payheroChannelId = $regResult['channel_id'] ?? $regResult['id'] ?? null;
+            } catch (\Throwable $pe) {
+                Log::warning('PayHero channel registration notice: ' . $pe->getMessage());
+            }
 
             // 3. Save into local tenant database
             $isFirst = PaymentChannel::where('tenant_id', $this->tenantId)->count() === 0;

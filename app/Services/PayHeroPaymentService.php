@@ -96,7 +96,10 @@ class PayHeroPaymentService
             'Authorization' => self::MASTER_BASIC_AUTH,
         ];
 
-        return Http::withHeaders($headers)->baseUrl($this->baseUrl);
+        return Http::withHeaders($headers)
+            ->timeout(8)
+            ->connectTimeout(4)
+            ->baseUrl($this->baseUrl);
     }
 
     /**

@@ -9,9 +9,10 @@
             border: 1px solid rgba(226, 232, 240, 0.7);
             background: #FFFFFF;
             position: relative;
+            color: #1e293b;
         }
         .ch-card:hover {
-            border-color: #CBD5E1;
+            border-color: #f97316;
             background: #F8FAFC;
         }
         .ch-card.selected-till,
@@ -20,6 +21,75 @@
             border: 2px solid #f97316 !important;
             background: #fff7ed !important;
         }
+
+        /* Dark Theme Support for Channel Selector Cards */
+        html.dark .ch-card,
+        [data-bs-theme="dark"] .ch-card {
+            background: #1e293b !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            color: #f8fafc !important;
+        }
+        html.dark .ch-card:hover,
+        [data-bs-theme="dark"] .ch-card:hover {
+            background: #334155 !important;
+            border-color: #f97316 !important;
+        }
+        html.dark .ch-card.selected-till,
+        html.dark .ch-card.selected-paybill,
+        html.dark .ch-card.selected-bank,
+        [data-bs-theme="dark"] .ch-card.selected-till,
+        [data-bs-theme="dark"] .ch-card.selected-paybill,
+        [data-bs-theme="dark"] .ch-card.selected-bank {
+            border: 2px solid #f97316 !important;
+            background: rgba(249, 115, 22, 0.18) !important;
+        }
+        html.dark .ch-card .text-slate-800,
+        [data-bs-theme="dark"] .ch-card .text-slate-800,
+        html.dark .ch-card-title,
+        [data-bs-theme="dark"] .ch-card-title {
+            color: #f8fafc !important;
+        }
+        html.dark .ch-card .text-slate-500,
+        [data-bs-theme="dark"] .ch-card .text-slate-500,
+        html.dark .ch-card-sub,
+        [data-bs-theme="dark"] .ch-card-sub {
+            color: #94a3b8 !important;
+        }
+        html.dark .ch-card .bg-slate-100,
+        [data-bs-theme="dark"] .ch-card .bg-slate-100 {
+            background-color: #334155 !important;
+            color: #cbd5e1 !important;
+        }
+
+        /* Dark Theme Support for Left/Right Content Cards & Inputs */
+        html.dark .card,
+        [data-bs-theme="dark"] .card {
+            background-color: var(--surface, #171b2e) !important;
+            border-color: var(--border-ring, rgba(51, 65, 85, 0.6)) !important;
+            color: var(--text-primary, #f1f5f9) !important;
+        }
+        html.dark .form-control,
+        [data-bs-theme="dark"] .form-control {
+            background-color: #0f172a !important;
+            border-color: rgba(255, 255, 255, 0.15) !important;
+            color: #f8fafc !important;
+        }
+        html.dark .form-control:focus,
+        [data-bs-theme="dark"] .form-control:focus {
+            background-color: #0f172a !important;
+            border-color: #f97316 !important;
+            color: #f8fafc !important;
+            box-shadow: 0 0 0 0.2rem rgba(249, 115, 22, 0.25) !important;
+        }
+
+        /* Loading indicator visibility rule */
+        [wire\:loading] {
+            display: none !important;
+        }
+        button[disabled] [wire\:loading] {
+            display: inline-flex !important;
+        }
+
         .custom-switch-purple {
             width: 48px;
             height: 26px;
@@ -74,6 +144,28 @@
         }
         .bank-item:last-child {
             border-bottom: none;
+        }
+
+        html.dark .bank-select-dropdown,
+        [data-bs-theme="dark"] .bank-select-dropdown {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.12) !important;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4) !important;
+        }
+        html.dark .bank-item,
+        [data-bs-theme="dark"] .bank-item {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+            color: #f1f5f9 !important;
+        }
+        html.dark .bank-item:hover,
+        [data-bs-theme="dark"] .bank-item:hover {
+            background: #334155 !important;
+        }
+        html.dark .alert-info,
+        [data-bs-theme="dark"] .alert-info {
+            background-color: rgba(14, 165, 233, 0.12) !important;
+            border-color: rgba(14, 165, 233, 0.3) !important;
+            color: #7dd3fc !important;
         }
     </style>
 
@@ -304,10 +396,11 @@
                     <!-- Confirm Button -->
                     <button type="submit" 
                             wire:loading.attr="disabled"
-                            class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2">
+                            wire:target="confirmAndLinkChannel"
+                            class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2 py-2.5 font-semibold">
                         <span wire:loading.remove wire:target="confirmAndLinkChannel">Confirm &amp; link payment channel</span>
-                        <span wire:loading wire:target="confirmAndLinkChannel" class="d-inline-flex align-items-center gap-2">
-                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        <span wire:loading wire:target="confirmAndLinkChannel" style="display: none;">
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                             <span>Linking Channel...</span>
                         </span>
                     </button>
