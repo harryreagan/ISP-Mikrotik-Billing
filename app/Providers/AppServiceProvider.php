@@ -95,6 +95,15 @@ class AppServiceProvider extends ServiceProvider
         if (class_exists(\App\Models\PaymentSummary::class)) {
             \App\Models\PaymentSummary::observe(\App\Observers\PaymentHubObserver::class);
         }
+        if (class_exists(\App\Models\MpesaStkTransaction::class)) {
+            \App\Models\MpesaStkTransaction::observe(\App\Observers\PaymentHubObserver::class);
+        }
+        if (class_exists(\App\Models\CollectionSummary::class)) {
+            \App\Models\CollectionSummary::observe(\App\Observers\PaymentHubObserver::class);
+        }
+        if (class_exists(\App\Models\HotspotSale::class)) {
+            \App\Models\HotspotSale::observe(\App\Observers\PaymentHubObserver::class);
+        }
 
         // ISP Hub Console Commands
         if ($this->app->runningInConsole()) {
