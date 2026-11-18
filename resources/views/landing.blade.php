@@ -1614,7 +1614,8 @@
                         $isCustom = ($basePriceKes === null);
                         $isPopular = !empty($plan['is_popular']) || !empty($plan['highlighted']) || !empty($plan['badge']);
                         $badgeText = !empty($plan['badge']) ? $plan['badge'] : ($isPopular ? 'POPULAR' : null);
-                        $btnUrl = !empty($plan['button_url']) ? $plan['button_url'] : ($isCustom ? $whatsAppUrl : ($registerUrl . '?plan=' . ($plan['slug'] ?? 'starter')));
+                        $planTargetUrl = auth()->check() ? url('/subscription?plan=' . ($plan['slug'] ?? 'starter')) : ($registerUrl . '?plan=' . ($plan['slug'] ?? 'starter'));
+                        $btnUrl = $isCustom ? $whatsAppUrl : (auth()->check() ? url('/subscription?plan=' . ($plan['slug'] ?? 'starter')) : (!empty($plan['button_url']) ? $plan['button_url'] : $planTargetUrl));
                         $btnText = !empty($plan['button_text']) ? $plan['button_text'] : ($isCustom ? 'Talk to us' : 'Choose Plan');
                         $features = is_array($plan['features'] ?? null) ? $plan['features'] : [];
                     @endphp

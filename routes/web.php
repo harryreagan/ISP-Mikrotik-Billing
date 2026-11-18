@@ -260,9 +260,16 @@ Route::get('/portal', function (\Illuminate\Http\Request $r) {
     return redirect('/portal/login');
 });
 
-Route::get('/billing', function () {
-    return auth()->check() ? redirect()->route('dashboard') : redirect()->route('login');
+// ── ISP Tenant Subscription & Automated Billing ──
+Route::middleware(['auth'])->group(function () {
+    Route::get('/subscription', [\App\Http\Controllers\TenantSubscriptionController::class, 'index'])->name('subscription.index');
+    Route::get('/billing', fn() => redirect()->route('subscription.index'))->name('billing');
+    Route::post('/subscription/pay/mpesa', [\App\Http\Controllers\TenantSubscriptionController::class, 'initiateMpesa'])->name('subscription.pay.mpesa');
+    Route::get('/subscription/check-status/{reference}', [\App\Http\Controllers\TenantSubscriptionController::class, 'checkStatus'])->name('subscription.check-status');
 });
+
+// Subscription Webhook Callback (PayHero / Mpesa)
+Route::post('/api/subscription/callback', [\App\Http\Controllers\TenantSubscriptionController::class, 'webhookCallback'])->name('api.subscription.callback');
 
 // Authentication & Verification Extensions (Email/Phone OTP, Password Reset & Google OAuth)
 Route::post('/forgot-password', [\App\Http\Controllers\Auth\CustomAuthController::class, 'handleForgotPassword'])->name('password.email');

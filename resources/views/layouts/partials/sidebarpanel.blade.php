@@ -246,6 +246,13 @@
                     </div>
                 </a>
 
+                <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('subscription.index') }}" role="button">
+                    <div class="d-flex align-items-center">
+                        <span class="nav-link-icon"><i class="bi bi-shield-check text-success"></i></span>
+                        <span class="nav-link-text ps-1">{{ __('Subscription & Plan') }}</span>
+                    </div>
+                </a>
+
                 <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin.expenses') }}" role="button">
                     <div class="d-flex align-items-center">
                         <span class="nav-link-icon"><i class="bi bi-wallet2"></i></span>
