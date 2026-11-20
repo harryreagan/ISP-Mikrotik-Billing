@@ -6,14 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\HotspotSale;
 use App\Models\MpesaStkTransaction;
 use App\Models\PackageList;
+use App\Models\PrepaidUser;
 use App\Models\Router;
+use App\Services\CaptivePortalTemplates;
 use App\Services\MikrotikApiService;
+use App\Services\MikrotikDuration;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class CaptivePortalApiController extends Controller
 {
@@ -45,36 +48,46 @@ class CaptivePortalApiController extends Controller
         }
 
         try {
-            // Check 1: Input is a Phone Number
+            $tenantId = max(1, $tenantId);
+
+            // Check 1: Input is a Phone Number (strictly isolated to $tenantId)
             $cleanDigits = preg_replace('/[^\d]/', '', $rawInput);
             if (strlen($cleanDigits) >= 9 && strlen($cleanDigits) <= 13 && (str_starts_with($rawInput, '0') || str_starts_with($rawInput, '254') || str_starts_with($rawInput, '7') || str_starts_with($rawInput, '1'))) {
                 $normPhone = function_exists('normalizeKenyanPhone') ? normalizeKenyanPhone($rawInput) : $rawInput;
 
-                // Find latest successful transaction for this phone
                 $tx = MpesaStkTransaction::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
                     ->where('status', 'completed')
                     ->where(function ($q) use ($rawInput, $normPhone) {
                         $q->where('phone', $normPhone)->orWhere('phone', $rawInput);
                     })
-                    ->when($tenantId > 0, fn($q) => $q->where('tenant_id', $tenantId))
                     ->latest('id')
                     ->first();
 
                 if ($tx) {
                     $receipt = strtoupper($tx->mpesa_receipt_number ?: $tx->checkout_request_id);
-                    $durationHours = $this->resolveDurationHours($tx);
+                    $sale = HotspotSale::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->where('voucher_code', $receipt)
+                        ->latest('id')
+                        ->first();
 
+                    $durationHours = $this->resolveDurationHours($tx);
                     $createdAt = Carbon::parse($tx->updated_at ?: $tx->created_at)->timezone('Africa/Nairobi');
-                    $expiresAt = (clone $createdAt)->addHours($durationHours);
+                    $expiresAt = ($sale && $sale->expires_at)
+                        ? Carbon::parse($sale->expires_at)->timezone('Africa/Nairobi')
+                        : (clone $createdAt)->addHours($durationHours);
 
                     if (now()->timezone('Africa/Nairobi')->lt($expiresAt)) {
+                        $roamError = $this->handleRoamingAndEnsureOnRouter($tenantId, $routerId, $sale?->router_id ?: $tx->router_id, $receipt, $expiresAt, $sale?->profile);
+                        if ($roamError) {
+                            return $this->withCors(response()->json(['status' => 'error', 'message' => $roamError]));
+                        }
+
                         $remainingMin = now()->timezone('Africa/Nairobi')->diffInMinutes($expiresAt);
                         $remainingHuman = $remainingMin > 60
                             ? round($remainingMin / 60, 1) . ' hours remaining'
-                            : $remainingMin . ' minutes remaining';
-
-                        // Ensure user on router
-                        $this->ensureHotspotUserOnRouter($routerId, $receipt, $durationHours);
+                            : max(1, $remainingMin) . ' minutes remaining';
 
                         return $this->withCors(response()->json([
                             'status'          => 'active',
@@ -82,7 +95,7 @@ class CaptivePortalApiController extends Controller
                             'password'        => $receipt,
                             'voucher_code'    => $receipt,
                             'remaining_human' => $remainingHuman,
-                            'message'         => "Welcome back! Your {$durationHours}h package is active ({$remainingHuman}). Connecting...",
+                            'message'         => "Welcome back! Your package is active ({$remainingHuman}). Connecting...",
                         ]));
                     } else {
                         return $this->withCors(response()->json([
@@ -95,26 +108,38 @@ class CaptivePortalApiController extends Controller
                 }
             }
 
-            // Check 2: Input is an M-Pesa Receipt Code or Voucher Code
+            // Check 2: Input is an M-Pesa Receipt Code or Voucher Code (strictly isolated to $tenantId)
             $upperCode = strtoupper($rawInput);
             $txByCode = MpesaStkTransaction::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
                 ->where('status', 'completed')
                 ->where('mpesa_receipt_number', $upperCode)
                 ->latest('id')
                 ->first();
 
             if ($txByCode) {
+                $sale = HotspotSale::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('voucher_code', $upperCode)
+                    ->latest('id')
+                    ->first();
+
                 $durationHours = $this->resolveDurationHours($txByCode);
                 $createdAt = Carbon::parse($txByCode->updated_at ?: $txByCode->created_at)->timezone('Africa/Nairobi');
-                $expiresAt = (clone $createdAt)->addHours($durationHours);
+                $expiresAt = ($sale && $sale->expires_at)
+                    ? Carbon::parse($sale->expires_at)->timezone('Africa/Nairobi')
+                    : (clone $createdAt)->addHours($durationHours);
 
                 if (now()->timezone('Africa/Nairobi')->lt($expiresAt)) {
+                    $roamError = $this->handleRoamingAndEnsureOnRouter($tenantId, $routerId, $sale?->router_id ?: $txByCode->router_id, $upperCode, $expiresAt, $sale?->profile);
+                    if ($roamError) {
+                        return $this->withCors(response()->json(['status' => 'error', 'message' => $roamError]));
+                    }
+
                     $remainingMin = now()->timezone('Africa/Nairobi')->diffInMinutes($expiresAt);
                     $remainingHuman = $remainingMin > 60
                         ? round($remainingMin / 60, 1) . ' hours remaining'
-                        : $remainingMin . ' minutes remaining';
-
-                    $this->ensureHotspotUserOnRouter($routerId, $upperCode, $durationHours);
+                        : max(1, $remainingMin) . ' minutes remaining';
 
                     return $this->withCors(response()->json([
                         'status'          => 'active',
@@ -133,9 +158,10 @@ class CaptivePortalApiController extends Controller
                 }
             }
 
-            // Check 3: Check hotspot_sales table directly for this voucher
+            // Check 3: Check hotspot_sales table directly within $tenantId
             if (DB::getSchemaBuilder()->hasTable('hotspot_sales')) {
-                $sale = DB::table('hotspot_sales')
+                $sale = HotspotSale::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
                     ->where(function ($q) use ($upperCode, $rawInput) {
                         $q->where('voucher_code', $upperCode)->orWhere('username', $rawInput);
                     })
@@ -144,16 +170,22 @@ class CaptivePortalApiController extends Controller
 
                 if ($sale) {
                     $createdAt = Carbon::parse($sale->created_at ?: $sale->sale_date)->timezone('Africa/Nairobi');
-                    $expiresAt = (clone $createdAt)->addHours(24); // default 24h if unknown
+                    $expiresAt = $sale->expires_at
+                        ? Carbon::parse($sale->expires_at)->timezone('Africa/Nairobi')
+                        : (clone $createdAt)->addMinutes((int) ($sale->duration_minutes ?: 60));
 
-                    if (now()->timezone('Africa/Nairobi')->lt($expiresAt)) {
-                        $this->ensureHotspotUserOnRouter($routerId, $upperCode, 24);
+                    if ($sale->status !== 'expired' && now()->timezone('Africa/Nairobi')->lt($expiresAt)) {
+                        $roamError = $this->handleRoamingAndEnsureOnRouter($tenantId, $routerId, $sale->router_id, $upperCode, $expiresAt, $sale->profile);
+                        if ($roamError) {
+                            return $this->withCors(response()->json(['status' => 'error', 'message' => $roamError]));
+                        }
+
                         return $this->withCors(response()->json([
                             'status'          => 'active',
                             'username'        => $upperCode,
                             'password'        => $upperCode,
                             'voucher_code'    => $upperCode,
-                            'remaining_human' => 'Active',
+                            'remaining_human' => now()->timezone('Africa/Nairobi')->diffInMinutes($expiresAt) . ' minutes remaining',
                             'message'         => "Active package found! Connecting...",
                         ]));
                     }
@@ -188,16 +220,17 @@ class CaptivePortalApiController extends Controller
         }
 
         try {
+            $tenantId = max(1, $tenantId);
             $now = Carbon::now('Africa/Nairobi');
 
-            // 1. Check latest HotspotSale for this MAC
+            // 1. Check latest HotspotSale for this MAC strictly inside $tenantId
             $sale = HotspotSale::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
                 ->where(function ($q) use ($mac) {
                     $q->where('mac_address', $mac)
                       ->orWhere('mac_address', strtoupper($mac))
                       ->orWhere('mac_address', strtolower($mac));
                 })
-                ->when($tenantId > 0, fn($q) => $q->where('tenant_id', $tenantId))
                 ->latest('id')
                 ->first();
 
@@ -229,8 +262,10 @@ class CaptivePortalApiController extends Controller
                     if ($remainingMins > 0) {
                         $voucher = $sale->voucher_code ?: ($sale->username ?: strtoupper($sale->mpesa_receipt ?? ''));
                         if (!empty($voucher)) {
-                            $durationHours = max(1, (int) ceil($remainingMins / 60));
-                            $this->ensureHotspotUserOnRouter($routerId, $voucher, $durationHours);
+                            $roamError = $this->handleRoamingAndEnsureOnRouter($tenantId, $routerId, $sale->router_id, $voucher, $saleExp, $sale->profile);
+                            if ($roamError) {
+                                return $this->withCors(response()->json(['status' => 'error', 'message' => $roamError]));
+                            }
 
                             return $this->withCors(response()->json([
                                 'status'          => 'active',
@@ -245,14 +280,14 @@ class CaptivePortalApiController extends Controller
                 }
             }
 
-            // 2. Fallback to check MpesaStkTransaction
+            // 2. Fallback to check MpesaStkTransaction strictly inside $tenantId
             $tx = MpesaStkTransaction::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
                 ->where('status', 'completed')
                 ->where(function ($q) use ($mac) {
                     $q->where('raw_callback', 'like', '%' . $mac . '%')
                       ->orWhere('reference', 'like', '%' . $mac . '%');
                 })
-                ->when($tenantId > 0, fn($q) => $q->where('tenant_id', $tenantId))
                 ->latest('id')
                 ->first();
 
@@ -263,7 +298,10 @@ class CaptivePortalApiController extends Controller
 
                 if ($now->lt($expiresAt)) {
                     $receipt = strtoupper($tx->mpesa_receipt_number ?: $tx->checkout_request_id);
-                    $this->ensureHotspotUserOnRouter($routerId, $receipt, $durationHours);
+                    $roamError = $this->handleRoamingAndEnsureOnRouter($tenantId, $routerId, $tx->router_id, $receipt, $expiresAt, null);
+                    if ($roamError) {
+                        return $this->withCors(response()->json(['status' => 'error', 'message' => $roamError]));
+                    }
 
                     return $this->withCors(response()->json([
                         'status'          => 'active',
@@ -342,56 +380,104 @@ class CaptivePortalApiController extends Controller
     }
 
     /**
-     * Ensure Hotspot User exists on MikroTik Router with correct profile and uptime limits.
+     * Check tenant allow_roaming policy, record same-tenant roaming on PrepaidUser, and ensure hotspot user exists on Router B.
      */
-    protected function ensureHotspotUserOnRouter(int $routerId, string $username, int $durationHours): void
-    {
-        if ($routerId <= 0) return;
+    protected function handleRoamingAndEnsureOnRouter(
+        int $tenantId,
+        int $targetRouterId,
+        ?int $originRouterId,
+        string $username,
+        Carbon $expiresAt,
+        ?string $profileName = null
+    ): ?string {
+        if ($targetRouterId <= 0) {
+            return null;
+        }
 
-        $router = Router::withoutGlobalScopes()->find($routerId);
-        if (!$router) return;
+        $targetRouter = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($targetRouterId);
+        if (!$targetRouter) {
+            return 'Router does not belong to this network.';
+        }
 
-        $host = $router->vpn_ip ?: $router->ip;
-        $port = (int) ($router->api_port ?: 8728);
-        $user = $router->api_user ?: ($router->username ?: 'admin');
-        $pass = '';
+        if ($originRouterId && $originRouterId !== $targetRouterId) {
+            $allowRoaming = true;
+            try {
+                if (Schema::hasTable('isp_portal_settings') && Schema::hasColumn('isp_portal_settings', 'allow_roaming')) {
+                    $val = DB::table('isp_portal_settings')->where('tenant_id', $tenantId)->value('allow_roaming');
+                    if ($val !== null) {
+                        $allowRoaming = (bool) $val;
+                    }
+                }
+            } catch (\Throwable $e) {}
 
-        $keys = [
-            'base64:OsvBUcJog9u3L7RHpAXOV3lAVumKIyCIOscxYwKXufQ=',
-            'base64:NSLTh+nKIi546KF1WfENeIVjjBvu0SSvE2kgyiFu7CE=',
-            'base64:motZaNhPAm6uv5uffwL6kbrJdtOu3qgrdgjtXarDoaU=',
-            'base64:CGygtTkIhnvb+mwr8Mv5j5DjDkgmbq9ej3mmKwHcS5g=',
-        ];
-
-        try {
-            $pass = Crypt::decryptString($router->api_password ?: $router->password);
-        } catch (\Throwable $e) {
-            foreach ($keys as $k) {
-                try {
-                    $rawKey = base64_decode(substr($k, 7));
-                    $enc = new \Illuminate\Encryption\Encrypter($rawKey, 'AES-256-CBC');
-                    $pass = $enc->decryptString($router->api_password ?: $router->password);
-                    break;
-                } catch (\Throwable $e2) {}
+            if (!$allowRoaming) {
+                return 'Roaming across routers is disabled for this network. Please connect using your original Wi-Fi router.';
             }
-            if (empty($pass)) {
-                $pass = $router->api_password ?: $router->password;
+
+            if (Schema::hasTable('prepaid_users')) {
+                PrepaidUser::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->whereRaw('LOWER(username) = ?', [strtolower(trim($username))])
+                    ->update([
+                        'is_roaming'          => true,
+                        'roaming_router_id'   => $targetRouter->id,
+                        'roaming_router_name' => $targetRouter->name,
+                    ]);
             }
         }
+
+        $remainingSec = max(60, now()->timezone('Africa/Nairobi')->diffInSeconds($expiresAt, false));
+        $this->ensureHotspotUserOnRouter($targetRouterId, $username, max(1, (int) ceil($remainingSec / 3600)), $remainingSec, $expiresAt, $profileName, $tenantId);
+
+        return null;
+    }
+
+    /**
+     * Ensure Hotspot User exists on MikroTik Router with correct profile and remaining uptime limits.
+     */
+    protected function ensureHotspotUserOnRouter(
+        int $routerId,
+        string $username,
+        int $durationHours,
+        ?int $remainingSeconds = null,
+        ?Carbon $explicitExpiresAt = null,
+        ?string $profileName = null,
+        int $tenantId = 0
+    ): void {
+        if ($routerId <= 0) return;
+
+        $router = Router::withoutGlobalScopes()
+            ->when($tenantId > 0, fn($q) => $q->where('tenant_id', $tenantId))
+            ->find($routerId);
+        if (!$router) return;
+
+        $host = $router->vpn_ip ?: ($router->last_known_ip ?: $router->ip);
+        if (!$host) return;
+        $port = (int) ($router->api_port ?: 8728);
+        $user = $router->api_user ?: ($router->username ?: 'admin');
+        $pass = CaptivePortalTemplates::decryptRouterPassword($router->api_password ?: $router->password);
 
         try {
             $api = new MikrotikApiService($host, $port, $user, $pass, 6);
             $existing = $api->executeCommand('/ip/hotspot/user/print', [], ['name' => $username]);
 
-            $durationInfo = \App\Services\MikrotikDuration::parse($durationHours, 'hours');
-            $uptimeLimit = $durationInfo['mikrotik'];
-            $expiresAt = now()->timezone('Africa/Nairobi')->addSeconds($durationInfo['seconds']);
+            $secs = $remainingSeconds ?: ($durationHours * 3600);
+            $uptimeLimit = MikrotikDuration::secondsToMikrotik(max(60, $secs));
+            $expiresAt = $explicitExpiresAt ?: now()->timezone('Africa/Nairobi')->addSeconds($secs);
+
+            $resolvedProfile = 'default';
+            if (!empty($profileName) && $profileName !== 'default') {
+                $prof = $api->executeCommand('/ip/hotspot/user/profile/print', [], ['name' => $profileName]);
+                if (is_array($prof) && !empty($prof[0]['.id'])) {
+                    $resolvedProfile = $profileName;
+                }
+            }
 
             if (empty($existing) || !is_array($existing)) {
                 $api->executeCommand('/ip/hotspot/user/add', [
                     'name'         => $username,
                     'password'     => $username,
-                    'profile'      => 'default',
+                    'profile'      => $resolvedProfile,
                     'limit-uptime' => $uptimeLimit,
                     'comment'      => 'HSmart Hotspot exp:' . $expiresAt->toDateTimeString(),
                 ]);

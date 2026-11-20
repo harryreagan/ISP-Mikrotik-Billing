@@ -206,11 +206,21 @@
                     <tbody>
                         @forelse ($txRecords as $row)
                             @php
-                                $isHotspot = ($txTypeFilter === 'hotspot') || isset($row->voucher_code);
-                                $date = $isHotspot ? ($row->created_at ?? $row->sale_date) : ($row->collection_date ?? $row->created_at);
-                                $ref = $isHotspot ? ($row->voucher_code ?: 'HS-'.$row->id) : ($row->transaction_id ?: ($row->invoice_no ? '#'.$row->invoice_no : 'COL-'.$row->id));
-                                $amount = $isHotspot ? $row->amount : $row->collection_amount;
-                                $channel = $isHotspot ? ($row->payment_method ?: 'Portal STK') : ($row->payment_method ?: ($row->payment_type ?: $row->collected_by));
+                                $svcType = strtolower((string) ($row->service_type ?? ($row->payment_type === 'hotspot' ? 'hotspot' : 'pppoe')));
+                                $isHotspot = ($svcType === 'hotspot') || ($row->payment_type === 'hotspot');
+                                $date = $row->collection_date ?? $row->created_at;
+                                $ref = $row->transaction_id ?: ($row->invoice_no ? '#'.$row->invoice_no : 'COL-'.$row->id);
+                                $amount = $row->collection_amount;
+                                $channel = $row->payment_method ?: ($row->payment_type ?: $row->collected_by);
+
+                                $subDisplay = $row->customer?->customer_name
+                                    ?: ($row->subscriber_name
+                                        ?: ($row->customer?->pppUser?->username
+                                            ?: ($row->phone ?: ($row->customer_collection_unique_id ?: $ref))));
+                                $subPhone = $row->phone ?: ($row->customer?->mobile ?: ($row->customer_collection_unique_id ?: ''));
+                                $subExtra = $row->mac_address
+                                    ?: ($row->router?->name
+                                        ?: ($row->customer?->pppUser?->username ?: ''));
                             @endphp
                             <tr wire:key="tx-row-{{ $isHotspot ? 'hs' : 'col' }}-{{ $row->id }}">
                                 <td>
@@ -219,19 +229,27 @@
                                 </td>
                                 <td>
                                     <span class="font-monospace fw-bold text-primary">{{ $ref }}</span>
-                                </td>
-                                <td>
-                                    @if ($isHotspot)
-                                        <div class="fw-semibold text-dark">{{ $row->username ?: 'Hotspot Voucher' }}</div>
-                                        <small class="text-muted"><i class="bi bi-router me-1"></i>{{ $row->router_name ?: 'MikroTik Router' }}</small>
-                                    @else
-                                        <div class="fw-semibold text-dark">{{ $row->customer->customer_name ?? 'N/A' }}</div>
-                                        <small class="text-muted">{{ $row->customer->mobile ?? '' }} &bull; <span class="font-monospace">{{ $row->customer->pppUser->username ?? $row->customer_collection_unique_id }}</span></small>
+                                    @if($row->package)
+                                        <div><small class="text-muted">{{ $row->package->name }}</small></div>
                                     @endif
                                 </td>
                                 <td>
+                                    <div class="fw-semibold text-dark">{{ $subDisplay }}</div>
+                                    <small class="text-muted">
+                                        @if($subPhone)
+                                            {{ $subPhone }}
+                                        @endif
+                                        @if($subPhone && $subExtra)
+                                            &bull;
+                                        @endif
+                                        @if($subExtra)
+                                            <span class="font-monospace">{{ $subExtra }}</span>
+                                        @endif
+                                    </small>
+                                </td>
+                                <td>
                                     @if ($isHotspot)
-                                        <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-wifi me-1"></i>Hotspot</span>
+                                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle"><i class="bi bi-wifi me-1"></i>Hotspot</span>
                                     @else
                                         <span class="badge bg-primary-subtle text-primary border border-primary-subtle"><i class="bi bi-hdd-network me-1"></i>PPPoE</span>
                                     @endif
@@ -799,10 +817,13 @@
                         </div>
 
                         @php
-                            $isHs = ($selectedReceiptType === 'hotspot');
-                            $rDate = $isHs ? ($selectedReceiptData->created_at ?? $selectedReceiptData->sale_date) : ($selectedReceiptData->collection_date ?? $selectedReceiptData->created_at);
-                            $rAmount = $isHs ? $selectedReceiptData->amount : $selectedReceiptData->collection_amount;
-                            $rRef = $isHs ? ($selectedReceiptData->voucher_code ?: 'HS-'.$selectedReceiptData->id) : ($selectedReceiptData->transaction_id ?: ($selectedReceiptData->invoice_no ? '#'.$selectedReceiptData->invoice_no : 'COL-'.$selectedReceiptData->id));
+                            $rDate = $selectedReceiptData->collection_date ?? $selectedReceiptData->created_at;
+                            $rAmount = $selectedReceiptData->collection_amount ?? ($selectedReceiptData->amount ?? 0);
+                            $rRef = $selectedReceiptData->transaction_id ?: ($selectedReceiptData->invoice_no ? '#'.$selectedReceiptData->invoice_no : 'COL-'.$selectedReceiptData->id);
+                            $rSub = $selectedReceiptData->customer?->customer_name
+                                ?: ($selectedReceiptData->subscriber_name
+                                    ?: ($selectedReceiptData->phone ?: $selectedReceiptData->customer_collection_unique_id));
+                            $rChannel = $selectedReceiptData->payment_method ?: ($selectedReceiptData->payment_type ?: 'M-Pesa');
                         @endphp
 
                         <table class="table table-sm table-borderless small mb-3">
@@ -817,16 +838,12 @@
                             <tr>
                                 <td class="text-muted">{{ __('Customer / Account:') }}</td>
                                 <td class="text-end fw-semibold">
-                                    @if ($isHs)
-                                        {{ $selectedReceiptData->username ?: 'Hotspot Voucher' }}
-                                    @else
-                                        {{ $selectedReceiptData->customer->customer_name ?? 'N/A' }} ({{ $selectedReceiptData->customer_collection_unique_id }})
-                                    @endif
+                                    {{ $rSub }} ({{ $selectedReceiptData->phone ?: $selectedReceiptData->customer_collection_unique_id }})
                                 </td>
                             </tr>
                             <tr>
                                 <td class="text-muted">{{ __('Payment Channel:') }}</td>
-                                <td class="text-end">{{ ucfirst($isHs ? ($selectedReceiptData->payment_method ?: 'Portal STK') : ($selectedReceiptData->payment_method ?: ($selectedReceiptData->payment_type ?: 'Cash'))) }}</td>
+                                <td class="text-end">{{ ucfirst(str_replace('_', ' ', $rChannel)) }}</td>
                             </tr>
                             <tr class="border-top">
                                 <td class="fw-bold fs-6 text-dark pt-2">{{ __('Amount Paid:') }}</td>

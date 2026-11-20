@@ -439,6 +439,17 @@ Route::middleware([
 
             // Package purchase requests
             Route::get('purchase-requests', ManagePurchaseRequests::class)->name('purchase-requests');
+
+            // Activation / Prepaid Users Hub
+            Route::prefix('activation')->name('activation.')->group(function () {
+                Route::get('prepaid-users', \App\Livewire\Admin\PrepaidUsersHub::class)->name('prepaid-users');
+                Route::get('active-users', \App\Livewire\Admin\PrepaidUsersHub::class)->name('active-users');
+                Route::get('expired-users', \App\Livewire\Admin\PrepaidUsersHub::class)->name('expired-users');
+                Route::get('online-users', \App\Livewire\Admin\PrepaidUsersHub::class)->name('online-users');
+                Route::get('offline-users', \App\Livewire\Admin\PrepaidUsersHub::class)->name('offline-users');
+                Route::get('activate-user', \App\Livewire\Admin\PrepaidUsersHub::class)->name('activate-user');
+                Route::get('roaming-users', \App\Livewire\Admin\PrepaidUsersHub::class)->name('roaming-users');
+            });
         });
 
         // Reseller Portal Routes

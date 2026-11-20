@@ -42,12 +42,14 @@ Schedule::job(new \App\Jobs\PollRouterTelemetryJob)->everyFiveMinutes()->without
 
 Schedule::command('isp:lifecycle-automations')->everyMinute()->withoutOverlapping();
 Schedule::command('isp:process-pending-router-activations')->everyMinute()->withoutOverlapping();
+Schedule::command('isp:poll-active-sessions')->everyMinute()->withoutOverlapping();
+Schedule::command('hotspot:expire')->everyMinute()->withoutOverlapping();
 Schedule::command('isp:check-router-offline-alerts')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('isp:check-portal-health')->everyFifteenMinutes()->withoutOverlapping();
 
-Schedule::call(function () {
-    Artisan::call('app:expire-realtime-hotspot-users');
-})->name('expire-realtime-hotspot-users')->everyTenMinutes()->withoutOverlapping();
+Artisan::command('app:expire-realtime-hotspot-users', function () {
+    $this->call('hotspot:expire');
+})->purpose('Alias for hotspot:expire');
 
 Schedule::call(function () {
     $days = (int) MainSiteData::getValue('log_retention_days', 30);

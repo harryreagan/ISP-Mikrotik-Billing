@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Jobs\SyncPackageToRouters;
 use App\Models\CustomersInfo;
 use App\Models\PackageList;
 use App\Models\Router;
@@ -115,9 +116,10 @@ class PackagesManager extends Component
         $this->unlimited_data = true;
         $this->data_limit_mb = null;
         $this->shared_users = 1;
+        $tenantId = $this->resolveTenantId();
         $this->includes_tv = false;
         $this->tv_channels = '';
-        $this->selected_routers = [];
+        $this->selected_routers = Router::forTenant($tenantId)->pluck('id')->map(fn($id) => (string) $id)->toArray();
         $this->show_public = true;
         $this->is_active = true;
         $this->sort_order = 0;
@@ -208,27 +210,40 @@ class PackagesManager extends Component
                 'mikrotik_rate_limit' => $rateLimit,
             ];
 
+            $oldProfileName = null;
             if ($this->editingId) {
                 $package = PackageList::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($this->editingId);
+                $oldProfileName = $package->package;
                 $package->update($data);
             } else {
                 $package = PackageList::withoutGlobalScopes()->create($data);
             }
 
-            // Attach Routers
+            // Attach Routers (explicitly scoped to tenant; default to all tenant routers if none checked)
             $routerIds = [];
-            if (in_array('all', $this->selected_routers)) {
+            if (in_array('all', $this->selected_routers, true) || empty($this->selected_routers)) {
                 $routerIds = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->pluck('id')->toArray();
             } else {
-                $routerIds = array_map('intval', array_filter($this->selected_routers, 'is_numeric'));
+                $requestedIds = array_map('intval', array_filter($this->selected_routers, 'is_numeric'));
+                $routerIds = Router::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->whereIn('id', $requestedIds)
+                    ->pluck('id')
+                    ->toArray();
             }
-            $package->routers()->sync($routerIds);
 
-            // Sync Profile to RouterOS (and refresh captive portal login.html if hotspot)
-            $syncResults = $this->syncPackageToRouters($package);
+            $pivotData = [];
+            foreach ($routerIds as $rid) {
+                $pivotData[$rid] = ['sync_status' => 'pending', 'sync_error' => null];
+            }
+            $package->routers()->sync($pivotData);
+            $package->updateQuietly(['sync_status' => 'pending', 'last_sync_error' => null]);
+
+            // Run queued sync job right away cleanly (logs failures, retries with backoff in background)
+            $syncResults = $this->syncPackageToRouters($package, $oldProfileName);
 
             $this->showModal = false;
-            $this->feedbackType = 'success';
+            $this->feedbackType = $package->fresh()?->sync_status === 'failed' ? 'info' : 'success';
             $this->feedbackMessage = ucfirst($package->type) . " package '{$package->package}' saved successfully. " . $syncResults;
         } catch (\Throwable $e) {
             Log::error('[PackagesManager] savePackage error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
@@ -241,115 +256,38 @@ class PackagesManager extends Component
     }
 
     /**
-     * Push package configuration profile to linked MikroTik routers using proper RouterOS API slash syntax.
+     * Dispatch and run SyncPackageToRouters job safely (never throws unhandled errors to UI; queues retries on failure).
      */
-    public function syncPackageToRouters(PackageList $package): string
+    public function syncPackageToRouters(PackageList $package, ?string $oldProfileName = null): string
     {
-        $routers = $package->routers()->get();
-        if ($routers->isEmpty()) {
-            return "Saved (no routers linked).";
+        $tenantId = (int) ($package->tenant_id ?: $this->resolveTenantId());
+
+        try {
+            SyncPackageToRouters::dispatchSync($package->id, 'upsert', $oldProfileName, $tenantId);
+        } catch (\Throwable $e) {
+            Log::warning("[PackagesManager] SyncPackageToRouters warning for package #{$package->id}: " . $e->getMessage());
+            $package->updateQuietly([
+                'sync_status'     => 'failed',
+                'last_sync_error' => substr($e->getMessage(), 0, 250),
+                'last_synced_at'  => now(),
+            ]);
         }
 
-        $rateLimit = $package->getRateLimitString();
-        $sessionTimeout = $package->getSessionTimeoutString();
-        $prefix = $package->type === 'pppoe' ? 'ppp_' : 'hs_';
-        $profileName = $prefix . preg_replace('/[^a-zA-Z0-9_\-]/', '_', $package->package);
-
-        $syncedCount = 0;
-        $failedCount = 0;
-
-        foreach ($routers as $router) {
-            try {
-                $host = $router->vpn_ip ?: $router->ip;
-                $apiUser = $router->api_user ?: ($router->username ?: 'admin');
-                if (empty($host) || empty($apiUser)) {
-                    throw new \Exception("Router IP or credentials not configured.");
-                }
-
-                $port = (int) ($router->api_port ?: 8728);
-                $rawPass = $router->api_password ?: $router->password;
-                $password = $rawPass;
-                if (!empty($rawPass)) {
-                    try {
-                        $password = \Illuminate\Support\Facades\Crypt::decryptString($rawPass);
-                    } catch (\Throwable $e) {
-                        $password = $rawPass;
-                    }
-                }
-
-                $api = new MikrotikApiService($host, $port, $apiUser, $password, 4);
-
-                if ($package->type === 'hotspot') {
-                    // Hotspot User Profile via proper RouterOS API slash commands
-                    $existing = $api->executeCommand('/ip/hotspot/user/profile/print', [], ['name' => $profileName]);
-
-                    if (is_array($existing) && !empty($existing[0]['.id'])) {
-                        $api->executeCommand('/ip/hotspot/user/profile/set', [
-                            'rate-limit'      => $rateLimit,
-                            'session-timeout' => $sessionTimeout,
-                            'shared-users'    => (string) max(1, (int) $package->shared_users),
-                        ], ['.id' => $existing[0]['.id']]);
-                    } else {
-                        $api->executeCommand('/ip/hotspot/user/profile/add', [
-                            'name'               => $profileName,
-                            'rate-limit'         => $rateLimit,
-                            'session-timeout'    => $sessionTimeout,
-                            'shared-users'       => (string) max(1, (int) $package->shared_users),
-                            'transparent-proxy'  => 'yes',
-                            'status-autorefresh' => '1m',
-                        ]);
-                    }
-
-                    // Refresh captive portal login.html on router so new/edited Hotspot plan appears immediately
-                    try {
-                        $fetchUrl = "http://isp.hsmart.co.ke/provision/hotspot-portal/{$router->id}/login.html";
-                        $api->executeCommand('/tool/fetch', [
-                            'url'      => $fetchUrl,
-                            'dst-path' => 'hotspot/login.html',
-                            'mode'     => 'http',
-                        ]);
-                    } catch (\Throwable $fe) {}
-                } else {
-                    // PPPoE PPP Profile via proper RouterOS API slash commands
-                    $existing = $api->executeCommand('/ppp/profile/print', [], ['name' => $profileName]);
-
-                    if (is_array($existing) && !empty($existing[0]['.id'])) {
-                        $api->executeCommand('/ppp/profile/set', [
-                            'rate-limit' => $rateLimit,
-                        ], ['.id' => $existing[0]['.id']]);
-                    } else {
-                        $api->executeCommand('/ppp/profile/add', [
-                            'name'           => $profileName,
-                            'rate-limit'     => $rateLimit,
-                            'local-address'  => '10.0.0.1',
-                            'remote-address' => 'pppoe-pool',
-                        ]);
-                    }
-                }
-
-                $package->routers()->updateExistingPivot($router->id, [
-                    'sync_status' => 'synced',
-                    'sync_error'  => null,
-                    'synced_at'   => now(),
-                ]);
-                $syncedCount++;
-
-            } catch (\Throwable $e) {
-                Log::warning("[PackageSync] Failed syncing package #{$package->id} to router #{$router->id} ({$router->name}): " . $e->getMessage());
-                $package->routers()->updateExistingPivot($router->id, [
-                    'sync_status' => 'failed',
-                    'sync_error'  => substr($e->getMessage(), 0, 255),
-                    'synced_at'   => null,
-                ]);
-                $failedCount++;
-            }
+        $fresh = $package->fresh();
+        if (!$fresh) {
+            return 'Sync dispatched.';
         }
 
-        if ($failedCount > 0) {
-            return "Synced to {$syncedCount} router(s), {$failedCount} pending/offline (click Sync to retry).";
+        if ($fresh->sync_status === 'synced') {
+            return 'Synced to all attached router(s).';
         }
 
-        return "Synced to all {$syncedCount} linked router(s).";
+        if ($fresh->sync_status === 'failed') {
+            SyncPackageToRouters::dispatch($fresh->id, 'upsert', $oldProfileName, $tenantId)->delay(now()->addSeconds(15));
+            return 'Sync queued for automatic retry (' . ($fresh->last_sync_error ?: 'router unreachable') . ').';
+        }
+
+        return 'Sync pending (' . ($fresh->last_sync_error ?: 'no routers linked') . ').';
     }
 
     public function retrySync(int $packageId)
@@ -357,8 +295,9 @@ class PackagesManager extends Component
         $tenantId = $this->resolveTenantId();
         $package = PackageList::forTenant($tenantId)->findOrFail($packageId);
 
+        $package->updateQuietly(['sync_status' => 'pending', 'last_sync_error' => null]);
         $msg = $this->syncPackageToRouters($package);
-        $this->feedbackType = 'info';
+        $this->feedbackType = $package->fresh()?->sync_status === 'synced' ? 'success' : 'info';
         $this->feedbackMessage = "Sync Result: " . $msg;
     }
 
@@ -408,11 +347,20 @@ class PackagesManager extends Component
             return;
         }
 
+        $snapshot = [
+            'tenant_id'  => $tenantId,
+            'package'    => $pkg->package,
+            'type'       => $pkg->type ?: 'hotspot',
+            'router_ids' => $pkg->routers()->pluck('routers.id')->all(),
+        ];
+
         $pkg->routers()->detach();
         $pkg->delete();
 
+        SyncPackageToRouters::dispatch($id, 'delete', $snapshot['package'], $tenantId, $snapshot);
+
         $this->feedbackType = 'success';
-        $this->feedbackMessage = "Package deleted successfully.";
+        $this->feedbackMessage = "Package '{$snapshot['package']}' deleted and router profile removal queued.";
     }
 
     public function render()

@@ -113,31 +113,26 @@ class UnifiedTransactionsHub extends Component
     }
 
     // ── Scope helper for tenant & reseller isolation ──
-    private function getTenantId(): ?int
+    private function getTenantId(): int
     {
         $user = auth()->user();
-        if (! $user) {
-            return null;
-        }
-        $tenantId = $user->tenant_id ?? null;
-        return ($tenantId && $tenantId > 1) ? $tenantId : null;
+        return (int) ($user?->tenant_id ?: (session('tenant_id') ?: (session('impersonated_tenant_id') ?: 1)));
     }
 
     private function customerScope()
     {
         $user = auth()->user();
-        $query = CustomersInfo::query();
+        $tenantId = $this->getTenantId();
+        $query = CustomersInfo::withoutGlobalScopes()->where('tenant_id', $tenantId);
 
         if ($user && method_exists($user, 'hasRole') && $user->hasRole('Reseller') && $user->reseller) {
             $query->where('reseller_id', $user->reseller->id);
-        } elseif ($tenantId = $this->getTenantId()) {
-            $query->where('tenant_id', $tenantId);
         }
 
         return $query;
     }
 
-    // ── Metric calculations ──
+    // ── Metric calculations (Single source of truth: CollectionSummary.service_type per tenant) ──
     public function getMetricsProperty(): array
     {
         $tenantId = $this->getTenantId();
@@ -145,50 +140,44 @@ class UnifiedTransactionsHub extends Component
         $startOfMonth = Carbon::now()->startOfMonth();
         $endOfMonth = Carbon::now()->endOfMonth();
 
-        // PPPoE / CollectionSummary totals
-        $pppoeTodayQuery = CollectionSummary::whereDate('collection_date', $today);
-        $pppoeMonthQuery = CollectionSummary::whereBetween('collection_date', [$startOfMonth, $endOfMonth]);
+        $base = CollectionSummary::withoutGlobalScopes()->where('tenant_id', $tenantId);
 
-        if ($tenantId) {
-            $pppoeTodayQuery->whereHas('customer', fn($q) => $q->where('tenant_id', $tenantId));
-            $pppoeMonthQuery->whereHas('customer', fn($q) => $q->where('tenant_id', $tenantId));
-        }
-        $pppoeToday = (float) $pppoeTodayQuery->sum('collection_amount');
-        $pppoeMonth = (float) $pppoeMonthQuery->sum('collection_amount');
+        $pppoeToday = (float) (clone $base)
+            ->where('service_type', 'pppoe')
+            ->whereDate('collection_date', $today)
+            ->sum('collection_amount');
 
-        // HotspotSale totals
-        $hotspotToday = 0.0;
-        $hotspotMonth = 0.0;
-        try {
-            if (\Illuminate\Support\Facades\Schema::hasTable('hotspot_sales')) {
-                $hsTodayQuery = HotspotSale::whereDate('sale_date', $today);
-                $hsMonthQuery = HotspotSale::whereBetween('sale_date', [$startOfMonth, $endOfMonth]);
-                if ($tenantId) {
-                    $hsTodayQuery->where('tenant_id', $tenantId);
-                    $hsMonthQuery->where('tenant_id', $tenantId);
-                }
-                $hotspotToday = (float) $hsTodayQuery->sum('amount');
-                $hotspotMonth = (float) $hsMonthQuery->sum('amount');
-            }
-        } catch (\Throwable $e) {}
+        $hotspotToday = (float) (clone $base)
+            ->where('service_type', 'hotspot')
+            ->whereDate('collection_date', $today)
+            ->sum('collection_amount');
 
-        // Pending Unmatched
+        $pppoeMonth = (float) (clone $base)
+            ->where('service_type', 'pppoe')
+            ->whereBetween('collection_date', [$startOfMonth, $endOfMonth])
+            ->sum('collection_amount');
+
+        $hotspotMonth = (float) (clone $base)
+            ->where('service_type', 'hotspot')
+            ->whereBetween('collection_date', [$startOfMonth, $endOfMonth])
+            ->sum('collection_amount');
+
+        // Pending Unmatched (strictly tenant scoped)
         $pendingUnmatched = 0;
         try {
             if (\Illuminate\Support\Facades\Schema::hasTable('unmatched_payments')) {
-                $unmatchedQuery = UnmatchedPayment::where('status', 'pending');
-                if ($tenantId) {
-                    $unmatchedQuery->where('tenant_id', $tenantId);
-                }
-                $pendingUnmatched = $unmatchedQuery->count();
+                $pendingUnmatched = (int) UnmatchedPayment::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('status', 'pending')
+                    ->count();
             }
         } catch (\Throwable $e) {}
 
         return [
-            'today_total' => $pppoeToday + $hotspotToday,
-            'month_total' => $pppoeMonth + $hotspotMonth,
-            'pppoe_month' => $pppoeMonth,
-            'hotspot_month' => $hotspotMonth,
+            'today_total'       => $pppoeToday + $hotspotToday,
+            'month_total'       => $pppoeMonth + $hotspotMonth,
+            'pppoe_month'       => $pppoeMonth,
+            'hotspot_month'     => $hotspotMonth,
             'pending_unmatched' => $pendingUnmatched,
         ];
     }
@@ -202,14 +191,14 @@ class UnifiedTransactionsHub extends Component
 
     public function openReceiptModal(int $id, string $type): void
     {
+        $tenantId = $this->getTenantId();
         $this->selectedReceiptId = $id;
         $this->selectedReceiptType = $type;
 
-        if ($type === 'hotspot') {
-            $this->selectedReceiptData = HotspotSale::find($id);
-        } else {
-            $this->selectedReceiptData = CollectionSummary::with(['customer', 'customer.customerAddress', 'customer.pppUser', 'customer.billing'])->find($id);
-        }
+        $this->selectedReceiptData = CollectionSummary::withoutGlobalScopes()
+            ->with(['customer', 'customer.customerAddress', 'customer.pppUser', 'customer.billing', 'package', 'router'])
+            ->where('tenant_id', $tenantId)
+            ->find($id);
     }
 
     public function closeReceiptModal(): void
@@ -480,18 +469,33 @@ class UnifiedTransactionsHub extends Component
 
         DB::beginTransaction();
         try {
+            $tenantId = $this->getTenantId();
             $uniqueId = $this->collectCustomerData->customer_unique_id;
+            $pkg = $this->collectCustomerData->package_id
+                ? \App\Models\PackageList::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($this->collectCustomerData->package_id)
+                : null;
+            $serviceType = strtolower((string) ($pkg?->type ?: ($this->collectCustomerData->service_type ?: ($this->collectCustomerData->pppUser?->service ?: 'pppoe'))));
+            if (!in_array($serviceType, ['hotspot', 'pppoe'], true)) {
+                $serviceType = 'pppoe';
+            }
 
-            CollectionSummary::create([
+            CollectionSummary::withoutGlobalScopes()->create([
+                'tenant_id'                     => $tenantId,
                 'customer_collection_unique_id' => $uniqueId,
-                'collection_date' => Carbon::now(),
-                'collection_amount' => $paid,
-                'collected_by' => auth()->user()?->email ?? 'admin',
-                'payment_type' => 'Cash',
-                'payment_method' => 'Cash',
-                'payment_status' => 'paid',
-                'invoice_no' => time() . rand(10, 99),
-                'bill_month' => Carbon::now()->format('F-Y'),
+                'subscriber_name'               => $this->collectCustomerData->customer_name ?: ($this->collectCustomerData->pppUser?->username ?: $this->collectCustomerData->mobile),
+                'phone'                         => $this->collectCustomerData->mobile,
+                'mac_address'                   => $this->collectCustomerData->pppUser?->caller_id,
+                'router_id'                     => $this->collectCustomerData->router_id,
+                'collection_date'               => Carbon::now(),
+                'collection_amount'             => $paid,
+                'collected_by'                  => auth()->user()?->email ?? 'admin',
+                'payment_type'                  => $serviceType === 'hotspot' ? 'hotspot' : 'Cash',
+                'service_type'                  => $serviceType,
+                'package_id'                    => $this->collectCustomerData->package_id,
+                'payment_method'                => 'Cash',
+                'payment_status'                => 'paid',
+                'invoice_no'                    => time() . rand(10, 99),
+                'bill_month'                    => Carbon::now()->format('F Y'),
             ]);
 
             $billing = $this->collectCustomerData->billing;
@@ -538,7 +542,8 @@ class UnifiedTransactionsHub extends Component
 
     public function deleteCollectionRecord(int $id): void
     {
-        $collection = CollectionSummary::find($id);
+        $tenantId = $this->getTenantId();
+        $collection = CollectionSummary::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($id);
         if (! $collection) {
             flash()->error('Collection record not found.');
             return;
@@ -547,7 +552,7 @@ class UnifiedTransactionsHub extends Component
         $collectedAmount = (float) $collection->collection_amount;
         $customerId = $collection->customer_collection_unique_id;
 
-        $billing = BillingInfo::where('customer_bill_unique_id', $customerId)->first();
+        $billing = BillingInfo::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('customer_bill_unique_id', $customerId)->first();
         if ($billing) {
             $due = (float) $billing->due_amount + $collectedAmount;
             $paid = (float) $billing->paid_amount - $collectedAmount;
@@ -608,21 +613,23 @@ class UnifiedTransactionsHub extends Component
                 $dateEnd = Carbon::now()->endOfMonth()->endOfDay();
             }
 
-            $collectionsQuery = CollectionSummary::with(['customer', 'customer.pppUser'])
+            $collectionsQuery = CollectionSummary::withoutGlobalScopes()
+                ->with(['customer', 'customer.pppUser', 'package', 'router'])
+                ->where('tenant_id', $tenantId)
                 ->orderBy('collection_date', 'desc');
 
             if ($dateStart && $dateEnd) {
                 $collectionsQuery->whereBetween('collection_date', [$dateStart, $dateEnd]);
             }
-            if ($tenantId) {
-                $collectionsQuery->whereHas('customer', fn($q) => $q->where('tenant_id', $tenantId));
-            }
             if (! empty($this->txSearch)) {
-                $term = $this->txSearch;
+                $term = trim($this->txSearch);
                 $collectionsQuery->where(function ($q) use ($term) {
                     $q->where('transaction_id', 'like', "%{$term}%")
                         ->orWhere('invoice_no', 'like', "%{$term}%")
                         ->orWhere('customer_collection_unique_id', 'like', "%{$term}%")
+                        ->orWhere('subscriber_name', 'like', "%{$term}%")
+                        ->orWhere('phone', 'like', "%{$term}%")
+                        ->orWhere('mac_address', 'like', "%{$term}%")
                         ->orWhereHas('customer', function ($qc) use ($term) {
                             $qc->where('customer_name', 'like', "%{$term}%")
                                 ->orWhere('mobile', 'like', "%{$term}%")
@@ -630,7 +637,11 @@ class UnifiedTransactionsHub extends Component
                         });
                 });
             }
-            if ($this->txTypeFilter === 'cash') {
+            if ($this->txTypeFilter === 'hotspot') {
+                $collectionsQuery->where('service_type', 'hotspot');
+            } elseif ($this->txTypeFilter === 'pppoe') {
+                $collectionsQuery->where('service_type', 'pppoe');
+            } elseif ($this->txTypeFilter === 'cash') {
                 $collectionsQuery->where(function ($q) {
                     $q->where('payment_method', 'cash')
                         ->orWhere('payment_type', 'cash')
@@ -638,40 +649,17 @@ class UnifiedTransactionsHub extends Component
                 });
             }
 
-            // If Hotspot filter is active, skip collection summaries or prioritize HotspotSale
-            if ($this->txTypeFilter === 'hotspot') {
-                $hotspotQuery = HotspotSale::orderBy('created_at', 'desc');
-                if ($dateStart && $dateEnd) {
-                    $hotspotQuery->whereBetween('sale_date', [$dateStart->toDateString(), $dateEnd->toDateString()]);
-                }
-                if ($tenantId) {
-                    $hotspotQuery->where('tenant_id', $tenantId);
-                }
-                if (! empty($this->txSearch)) {
-                    $term = $this->txSearch;
-                    $hotspotQuery->where(function ($q) use ($term) {
-                        $q->where('voucher_code', 'like', "%{$term}%")
-                            ->orWhere('username', 'like', "%{$term}%")
-                            ->orWhere('router_name', 'like', "%{$term}%")
-                            ->orWhere('payment_method', 'like', "%{$term}%");
-                    });
-                }
-                $txRecords = $hotspotQuery->paginate(15);
-            } else {
-                $txRecords = $collectionsQuery->paginate(15);
-            }
+            $txRecords = $collectionsQuery->paginate(15);
         }
 
         // ── Data for Tab 3: Unmatched ──
         $unmatchedPayments = collect();
         $claimCustomerResults = collect();
         if ($this->activeTab === 'unmatched') {
-            $uQuery = UnmatchedPayment::with(['customer', 'assignedByUser'])
+            $uQuery = UnmatchedPayment::withoutGlobalScopes()
+                ->with(['customer', 'assignedByUser'])
+                ->where('tenant_id', $tenantId)
                 ->orderBy('created_at', 'desc');
-
-            if ($tenantId) {
-                $uQuery->where('tenant_id', $tenantId);
-            }
             if ($this->unmatchedStatusFilter !== 'all') {
                 $uQuery->where('status', $this->unmatchedStatusFilter);
             }
@@ -704,8 +692,12 @@ class UnifiedTransactionsHub extends Component
             }
         }
 
-        $selectedClaimPayment = $this->unmatchedSelectedId ? UnmatchedPayment::find($this->unmatchedSelectedId) : null;
-        $selectedClaimCustomer = $this->claimSelectedCustomerId ? CustomersInfo::with('billing', 'pppUser')->find($this->claimSelectedCustomerId) : null;
+        $selectedClaimPayment = $this->unmatchedSelectedId
+            ? UnmatchedPayment::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($this->unmatchedSelectedId)
+            : null;
+        $selectedClaimCustomer = $this->claimSelectedCustomerId
+            ? CustomersInfo::withoutGlobalScopes()->where('tenant_id', $tenantId)->with('billing', 'pppUser')->find($this->claimSelectedCustomerId)
+            : null;
 
         return view('livewire.admin.unified-transactions-hub', [
             'metrics' => $this->metrics,

@@ -1392,8 +1392,10 @@ class HotspotManager extends Component
             'show_public' => $this->pkg_show_on_site,
         ];
 
+        $oldProfileName = null;
         if ($this->editingPackageId) {
             $pkg = PackageList::forTenant($tenantId)->findOrFail($this->editingPackageId);
+            $oldProfileName = $pkg->package;
             $pkg->update($data);
             flash()->success("Hotspot package '{$this->pkg_package}' updated successfully!");
         } else {
@@ -1401,19 +1403,17 @@ class HotspotManager extends Component
             flash()->success("Hotspot package '{$this->pkg_package}' created successfully!");
         }
 
-        // Push to MikroTik Hotspot User Profile if enabled
+        // Dispatch unified queued sync job to update router profile & users
+        try {
+            \App\Jobs\SyncPackageToRouters::dispatch($pkg->id, 'upsert', $oldProfileName, $tenantId);
+        } catch (\Throwable $e) {
+            \Log::warning("HotspotManager: Failed dispatching SyncPackageToRouters: " . $e->getMessage());
+        }
+
+        // Immediate push to MikroTik Hotspot User Profile if enabled
         if ($this->pkg_push_to_mikrotik && !empty($this->selectedRouter)) {
             try {
-                $sessionTimeout = $this->formatSessionTimeout($this->pkg_validity_value, $this->pkg_validity_unit);
-                $this->ctrl()->addHotspotUserProfile($this->selectedRouter, [
-                    'name' => $this->pkg_package,
-                    'rate_limit' => $this->pkg_rate_limit,
-                    'shared_users' => $this->pkg_shared_users,
-                    'session_timeout' => $sessionTimeout,
-                    'idle_timeout' => '',
-                    'status_autorefresh' => '1m',
-                    'address_pool' => 'none',
-                ]);
+                \App\Jobs\SyncPackageToRouters::dispatchSync($pkg->id, 'upsert', $oldProfileName, $tenantId);
                 flash()->info("MikroTik User Profile '{$this->pkg_package}' synced to router!");
             } catch (\Throwable $e) {
                 \Log::warning("HotspotManager: Profile sync to {$this->selectedRouter} failed: " . $e->getMessage());
@@ -1430,9 +1430,16 @@ class HotspotManager extends Component
     {
         $tenantId = auth()->user()?->tenant_id ?: 1;
         $pkg = PackageList::forTenant($tenantId)->findOrFail($id);
-        $name = $pkg->package;
+        $snapshot = [
+            'tenant_id'  => $tenantId,
+            'package'    => $pkg->package,
+            'type'       => $pkg->type ?: 'hotspot',
+            'router_ids' => $pkg->routers()->pluck('routers.id')->all(),
+        ];
+        $pkg->routers()->detach();
         $pkg->delete();
-        flash()->success("Package '{$name}' deleted.");
+        \App\Jobs\SyncPackageToRouters::dispatch($id, 'delete', $snapshot['package'], $tenantId, $snapshot);
+        flash()->success("Package '{$snapshot['package']}' deleted and router sync queued.");
     }
 
     public function pushPackageToRouter(int $id): void

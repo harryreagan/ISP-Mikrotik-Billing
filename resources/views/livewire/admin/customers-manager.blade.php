@@ -139,7 +139,10 @@
                             $isSuspended = in_array($customer->status, ['disable', 'suspended', 'inactive']);
                             $isExpired = $bill && $bill->auto_disable_date && \Carbon\Carbon::parse($bill->auto_disable_date)->isPast();
                             $dueAmount = $bill ? (float) ($bill->total_due_amount ?: $bill->due_amount) : 0;
-                            $rent = $bill ? (float) $bill->monthly_rent : (float) ($customer->package->price ?? 0);
+                            $livePkg = ($customer->package && (int) $customer->package->tenant_id === (int) $customer->tenant_id)
+                                ? $customer->package
+                                : null;
+                            $svcType = strtolower((string) ($livePkg?->type ?: ($customer->service_type ?: ($secret?->service ?: 'pppoe'))));
                         @endphp
                         <tr>
                             {{-- Customer Name & Phone --}}
@@ -158,15 +161,22 @@
                             {{-- Service Type & Package --}}
                             <td>
                                 <div>
-                                    @if($customer->service_type === 'hotspot' || ($secret && $secret->service === 'hotspot'))
+                                    @if($svcType === 'hotspot')
                                         <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle mb-1"><i class="bi bi-wifi me-1"></i>Hotspot</span>
                                     @else
                                         <span class="badge bg-primary-subtle text-primary border border-primary-subtle mb-1"><i class="bi bi-ethernet me-1"></i>PPPoE</span>
                                     @endif
-                                    <div class="small fw-medium text-dark text-truncate" style="max-width: 140px;">
-                                        {{ $customer->package->name ?? ($customer->package_name ?: 'Standard Package') }}
-                                    </div>
-                                    <small class="text-muted">{{ $rent > 0 ? 'KES ' . number_format($rent, 0) : '—' }}</small>
+                                    @if($livePkg)
+                                        <div class="small fw-medium text-dark text-truncate" style="max-width: 160px;">
+                                            {{ $livePkg->name }}
+                                        </div>
+                                        <small class="text-muted">KES {{ number_format((float) $livePkg->price, 0) }} &bull; {{ $livePkg->formatted_validity }}</small>
+                                    @else
+                                        <div class="small fw-medium text-muted">
+                                            No package
+                                        </div>
+                                        <small class="text-muted">—</small>
+                                    @endif
                                 </div>
                             </td>
 

@@ -132,16 +132,29 @@ class PaymentService
             }
 
             // Generate next sequential invoice number
-            $maxInvoice = CollectionSummary::max('invoice_no');
+            $maxInvoice = CollectionSummary::withoutGlobalScopes()->max('invoice_no');
             $invoiceNo = $maxInvoice ? ($maxInvoice + 1) : 100001;
 
+            $pkg = $customer->package_id ? \App\Models\PackageList::withoutGlobalScopes()->find($customer->package_id) : null;
+            $svcType = strtolower((string) ($pkg?->type ?: ($customer->service_type ?: ($customer->pppUser?->service ?: 'pppoe'))));
+            if (!in_array($svcType, ['hotspot', 'pppoe'], true)) {
+                $svcType = 'pppoe';
+            }
+
             // 2. Create Collection Record
-            CollectionSummary::create([
+            CollectionSummary::withoutGlobalScopes()->create([
+                'tenant_id' => $customer->tenant_id ?: 1,
                 'customer_collection_unique_id' => $customer->customer_unique_id,
+                'subscriber_name' => $customer->customer_name ?: ($customer->pppUser?->username ?: $customer->mobile),
+                'phone' => $customer->mobile,
+                'mac_address' => $customer->pppUser?->caller_id,
+                'router_id' => $customer->router_id,
                 'collection_date' => Carbon::now(),
                 'collection_amount' => $amount,
                 'collected_by' => 'Online Payment ('.strtoupper($gateway).')',
-                'payment_type' => 'online',
+                'payment_type' => $svcType === 'hotspot' ? 'hotspot' : 'online',
+                'service_type' => $svcType,
+                'package_id' => $customer->package_id,
                 'payment_method' => $gateway,
                 'transaction_id' => $trxId,
                 'payment_status' => 'paid',

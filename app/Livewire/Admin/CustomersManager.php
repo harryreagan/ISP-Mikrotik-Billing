@@ -4,8 +4,10 @@ namespace App\Livewire\Admin;
 
 use App\Models\BillingInfo;
 use App\Models\CustomersInfo;
+use App\Models\HotspotSale;
 use App\Models\PackageList;
 use App\Models\PPPSecrets;
+use App\Models\PrepaidUser;
 use App\Models\Router;
 use App\Scopes\TenantScope;
 use App\Services\Auth\OtpVerificationService;
@@ -96,14 +98,62 @@ class CustomersManager extends Component
         // If the tenant currently has 0 customers, automatically trigger a background sync from their online router
         $tenantId = $this->getTenantId();
         $count = CustomersInfo::withoutGlobalScope(TenantScope::class)
-            ->where(function ($q) use ($tenantId) {
-                $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
-            })
+            ->where('tenant_id', $tenantId)
             ->count();
 
         if ($count === 0) {
             $this->syncFromRouter(null, true);
         }
+    }
+
+    /**
+     * Resolve a real tenant-scoped package from RouterOS profile name or recent hotspot sale.
+     */
+    protected function resolveTenantPackage(int $tenantId, ?string $profileName, ?string $phone = null, ?string $username = null): ?PackageList
+    {
+        $cleanProfile = trim((string) ($profileName ?? ''));
+        if ($cleanProfile !== '' && strtolower($cleanProfile) !== 'default') {
+            $stripped = preg_replace('/^(hs_|ppp_)/', '', $cleanProfile);
+            $matched = PackageList::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where(function ($q) use ($cleanProfile, $stripped) {
+                    $q->whereRaw('LOWER(TRIM(package)) = ?', [strtolower($cleanProfile)])
+                      ->orWhereRaw('LOWER(TRIM(package)) = ?', [strtolower($stripped)]);
+                })
+                ->first();
+            if ($matched) {
+                return $matched;
+            }
+        }
+
+        if ($phone || $username) {
+            $sale = HotspotSale::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where(function ($q) use ($phone, $username) {
+                    if ($username) {
+                        $q->where('voucher_code', strtoupper($username))->orWhere('username', $username);
+                    }
+                    if ($phone) {
+                        $q->orWhere('phone', $phone);
+                    }
+                })
+                ->latest('id')
+                ->first();
+
+            if ($sale && !empty($sale->profile)) {
+                $saleProfile = trim((string) $sale->profile);
+                $stripped = preg_replace('/^(hs_|ppp_)/', '', $saleProfile);
+                return PackageList::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where(function ($q) use ($saleProfile, $stripped) {
+                        $q->whereRaw('LOWER(TRIM(package)) = ?', [strtolower($saleProfile)])
+                          ->orWhereRaw('LOWER(TRIM(package)) = ?', [strtolower($stripped)]);
+                    })
+                    ->first();
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -144,9 +194,7 @@ class CustomersManager extends Component
     {
         $tenantId = $this->getTenantId();
 
-        $query = Router::withoutGlobalScopes()->where(function ($q) use ($tenantId) {
-            $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
-        });
+        $query = Router::withoutGlobalScopes()->where('tenant_id', $tenantId);
 
         if ($routerId) {
             $query->where('id', $routerId);
@@ -273,6 +321,8 @@ class CustomersManager extends Component
                         $customerName = $comment;
                     }
 
+                    $matchedPkg = $this->resolveTenantPackage($tenantId, $hu['profile'] ?? null, $phone ?: null, $uName);
+
                     $secret = PPPSecrets::withoutGlobalScopes()->updateOrCreate(
                         [
                             'tenant_id' => $tenantId,
@@ -283,7 +333,7 @@ class CustomersManager extends Component
                             'router_name'   => $router->name,
                             'password'      => $hu['password'] ?? '******',
                             'service'       => 'hotspot',
-                            'profile'       => $hu['profile'] ?? 'default',
+                            'profile'       => $matchedPkg?->package ?: ($hu['profile'] ?? 'default'),
                             'status'        => ($hu['disabled'] ?? 'false') === 'true' ? 'disabled' : 'active',
                             'caller_id'     => $mac,
                             'ppp_remote_ip' => $ip,
@@ -307,6 +357,7 @@ class CustomersManager extends Component
                             'mobile'             => $phone ?: '254700000000',
                             'service_type'       => 'hotspot',
                             'router_id'          => $router->id,
+                            'package_id'         => $matchedPkg?->id,
                             'ppp_user_id'        => $secret->id,
                             'connection_date'    => now(),
                             'status'             => 'active',
@@ -317,11 +368,13 @@ class CustomersManager extends Component
                             'mobile'        => $phone ?: ($cust->mobile ?: '254700000000'),
                             'service_type'  => 'hotspot',
                             'router_id'     => $router->id,
+                            'package_id'    => $matchedPkg?->id ?? $cust->package_id,
                             'ppp_user_id'   => $secret->id,
                             'status'        => 'active',
                         ]);
                     }
 
+                    $pkgPrice = (float) ($matchedPkg?->price ?? 0);
                     BillingInfo::withoutGlobalScopes()->updateOrCreate(
                         [
                             'tenant_id'               => $tenantId,
@@ -329,14 +382,16 @@ class CustomersManager extends Component
                         ],
                         [
                             'billing_type'      => 'prepaid',
-                            'monthly_rent'      => 50,
-                            'total_amount'      => 50,
-                            'paid_amount'       => 50,
+                            'monthly_rent'      => $pkgPrice,
+                            'total_amount'      => $pkgPrice,
+                            'paid_amount'       => $pkgPrice,
                             'due_amount'        => 0,
                             'auto_disable'      => true,
                             'auto_disable_date' => now()->addDay(),
                         ]
                     );
+
+                    PrepaidUser::upsertFromCustomer($cust, $secret, $matchedPkg, now()->addDay());
 
                     $totalSyncedHs++;
                 }
@@ -385,6 +440,8 @@ class CustomersManager extends Component
                         $customerName = $comment;
                     }
 
+                    $matchedPppPkg = $this->resolveTenantPackage($tenantId, $pu['profile'] ?? null, $phone ?: null, $uName);
+
                     $secret = PPPSecrets::withoutGlobalScopes()->updateOrCreate(
                         [
                             'tenant_id' => $tenantId,
@@ -395,7 +452,7 @@ class CustomersManager extends Component
                             'router_name'   => $router->name,
                             'password'      => $pu['password'] ?? '******',
                             'service'       => 'pppoe',
-                            'profile'       => $pu['profile'] ?? 'default',
+                            'profile'       => $matchedPppPkg?->package ?: ($pu['profile'] ?? 'default'),
                             'status'        => ($pu['disabled'] ?? 'false') === 'true' ? 'disabled' : 'active',
                             'caller_id'     => $mac,
                             'ppp_remote_ip' => $ip,
@@ -419,6 +476,7 @@ class CustomersManager extends Component
                             'mobile'             => $phone ?: '254700000000',
                             'service_type'       => 'pppoe',
                             'router_id'          => $router->id,
+                            'package_id'         => $matchedPppPkg?->id,
                             'ppp_user_id'        => $secret->id,
                             'connection_date'    => now(),
                             'status'             => ($pu['disabled'] ?? 'false') === 'true' ? 'suspended' : 'active',
@@ -429,11 +487,13 @@ class CustomersManager extends Component
                             'mobile'        => $phone ?: ($cust->mobile ?: '254700000000'),
                             'service_type'  => 'pppoe',
                             'router_id'     => $router->id,
+                            'package_id'    => $matchedPppPkg?->id ?? $cust->package_id,
                             'ppp_user_id'   => $secret->id,
                             'status'        => ($pu['disabled'] ?? 'false') === 'true' ? 'suspended' : 'active',
                         ]);
                     }
 
+                    $pppPrice = (float) ($matchedPppPkg?->price ?? 0);
                     BillingInfo::withoutGlobalScopes()->updateOrCreate(
                         [
                             'tenant_id'               => $tenantId,
@@ -441,14 +501,16 @@ class CustomersManager extends Component
                         ],
                         [
                             'billing_type'      => 'prepaid',
-                            'monthly_rent'      => 1500,
-                            'total_amount'      => 1500,
-                            'paid_amount'       => 1500,
+                            'monthly_rent'      => $pppPrice,
+                            'total_amount'      => $pppPrice,
+                            'paid_amount'       => $pppPrice,
                             'due_amount'        => 0,
                             'auto_disable'      => true,
                             'auto_disable_date' => now()->addDays(30),
                         ]
                     );
+
+                    PrepaidUser::upsertFromCustomer($cust, $secret, $matchedPppPkg, now()->addDays(30));
 
                     $totalSyncedPpp++;
                 }
@@ -644,64 +706,18 @@ class CustomersManager extends Component
     }
 
     /**
-     * Auto-select or create matching package for service type (PPPoE vs Hotspot).
+     * Auto-select matching package for service type (PPPoE vs Hotspot) strictly for this tenant.
      */
     public function autoSelectPackageForType(string $type): void
     {
         $tenantId = $this->getTenantId();
 
         $pkg = PackageList::withoutGlobalScopes()
-            ->where(function ($q) use ($tenantId) {
-                $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
-            })
-            ->where(function ($q) use ($type) {
-                if ($type === 'hotspot') {
-                    $q->where('type', 'hotspot')->orWhere('package', 'like', '%hotspot%');
-                } else {
-                    $q->where('type', 'pppoe')
-                      ->orWhere('package', 'like', '%pppoe%')
-                      ->orWhere('package', 'like', '%fiber%')
-                      ->orWhereNull('type');
-                }
-            })
+            ->where('tenant_id', $tenantId)
+            ->where('type', $type === 'hotspot' ? 'hotspot' : 'pppoe')
             ->first();
 
-        if (! $pkg) {
-            // Auto-provision a starter package for this tenant so the dropdown is never empty
-            if ($type === 'pppoe') {
-                $pkg = PackageList::create([
-                    'tenant_id'           => $tenantId,
-                    'package'             => '10 Mbps Home Fiber (30 Days)',
-                    'type'                => 'pppoe',
-                    'price'               => 1500,
-                    'speed'               => '10M/10M',
-                    'mikrotik_rate_limit' => '10M/10M',
-                    'description'         => 'Fast residential fiber unlimited access',
-                    'duration_value'      => 30,
-                    'duration_unit'       => 'days',
-                    'is_active'           => true,
-                    'show_on_site'        => true,
-                ]);
-            } else {
-                $pkg = PackageList::create([
-                    'tenant_id'           => $tenantId,
-                    'package'             => '24 Hours Unlimited Hotspot',
-                    'type'                => 'hotspot',
-                    'price'               => 50,
-                    'speed'               => '5M/5M',
-                    'mikrotik_rate_limit' => '5M/5M',
-                    'description'         => 'Daily unlimited high-speed hotspot access',
-                    'duration_value'      => 24,
-                    'duration_unit'       => 'hours',
-                    'is_active'           => true,
-                    'show_on_site'        => true,
-                ]);
-            }
-        }
-
-        if ($pkg) {
-            $this->new_package_id = $pkg->id;
-        }
+        $this->new_package_id = $pkg?->id;
     }
 
     public function autoSelectPackageForEdit(string $type): void
@@ -709,19 +725,8 @@ class CustomersManager extends Component
         $tenantId = $this->getTenantId();
 
         $pkg = PackageList::withoutGlobalScopes()
-            ->where(function ($q) use ($tenantId) {
-                $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
-            })
-            ->where(function ($q) use ($type) {
-                if ($type === 'hotspot') {
-                    $q->where('type', 'hotspot')->orWhere('package', 'like', '%hotspot%');
-                } else {
-                    $q->where('type', 'pppoe')
-                      ->orWhere('package', 'like', '%pppoe%')
-                      ->orWhere('package', 'like', '%fiber%')
-                      ->orWhereNull('type');
-                }
-            })
+            ->where('tenant_id', $tenantId)
+            ->where('type', $type === 'hotspot' ? 'hotspot' : 'pppoe')
             ->first();
 
         if ($pkg) {
@@ -746,8 +751,8 @@ class CustomersManager extends Component
         $normalizedPhone = OtpVerificationService::normalizeKenyanPhone($this->new_phone) ?: $this->new_phone;
         $uniqueId = 'CUST-' . strtoupper(Str::random(6));
 
-        $router = Router::where('id', $this->new_router_id)->first();
-        $package = PackageList::withoutGlobalScopes()->where('id', $this->new_package_id)->first();
+        $router = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('id', $this->new_router_id)->first();
+        $package = PackageList::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('id', $this->new_package_id)->first();
 
         // 0. Ensure router is in legacy router_lists as safety fallback
         if ($router) {
@@ -864,10 +869,17 @@ class CustomersManager extends Component
             }
         }
 
+        PrepaidUser::upsertFromCustomer(
+            $customer,
+            $secret,
+            $package,
+            now()->addDays($this->new_validity_days)
+        );
+
         // 5. Send confirmation SMS with login credentials
         try {
-            $welcomeMsg = "Dear {$this->new_name}, welcome to HSmart WiFi! Your " . strtoupper($this->new_type) . " account is ready. Username: {$secret->username}, Password: {$secret->password}. Package: " . ($package?->name ?? 'Standard') . ". Enjoy high-speed internet!";
-            IspSmsDispatcher::sendDirectSms($customer->mobile, $welcomeMsg, null);
+            $welcomeMsg = "Dear {$this->new_name}, welcome to HSmart WiFi! Your " . strtoupper($this->new_type) . " account is ready. Username: {$secret->username}, Password: {$secret->password}. Package: " . ($package?->name ?? 'No package') . ". Enjoy high-speed internet!";
+            IspSmsDispatcher::sendDirectSms($customer->mobile, $welcomeMsg, $tenantId);
         } catch (\Throwable $se) {
             Log::warning("[CustomersManager] Welcome SMS notification error: " . $se->getMessage());
         }
@@ -881,7 +893,11 @@ class CustomersManager extends Component
      */
     public function openEditModal(int $customerId)
     {
-        $customer = CustomersInfo::where('id', $customerId)->first();
+        $tenantId = $this->getTenantId();
+        $customer = CustomersInfo::withoutGlobalScope(TenantScope::class)
+            ->where('tenant_id', $tenantId)
+            ->where('id', $customerId)
+            ->first();
         if (!$customer) {
             return;
         }
@@ -916,22 +932,26 @@ class CustomersManager extends Component
      */
     public function updateCustomer()
     {
-        $customer = CustomersInfo::where('id', $this->editingCustomerId)->first();
+        $tenantId = $this->getTenantId();
+        $customer = CustomersInfo::withoutGlobalScope(TenantScope::class)
+            ->where('tenant_id', $tenantId)
+            ->where('id', $this->editingCustomerId)
+            ->first();
         if (!$customer) {
             session()->flash('error', 'Customer not found.');
             $this->closeEditModal();
             return;
         }
 
-        $package = PackageList::where('id', $this->edit_package_id)->first();
-        $router = Router::where('id', $this->edit_router_id)->first();
+        $package = PackageList::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('id', $this->edit_package_id)->first();
+        $router = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('id', $this->edit_router_id)->first();
 
         $customer->update([
             'customer_name' => $this->edit_name,
             'mobile'        => OtpVerificationService::normalizeKenyanPhone($this->edit_phone) ?: $this->edit_phone,
             'service_type'  => $this->edit_type,
             'router_id'     => $this->edit_router_id,
-            'package_id'    => $this->edit_package_id,
+            'package_id'    => $package?->id,
             'status'        => $this->edit_status,
         ]);
 
@@ -946,10 +966,21 @@ class CustomersManager extends Component
         }
 
         if ($this->edit_expiry_date) {
-            BillingInfo::where('customer_bill_unique_id', $customer->customer_unique_id)->update([
-                'auto_disable_date' => Carbon::parse($this->edit_expiry_date)->endOfDay(),
-            ]);
+            BillingInfo::withoutGlobalScope(TenantScope::class)
+                ->where('tenant_id', $tenantId)
+                ->where('customer_bill_unique_id', $customer->customer_unique_id)
+                ->update([
+                    'auto_disable_date' => Carbon::parse($this->edit_expiry_date)->endOfDay(),
+                    'monthly_rent'      => (float) ($package?->price ?? 0),
+                ]);
         }
+
+        PrepaidUser::upsertFromCustomer(
+            $customer->fresh(),
+            $customer->pppUser,
+            $package,
+            $this->edit_expiry_date ? Carbon::parse($this->edit_expiry_date)->endOfDay() : null
+        );
 
         session()->flash('success', "Customer {$this->edit_name} updated successfully.");
         $this->closeEditModal();
@@ -960,12 +991,20 @@ class CustomersManager extends Component
      */
     public function deleteCustomer(int $customerId)
     {
-        $customer = CustomersInfo::where('id', $customerId)->first();
+        $tenantId = $this->getTenantId();
+        $customer = CustomersInfo::withoutGlobalScope(TenantScope::class)
+            ->where('tenant_id', $tenantId)
+            ->where('id', $customerId)
+            ->first();
         if (!$customer) {
             return;
         }
 
         $name = $customer->customer_name;
+        PrepaidUser::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('customer_id', $customer->id)
+            ->delete();
         if ($customer->pppUser) {
             $customer->pppUser->delete();
         }
@@ -978,13 +1017,13 @@ class CustomersManager extends Component
     {
         $tenantId = $this->getTenantId();
 
-        // Base Query with eager loading (bypassing TenantScope fail-closed filter)
+        // Base Query with live tenant-scoped package relationship
         $query = CustomersInfo::withoutGlobalScope(TenantScope::class)
-            ->with(['pppUser', 'package'])
-            ->where(function ($q) use ($tenantId) {
-                $q->where('customers_infos.tenant_id', $tenantId)
-                  ->orWhereNull('customers_infos.tenant_id');
-            });
+            ->with([
+                'pppUser',
+                'package' => fn($q) => $q->withoutGlobalScopes()->where('tenant_id', $tenantId),
+            ])
+            ->where('customers_infos.tenant_id', $tenantId);
 
         // Search Filter
         if (!empty($this->search)) {
@@ -1033,9 +1072,9 @@ class CustomersManager extends Component
         $billings = BillingInfo::withoutGlobalScope(TenantScope::class)->whereIn('customer_bill_unique_id', $uniqueIds)->get()->keyBy('customer_bill_unique_id');
 
         // Analytics Calculation (Tenant Scoped)
-        $allTenantCustomers = CustomersInfo::withoutGlobalScope(TenantScope::class)->where(function ($q) use ($tenantId) {
-            $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
-        })->get();
+        $allTenantCustomers = CustomersInfo::withoutGlobalScope(TenantScope::class)
+            ->where('tenant_id', $tenantId)
+            ->get();
 
         $totalCustomers = $allTenantCustomers->count();
         $activeCustomers = $allTenantCustomers->where('status', 'active')->count();
@@ -1060,46 +1099,22 @@ class CustomersManager extends Component
         // Routers and Packages for Modals and Filters (Scoped to tenant or global templates)
         $routers = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->get();
 
-        // 1. Packages specifically matching the Create modal's current service type (PPPoE vs Hotspot)
+        // 1. Packages strictly matching this tenant & service type
         $createPackages = PackageList::withoutGlobalScopes()
-            ->where(function ($q) use ($tenantId) {
-                $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
-            })
-            ->where(function ($q) {
-                if ($this->new_type === 'hotspot') {
-                    $q->where('type', 'hotspot')->orWhere('package', 'like', '%hotspot%');
-                } else {
-                    $q->where('type', 'pppoe')
-                      ->orWhere('package', 'like', '%pppoe%')
-                      ->orWhere('package', 'like', '%fiber%')
-                      ->orWhereNull('type');
-                }
-            })
+            ->where('tenant_id', $tenantId)
+            ->where('type', $this->new_type === 'hotspot' ? 'hotspot' : 'pppoe')
             ->get();
 
         if ($createPackages->isEmpty()) {
             $createPackages = PackageList::withoutGlobalScopes()
-                ->where(function ($q) use ($tenantId) {
-                    $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
-                })
+                ->where('tenant_id', $tenantId)
                 ->get();
         }
 
-        // 2. Packages specifically matching the Edit modal's service type
+        // 2. Packages strictly matching this tenant & edit service type
         $editPackages = PackageList::withoutGlobalScopes()
-            ->where(function ($q) use ($tenantId) {
-                $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
-            })
-            ->where(function ($q) {
-                if ($this->edit_type === 'hotspot') {
-                    $q->where('type', 'hotspot')->orWhere('package', 'like', '%hotspot%');
-                } else {
-                    $q->where('type', 'pppoe')
-                      ->orWhere('package', 'like', '%pppoe%')
-                      ->orWhere('package', 'like', '%fiber%')
-                      ->orWhereNull('type');
-                }
-            })
+            ->where('tenant_id', $tenantId)
+            ->where('type', $this->edit_type === 'hotspot' ? 'hotspot' : 'pppoe')
             ->get();
 
         if ($editPackages->isEmpty()) {

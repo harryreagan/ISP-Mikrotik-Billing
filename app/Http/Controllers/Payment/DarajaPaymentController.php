@@ -115,14 +115,15 @@ class DarajaPaymentController extends Controller
             return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Accepted']);
         }
 
-        // Update STK transaction status
+        // Preserve initiation metadata (package_id, router_id, mac, ip) while recording callback
+        $prevMeta = is_array($stkTx?->raw_callback) ? $stkTx->raw_callback : [];
         if ($stkTx) {
             $stkTx->update([
                 'status'               => 'completed',
                 'mpesa_receipt_number' => $mpesaReceiptNumber,
                 'result_code'          => 0,
                 'result_desc'          => $resultDesc,
-                'raw_callback'         => $request->all(),
+                'raw_callback'         => array_merge($prevMeta, ['daraja_callback' => $request->all()]),
             ]);
         }
 
@@ -132,6 +133,9 @@ class DarajaPaymentController extends Controller
         $isHotspot = ($stkTx && ($stkTx->router_id || !empty($meta['router_id']) || !empty($meta['package_id']) || str_starts_with((string)$reference, 'HS-') || str_contains((string)$reference, 'HSM-HS')));
 
         if ($isHotspot) {
+            if ($stkTx) {
+                $stkTx->update(['service_type' => 'hotspot']);
+            }
             $this->fulfillHotspotTransaction($stkTx, $mpesaReceiptNumber, $amount, $phoneNumber);
             return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Accepted']);
         }
@@ -401,16 +405,22 @@ class DarajaPaymentController extends Controller
         // 1. Resolve package details
         $durationInfo = MikrotikDuration::parse('1h');
         $limitBytes = null;
-        $profileName = 'Hotspot Plan';
+        $profileName = 'default';
+        $pkg = null;
         if ($packageId) {
-            $pkg = PackageList::withoutGlobalScopes()->find($packageId);
+            $pkg = PackageList::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->find($packageId) ?: PackageList::withoutGlobalScopes()->find($packageId);
             if ($pkg) {
-                $profileName = $pkg->package_name ?: ($pkg->name ?: 'Hotspot Plan');
-                $durationVal = !empty($pkg->duration) ? $pkg->duration : (!empty($pkg->validity) ? $pkg->validity : '1h');
-                $durationUnit = !empty($pkg->duration_unit) ? $pkg->duration_unit : null;
+                $profileName = $pkg->package ?: ($pkg->name ?: 'default');
+                $durationVal = $pkg->validity_value ?: ($pkg->duration_value ?: (!empty($pkg->duration) ? $pkg->duration : '1'));
+                $durationUnit = $pkg->validity_unit ?: ($pkg->duration_unit ?: 'hours');
                 $durationInfo = MikrotikDuration::parse($durationVal, $durationUnit);
 
-                if (!empty($pkg->volume) && is_numeric($pkg->volume) && $pkg->volume > 0) {
+                $limitMb = (int) ($pkg->data_limit_mb ?: ($pkg->data_cap_mb ?: 0));
+                if ($limitMb > 0) {
+                    $limitBytes = $limitMb * 1048576;
+                } elseif (!empty($pkg->volume) && is_numeric($pkg->volume) && $pkg->volume > 0) {
                     $unit = strtolower($pkg->volume_unit ?? 'mb');
                     $bytes = (int) $pkg->volume;
                     if ($unit === 'gb') $bytes *= 1073741824;
@@ -486,19 +496,38 @@ class DarajaPaymentController extends Controller
             Log::warning('[Daraja] HotspotSale save note: ' . $hse->getMessage());
         }
 
-        // 5. Record CollectionSummary FIRST
+        // 5. Upsert PrepaidUser & Record CollectionSummary
+        try {
+            if ($hotspotSale) {
+                \App\Models\PrepaidUser::upsertFromHotspotSale(
+                    $hotspotSale,
+                    $pkg,
+                    'Mpesa STK + ' . strtoupper($receipt)
+                );
+            }
+        } catch (\Throwable $pe) {
+            Log::warning('[Daraja] PrepaidUser upsert note: ' . $pe->getMessage());
+        }
+
         try {
             if (!CollectionSummary::withoutGlobalScopes()->where('transaction_id', $receipt)->exists()) {
                 $maxInvoice = CollectionSummary::withoutGlobalScopes()->max('invoice_no');
                 $invoiceNo = $maxInvoice ? ($maxInvoice + 1) : 100001;
+                $subLabel = $receipt . ($phone ? ' (' . $phone . ')' : '');
 
                 CollectionSummary::withoutGlobalScopes()->create([
                     'tenant_id'                     => $tenantId,
-                    'customer_collection_unique_id' => $phone,
+                    'customer_collection_unique_id' => $phone ?: $receipt,
+                    'subscriber_name'               => $subLabel,
+                    'phone'                         => $phone,
+                    'mac_address'                   => $clientMac ? strtoupper($clientMac) : null,
+                    'router_id'                     => $routerId,
                     'collection_date'               => now(),
                     'collection_amount'             => $amount,
                     'collected_by'                  => 'Hotspot M-Pesa (DARAJA)',
                     'payment_type'                  => 'hotspot',
+                    'service_type'                  => 'hotspot',
+                    'package_id'                    => $pkg?->id ?: ($packageId ? (int) $packageId : null),
                     'payment_method'                => 'daraja',
                     'transaction_id'                => $receipt,
                     'payment_status'                => 'paid',
@@ -522,7 +551,9 @@ class DarajaPaymentController extends Controller
                 $clientIp,
                 $clientMac,
                 $expiresAt,
-                $hotspotSale?->id
+                $hotspotSale?->id,
+                $profileName,
+                $pkg
             );
         } catch (\Throwable $he) {
             Log::warning('[Daraja] Hotspot router provisioning note: ' . $he->getMessage());
@@ -542,7 +573,9 @@ class DarajaPaymentController extends Controller
         ?string $clientIp,
         ?string $clientMac,
         Carbon $expiresAt,
-        ?int $saleId
+        ?int $saleId,
+        string $profileName = 'default',
+        ?PackageList $pkg = null
     ): void {
         $routersQuery = Router::withoutGlobalScopes()->where(function ($q) {
             $q->where('status', 'online')
@@ -590,6 +623,28 @@ class DarajaPaymentController extends Controller
                 $api = new MikrotikApiService($host, $port, $user, $pass, 15);
                 $code = strtoupper(trim($receipt));
 
+                $resolvedProfile = 'default';
+                if ($pkg && !empty($profileName) && $profileName !== 'default') {
+                    try {
+                        $existingProf = $api->executeCommand('/ip/hotspot/user/profile/print', [], ['name' => $profileName]);
+                        if (is_array($existingProf) && !empty($existingProf[0]['.id'])) {
+                            $resolvedProfile = $profileName;
+                        } else {
+                            $addProfRes = $api->executeCommand('/ip/hotspot/user/profile/add', [
+                                'name'               => $profileName,
+                                'rate-limit'         => $pkg->getRateLimitString(),
+                                'session-timeout'    => $pkg->getSessionTimeoutString(),
+                                'idle-timeout'       => '5m',
+                                'shared-users'       => (string) max(1, (int) ($pkg->shared_users ?: 1)),
+                                'status-autorefresh' => '1m',
+                            ]);
+                            if (!is_string($addProfRes) || !str_starts_with($addProfRes, 'Error:')) {
+                                $resolvedProfile = $profileName;
+                            }
+                        }
+                    } catch (\Throwable $pe) {}
+                }
+
                 $existingUsers = $api->executeCommand('/ip/hotspot/user/print');
                 $matchedUser = null;
                 if (is_array($existingUsers)) {
@@ -605,6 +660,7 @@ class DarajaPaymentController extends Controller
                 $userPayload = [
                     'name'         => $code,
                     'password'     => $code,
+                    'profile'      => $resolvedProfile,
                     'limit-uptime' => $limitUptime,
                     'comment'      => $comment,
                 ];

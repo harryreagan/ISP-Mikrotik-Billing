@@ -324,16 +324,22 @@ class PayHeroPaymentController extends Controller
         // 1. Resolve package duration & data limits
         $durationInfo = \App\Services\MikrotikDuration::parse('1h');
         $limitBytes = null;
-        $profileName = 'Hotspot Plan';
+        $profileName = 'default';
+        $pkg = null;
         if ($packageId) {
-            $pkg = PackageList::withoutGlobalScopes()->find($packageId);
+            $pkg = PackageList::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->find($packageId) ?: PackageList::withoutGlobalScopes()->find($packageId);
             if ($pkg) {
-                $profileName = $pkg->package_name ?: ($pkg->name ?: 'Hotspot Plan');
-                $durationVal = !empty($pkg->duration) ? $pkg->duration : (!empty($pkg->validity) ? $pkg->validity : '1h');
-                $durationUnit = !empty($pkg->duration_unit) ? $pkg->duration_unit : null;
+                $profileName = $pkg->package ?: ($pkg->name ?: 'default');
+                $durationVal = $pkg->validity_value ?: ($pkg->duration_value ?: (!empty($pkg->duration) ? $pkg->duration : '1'));
+                $durationUnit = $pkg->validity_unit ?: ($pkg->duration_unit ?: 'hours');
                 $durationInfo = \App\Services\MikrotikDuration::parse($durationVal, $durationUnit);
 
-                if (!empty($pkg->volume) && is_numeric($pkg->volume) && $pkg->volume > 0) {
+                $limitMb = (int) ($pkg->data_limit_mb ?: ($pkg->data_cap_mb ?: 0));
+                if ($limitMb > 0) {
+                    $limitBytes = $limitMb * 1048576;
+                } elseif (!empty($pkg->volume) && is_numeric($pkg->volume) && $pkg->volume > 0) {
                     $unit = strtolower($pkg->volume_unit ?? 'mb');
                     $bytes = (int) $pkg->volume;
                     if ($unit === 'gb') $bytes *= 1073741824;
@@ -342,6 +348,9 @@ class PayHeroPaymentController extends Controller
                     $limitBytes = $bytes;
                 }
             }
+        }
+        if ($stkTx && $stkTx->service_type !== 'hotspot') {
+            MpesaStkTransaction::withoutGlobalScopes()->where('id', $stkTx->id)->update(['service_type' => 'hotspot']);
         }
         $durationSeconds = $durationInfo['seconds'] > 0 ? $durationInfo['seconds'] : 3600;
         $durationMinutes = (int) round($durationSeconds / 60);
@@ -409,19 +418,38 @@ class PayHeroPaymentController extends Controller
             Log::warning('[PayHero] HotspotSale save note: ' . $hse->getMessage());
         }
 
-        // 5. Financial Record: Save to collection_summaries FIRST
+        // 5. Financial Record: Save to collection_summaries & prepaid_users FIRST
+        try {
+            if ($hotspotSale) {
+                \App\Models\PrepaidUser::upsertFromHotspotSale(
+                    $hotspotSale,
+                    $pkg,
+                    'Mpesa STK + ' . strtoupper($receipt)
+                );
+            }
+        } catch (\Throwable $pe) {
+            Log::warning('[PayHero] PrepaidUser upsert note: ' . $pe->getMessage());
+        }
+
         try {
             if (!CollectionSummary::withoutGlobalScopes()->where('transaction_id', $receipt)->exists()) {
                 $maxInvoice = CollectionSummary::withoutGlobalScopes()->max('invoice_no');
                 $invoiceNo = $maxInvoice ? ($maxInvoice + 1) : 100001;
+                $subLabel = $receipt . ($stkTx->phone ? ' (' . $stkTx->phone . ')' : '');
 
                 CollectionSummary::withoutGlobalScopes()->create([
                     'tenant_id'                     => $tenantId,
-                    'customer_collection_unique_id' => $stkTx->phone,
+                    'customer_collection_unique_id' => $stkTx->phone ?: $receipt,
+                    'subscriber_name'               => $subLabel,
+                    'phone'                         => $stkTx->phone,
+                    'mac_address'                   => $clientMac ? strtoupper($clientMac) : null,
+                    'router_id'                     => $routerId,
                     'collection_date'               => now(),
                     'collection_amount'             => $amount,
                     'collected_by'                  => 'Hotspot M-Pesa (PAYHERO)',
                     'payment_type'                  => 'hotspot',
+                    'service_type'                  => 'hotspot',
+                    'package_id'                    => $pkg?->id ?: ($packageId ? (int) $packageId : null),
                     'payment_method'                => 'payhero',
                     'transaction_id'                => $receipt,
                     'payment_status'                => 'paid',
@@ -446,7 +474,9 @@ class PayHeroPaymentController extends Controller
                 $clientIp,
                 $clientMac,
                 $expiresAt,
-                $hotspotSale?->id
+                $hotspotSale?->id,
+                $profileName,
+                $pkg
             );
         } catch (\Throwable $he) {
             Log::warning('[PayHero] Hotspot router provisioning note: ' . $he->getMessage());
@@ -468,7 +498,9 @@ class PayHeroPaymentController extends Controller
         ?string $clientIp,
         ?string $clientMac,
         \Carbon\Carbon $expiresAt,
-        ?int $saleId
+        ?int $saleId,
+        string $profileName = 'default',
+        ?PackageList $pkg = null
     ): void {
         $routersQuery = \App\Models\Router::withoutGlobalScopes()->where(function ($q) {
             $q->where('status', 'online')
@@ -517,6 +549,29 @@ class PayHeroPaymentController extends Controller
                 $api = new \App\Services\MikrotikApiService($host, $port, $user, $pass, 15);
                 $code = strtoupper(trim($receipt));
 
+                // 0. Ensure package profile exists on router if package was resolved
+                $resolvedProfile = 'default';
+                if ($pkg && !empty($profileName) && $profileName !== 'default') {
+                    try {
+                        $existingProf = $api->executeCommand('/ip/hotspot/user/profile/print', [], ['name' => $profileName]);
+                        if (is_array($existingProf) && !empty($existingProf[0]['.id'])) {
+                            $resolvedProfile = $profileName;
+                        } else {
+                            $addProfRes = $api->executeCommand('/ip/hotspot/user/profile/add', [
+                                'name'               => $profileName,
+                                'rate-limit'         => $pkg->getRateLimitString(),
+                                'session-timeout'    => $pkg->getSessionTimeoutString(),
+                                'idle-timeout'       => '5m',
+                                'shared-users'       => (string) max(1, (int) ($pkg->shared_users ?: 1)),
+                                'status-autorefresh' => '1m',
+                            ]);
+                            if (!is_string($addProfRes) || !str_starts_with($addProfRes, 'Error:')) {
+                                $resolvedProfile = $profileName;
+                            }
+                        }
+                    } catch (\Throwable $pe) {}
+                }
+
                 // 1. Add / Update Hotspot voucher user (username = receipt, password = receipt)
                 $existingUsers = $api->executeCommand('/ip/hotspot/user/print');
                 $matchedUser = null;
@@ -533,6 +588,7 @@ class PayHeroPaymentController extends Controller
                 $userPayload = [
                     'name'         => $code,
                     'password'     => $code,
+                    'profile'      => $resolvedProfile,
                     'limit-uptime' => $limitUptime,
                     'comment'      => $comment,
                 ];

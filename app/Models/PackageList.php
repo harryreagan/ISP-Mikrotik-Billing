@@ -19,6 +19,7 @@ class PackageList extends Model
         'reseller_id',
         'validity_value', 'validity_unit', 'duration_value', 'duration_unit',
         'data_limit_mb', 'data_cap_mb', 'shared_users', 'validity_type',
+        'sync_status', 'last_sync_error', 'last_synced_at',
     ];
 
     protected $casts = [
@@ -30,6 +31,7 @@ class PackageList extends Model
         'show_public'     => 'boolean',
         'push_to_mikrotik'=> 'boolean',
         'price'           => 'decimal:2',
+        'last_synced_at'  => 'datetime',
     ];
 
     /**
@@ -154,5 +156,17 @@ class PackageList extends Model
             'month', 'months'        => ($val * 30) . "d",
             default                  => "{$val}h",
         };
+    }
+
+    /**
+     * Candidate profile names used across RouterOS (/ip/hotspot/user/profile or /ppp/profile).
+     */
+    public function getMikrotikProfileNames(): array
+    {
+        $raw = trim((string) $this->package);
+        $prefix = $this->type === 'pppoe' ? 'ppp_' : 'hs_';
+        $prefixed = $prefix . preg_replace('/[^a-zA-Z0-9_\-]/', '_', $raw);
+
+        return array_values(array_filter(array_unique([$raw, $prefixed])));
     }
 }

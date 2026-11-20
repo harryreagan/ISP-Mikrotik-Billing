@@ -172,12 +172,51 @@
 
                             {{-- Linked Routers & Sync Status --}}
                             <div class="border-top pt-3">
+                                @php
+                                    $pkgSyncStatus = strtolower((string) ($pkg->sync_status ?? 'pending'));
+                                    $syncBadgeClass = $pkgSyncStatus === 'synced'
+                                        ? 'bg-success-subtle text-success border-success-subtle'
+                                        : ($pkgSyncStatus === 'failed'
+                                            ? 'bg-danger-subtle text-danger border-danger-subtle'
+                                            : 'bg-warning-subtle text-warning-emphasis border-warning-subtle');
+                                    $syncIconClass = $pkgSyncStatus === 'synced'
+                                        ? 'bi-check-circle-fill'
+                                        : ($pkgSyncStatus === 'failed' ? 'bi-exclamation-triangle-fill' : 'bi-clock-history');
+                                @endphp
                                 <div class="d-flex justify-content-between align-items-center small mb-2">
-                                    <span class="text-muted fw-semibold">Linked Routers:</span>
-                                    <button wire:click="retrySync({{ $pkg->id }})" class="btn btn-link btn-sm p-0 text-decoration-none text-orange-600" title="Sync router profiles">
-                                        <i class="bi bi-arrow-repeat me-1"></i>Sync
+                                    <div class="d-flex align-items-center gap-1.5">
+                                        <span class="text-muted fw-semibold">Sync Status:</span>
+                                        <span class="badge border {{ $syncBadgeClass }}">
+                                            <i class="bi {{ $syncIconClass }} me-1"></i>{{ ucfirst($pkgSyncStatus) }}
+                                        </span>
+                                    </div>
+                                    <button type="button"
+                                            wire:click="retrySync({{ $pkg->id }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="retrySync({{ $pkg->id }})"
+                                            class="btn btn-outline-primary btn-sm py-0 px-2"
+                                            style="font-size: 11px;"
+                                            title="Push package profile & speed to attached routers">
+                                        <span wire:loading.remove wire:target="retrySync({{ $pkg->id }})">
+                                            <i class="bi bi-arrow-repeat me-1"></i>Sync to routers
+                                        </span>
+                                        <span wire:loading wire:target="retrySync({{ $pkg->id }})">
+                                            <span class="spinner-border spinner-border-sm me-1"></span>Syncing...
+                                        </span>
                                     </button>
                                 </div>
+
+                                @if($pkg->last_synced_at)
+                                    <div class="text-muted mb-1" style="font-size: 11px;">
+                                        <i class="bi bi-clock me-1"></i>Last synced: {{ \Carbon\Carbon::parse($pkg->last_synced_at)->diffForHumans() }}
+                                    </div>
+                                @endif
+
+                                @if($pkgSyncStatus === 'failed' && !empty($pkg->last_sync_error))
+                                    <div class="alert alert-danger py-1 px-2 mb-2" style="font-size: 11px;">
+                                        {{ Str::limit($pkg->last_sync_error, 120) }}
+                                    </div>
+                                @endif
 
                                 @if($pkg->routers->isEmpty())
                                     <span class="badge bg-secondary-subtle text-secondary">All tenant routers</span>

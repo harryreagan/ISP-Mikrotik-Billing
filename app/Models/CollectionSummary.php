@@ -13,11 +13,18 @@ class CollectionSummary extends Model
     protected static $recordEvents = ['deleted', 'updated'];
 
     protected $fillable = [
+        'tenant_id',
         'customer_collection_unique_id',
+        'subscriber_name',
+        'phone',
+        'mac_address',
+        'router_id',
         'collection_date',
         'collection_amount',
         'collected_by',
         'payment_type',
+        'service_type',
+        'package_id',
         'payment_method',
         'transaction_id',
         'payment_status',
@@ -28,6 +35,16 @@ class CollectionSummary extends Model
     public function customer()
     {
         return $this->belongsTo(CustomersInfo::class, 'customer_collection_unique_id', 'customer_unique_id');
+    }
+
+    public function package()
+    {
+        return $this->belongsTo(PackageList::class, 'package_id', 'id');
+    }
+
+    public function router()
+    {
+        return $this->belongsTo(Router::class, 'router_id', 'id');
     }
 
     public function pppUser()

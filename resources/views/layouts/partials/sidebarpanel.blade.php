@@ -180,6 +180,84 @@
             </li>
 
             {{-- ══════════════════════════════════════════════════════════════ --}}
+            {{-- 1B. ACTIVATION / PREPAID USERS                                 --}}
+            {{-- ══════════════════════════════════════════════════════════════ --}}
+            <li class="nav-item">
+                <div class="row navbar-vertical-label-wrapper mt-3 mb-1">
+                    <div class="col-auto navbar-vertical-label">{{ __('Activation') }}</div>
+                </div>
+
+                @php
+                    $isActivationOpen = request()->routeIs('admin.activation.*');
+                @endphp
+                <a class="nav-link dropdown-indicator {{ $isActivationOpen ? '' : 'collapsed' }}" href="#activationMenuDropdown" role="button"
+                    data-bs-toggle="collapse" aria-expanded="{{ $isActivationOpen ? 'true' : 'false' }}" aria-controls="activationMenuDropdown">
+                    <div class="d-flex align-items-center">
+                        <span class="nav-link-icon"><i class="bi bi-lightning-charge text-primary"></i></span>
+                        <span class="nav-link-text ps-1 fw-semibold">{{ __('Activation') }}</span>
+                    </div>
+                </a>
+                <ul class="nav collapse {{ $isActivationOpen ? 'show' : '' }}" id="activationMenuDropdown">
+                    <li class="nav-item">
+                        <a wire:navigate.hover wire:current.exact="active" class="nav-link {{ request()->routeIs('admin.activation.prepaid-users') ? 'active' : '' }}" href="{{ route('admin.activation.prepaid-users') }}">
+                            <div class="d-flex align-items-center">
+                                <span class="nav-link-icon"><i class="bi bi-people"></i></span>
+                                <span class="nav-link-text ps-1">{{ __('Prepaid Users') }}</span>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a wire:navigate.hover wire:current.exact="active" class="nav-link {{ request()->routeIs('admin.activation.active-users') ? 'active' : '' }}" href="{{ route('admin.activation.active-users') }}">
+                            <div class="d-flex align-items-center">
+                                <span class="nav-link-icon"><i class="bi bi-check-circle"></i></span>
+                                <span class="nav-link-text ps-1">{{ __('Active Users') }}</span>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a wire:navigate.hover wire:current.exact="active" class="nav-link {{ request()->routeIs('admin.activation.expired-users') ? 'active' : '' }}" href="{{ route('admin.activation.expired-users') }}">
+                            <div class="d-flex align-items-center">
+                                <span class="nav-link-icon"><i class="bi bi-clock-history"></i></span>
+                                <span class="nav-link-text ps-1">{{ __('Expired Users') }}</span>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a wire:navigate.hover wire:current.exact="active" class="nav-link {{ request()->routeIs('admin.activation.online-users') ? 'active' : '' }}" href="{{ route('admin.activation.online-users') }}">
+                            <div class="d-flex align-items-center">
+                                <span class="nav-link-icon"><i class="bi bi-broadcast"></i></span>
+                                <span class="nav-link-text ps-1">{{ __('Online Users') }}</span>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a wire:navigate.hover wire:current.exact="active" class="nav-link {{ request()->routeIs('admin.activation.offline-users') ? 'active' : '' }}" href="{{ route('admin.activation.offline-users') }}">
+                            <div class="d-flex align-items-center">
+                                <span class="nav-link-icon"><i class="bi bi-wifi-off"></i></span>
+                                <span class="nav-link-text ps-1">{{ __('Offline Users') }}</span>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a wire:navigate.hover wire:current.exact="active" class="nav-link {{ request()->routeIs('admin.activation.activate-user') ? 'active' : '' }}" href="{{ route('admin.activation.activate-user') }}">
+                            <div class="d-flex align-items-center">
+                                <span class="nav-link-icon"><i class="bi bi-person-plus"></i></span>
+                                <span class="nav-link-text ps-1">{{ __('Activate User') }}</span>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a wire:navigate.hover wire:current.exact="active" class="nav-link {{ request()->routeIs('admin.activation.roaming-users') ? 'active' : '' }}" href="{{ route('admin.activation.roaming-users') }}">
+                            <div class="d-flex align-items-center">
+                                <span class="nav-link-icon"><i class="bi bi-arrow-left-right"></i></span>
+                                <span class="nav-link-text ps-1">{{ __('Roaming Users') }}</span>
+                            </div>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+
+            {{-- ══════════════════════════════════════════════════════════════ --}}
             {{-- 2. NETWORK                                                     --}}
             {{-- ══════════════════════════════════════════════════════════════ --}}
             <li class="nav-item">
