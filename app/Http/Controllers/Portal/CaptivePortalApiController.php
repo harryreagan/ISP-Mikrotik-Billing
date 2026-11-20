@@ -192,7 +192,11 @@ class CaptivePortalApiController extends Controller
 
             // 1. Check latest HotspotSale for this MAC
             $sale = HotspotSale::withoutGlobalScopes()
-                ->where('mac', $mac)
+                ->where(function ($q) use ($mac) {
+                    $q->where('mac_address', $mac)
+                      ->orWhere('mac_address', strtoupper($mac))
+                      ->orWhere('mac_address', strtolower($mac));
+                })
                 ->when($tenantId > 0, fn($q) => $q->where('tenant_id', $tenantId))
                 ->latest('id')
                 ->first();
@@ -244,7 +248,10 @@ class CaptivePortalApiController extends Controller
             // 2. Fallback to check MpesaStkTransaction
             $tx = MpesaStkTransaction::withoutGlobalScopes()
                 ->where('status', 'completed')
-                ->where('mac', $mac)
+                ->where(function ($q) use ($mac) {
+                    $q->where('raw_callback', 'like', '%' . $mac . '%')
+                      ->orWhere('reference', 'like', '%' . $mac . '%');
+                })
                 ->when($tenantId > 0, fn($q) => $q->where('tenant_id', $tenantId))
                 ->latest('id')
                 ->first();
@@ -373,7 +380,7 @@ class CaptivePortalApiController extends Controller
         }
 
         try {
-            $api = new MikrotikApiService($host, $port, $user, $pass, 3);
+            $api = new MikrotikApiService($host, $port, $user, $pass, 6);
             $existing = $api->executeCommand('/ip/hotspot/user/print', [], ['name' => $username]);
 
             $durationInfo = \App\Services\MikrotikDuration::parse($durationHours, 'hours');

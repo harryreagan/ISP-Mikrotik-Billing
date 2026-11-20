@@ -594,8 +594,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnText && selectedPlanPrice) {
         btnText.innerText = 'Pay KES ' + selectedPlanPrice + ' via M-Pesa';
     }
-    if (mtError) {
-        showStatus('Hotspot Login Error: ' + mtError, 'error');
+    // Only display login error if the user actually attempted a voucher login submission
+    const attemptedUser = urlParams.get('username') || urlParams.get('user') || urlParams.get('voucher') || urlParams.get('code');
+    if (mtError && mtError !== '' && attemptedUser) {
+        if (mtError.toLowerCase().includes('invalid username') || (mtError.toLowerCase().includes('user') && mtError.toLowerCase().includes('not found'))) {
+            showStatus('⚠️ Invalid or expired voucher code (' + attemptedUser + '). Please verify your code or choose a package above.', 'error');
+        } else {
+            showStatus('⚠️ ' + mtError, 'error');
+        }
     }
     const form = document.getElementById('voucherLoginForm');
     if (form) {
@@ -1713,7 +1719,7 @@ HTML;
                             'hotspot-address'   => '10.5.50.1',
                             'dns-name'          => 'hotspot.hsmart.lan',
                             'html-directory'    => $htmlDir,
-                            'login-by'          => 'http-pap,http-chap',
+                            'login-by'          => 'http-pap',
                             'keepalive-timeout' => '2m',
                         ], ['.id' => $pr['.id']]);
                         $hasProf = true;
@@ -1727,7 +1733,7 @@ HTML;
                     'hotspot-address'   => '10.5.50.1',
                     'dns-name'          => 'hotspot.hsmart.lan',
                     'html-directory'    => $htmlDir,
-                    'login-by'          => 'http-pap,http-chap',
+                    'login-by'          => 'http-pap',
                     'keepalive-timeout' => '2m',
                 ]);
             }
