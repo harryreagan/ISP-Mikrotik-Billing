@@ -39,8 +39,13 @@ class PollPrepaidActiveSessionsCommand extends Command
             $tenantId = (int) $tenantId;
             $routers = Router::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
+                ->whereNull('deleted_at')
+                ->where('status', 'online')
                 ->when($routerFilter, fn($q) => $q->where('id', $routerFilter))
-                ->get();
+                ->orderByDesc('last_seen_at')
+                ->orderByDesc('id')
+                ->get()
+                ->unique(fn($r) => trim((string) ($r->vpn_ip ?: $r->ip)));
 
             if ($routers->isEmpty()) {
                 continue;
@@ -276,3 +281,4 @@ class PollPrepaidActiveSessionsCommand extends Command
         return Command::SUCCESS;
     }
 }
+

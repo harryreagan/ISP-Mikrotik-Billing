@@ -220,3 +220,4 @@ class PrepaidUser extends Model
         );
     }
 }
+

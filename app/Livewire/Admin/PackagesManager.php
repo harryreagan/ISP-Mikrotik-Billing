@@ -219,14 +219,27 @@ class PackagesManager extends Component
                 $package = PackageList::withoutGlobalScopes()->create($data);
             }
 
-            // Attach Routers (explicitly scoped to tenant; default to all tenant routers if none checked)
+            // Attach Routers (explicitly scoped to tenant & non-deleted; default to online tenant routers if none checked)
             $routerIds = [];
             if (in_array('all', $this->selected_routers, true) || empty($this->selected_routers)) {
-                $routerIds = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->pluck('id')->toArray();
+                $routerIds = Router::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
+                    ->where('status', 'online')
+                    ->pluck('id')
+                    ->toArray();
+                if (empty($routerIds)) {
+                    $routerIds = Router::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->whereNull('deleted_at')
+                        ->pluck('id')
+                        ->toArray();
+                }
             } else {
                 $requestedIds = array_map('intval', array_filter($this->selected_routers, 'is_numeric'));
                 $routerIds = Router::withoutGlobalScopes()
                     ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
                     ->whereIn('id', $requestedIds)
                     ->pluck('id')
                     ->toArray();

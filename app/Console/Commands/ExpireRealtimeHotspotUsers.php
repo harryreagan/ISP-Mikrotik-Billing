@@ -44,14 +44,14 @@ class ExpireRealtimeHotspotUsers extends Command
             $expiredTargetsByTenant[$tId][strtolower(trim($pu->username))] = $pu;
         }
 
-        // 2. Audit every router for live active/user/cookie/ip-binding/host expiry enforcement
+        // 2. Audit active, online, non-deleted routers (deduplicated by tunnel/IP so pending/stale peers never trigger bad logins)
         $routers = Router::withoutGlobalScopes()
-            ->where(function ($q) {
-                $q->where('status', 'online')
-                  ->orWhere('action', 'connected')
-                  ->orWhereNotNull('vpn_ip');
-            })
-            ->get();
+            ->whereNull('deleted_at')
+            ->where('status', 'online')
+            ->orderByDesc('last_seen_at')
+            ->orderByDesc('id')
+            ->get()
+            ->unique(fn($r) => trim((string) ($r->vpn_ip ?: $r->ip)));
 
         foreach ($routers as $router) {
             $tId = (int) ($router->tenant_id ?: 1);

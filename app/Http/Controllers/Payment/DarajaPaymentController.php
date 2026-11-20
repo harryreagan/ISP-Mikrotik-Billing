@@ -577,7 +577,7 @@ class DarajaPaymentController extends Controller
         string $profileName = 'default',
         ?PackageList $pkg = null
     ): void {
-        $routersQuery = Router::withoutGlobalScopes()->where(function ($q) {
+        $routersQuery = Router::withoutGlobalScopes()->whereNull('deleted_at')->where(function ($q) {
             $q->where('status', 'online')
               ->orWhere('action', 'connected')
               ->orWhereNotNull('vpn_ip')

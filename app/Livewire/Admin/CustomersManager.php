@@ -194,17 +194,19 @@ class CustomersManager extends Component
     {
         $tenantId = $this->getTenantId();
 
-        $query = Router::withoutGlobalScopes()->where('tenant_id', $tenantId);
+        $query = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereNull('deleted_at');
 
         if ($routerId) {
             $query->where('id', $routerId);
         } elseif ($this->filterRouter !== 'all' && is_numeric($this->filterRouter)) {
             $query->where('id', $this->filterRouter);
+        } else {
+            $query->where('status', 'online');
         }
 
         $routers = $query->get();
         if ($routers->isEmpty()) {
-            $routers = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->get();
+            $routers = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereNull('deleted_at')->get();
         }
 
         if ($routers->isEmpty()) {
@@ -751,7 +753,7 @@ class CustomersManager extends Component
         $normalizedPhone = OtpVerificationService::normalizeKenyanPhone($this->new_phone) ?: $this->new_phone;
         $uniqueId = 'CUST-' . strtoupper(Str::random(6));
 
-        $router = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('id', $this->new_router_id)->first();
+        $router = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereNull('deleted_at')->where('id', $this->new_router_id)->first();
         $package = PackageList::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('id', $this->new_package_id)->first();
 
         // 0. Ensure router is in legacy router_lists as safety fallback
@@ -944,7 +946,7 @@ class CustomersManager extends Component
         }
 
         $package = PackageList::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('id', $this->edit_package_id)->first();
-        $router = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('id', $this->edit_router_id)->first();
+        $router = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereNull('deleted_at')->where('id', $this->edit_router_id)->first();
 
         $customer->update([
             'customer_name' => $this->edit_name,
@@ -1096,8 +1098,8 @@ class CustomersManager extends Component
 
         $outstandingBalance = (float) $allBillings->sum('due_amount');
 
-        // Routers and Packages for Modals and Filters (Scoped to tenant or global templates)
-        $routers = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->get();
+        // Routers and Packages for Modals and Filters
+        $routers = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereNull('deleted_at')->get();
 
         // 1. Packages strictly matching this tenant & service type
         $createPackages = PackageList::withoutGlobalScopes()

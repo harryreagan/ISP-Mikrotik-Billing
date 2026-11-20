@@ -276,7 +276,8 @@ class PrepaidUsersHub extends Component
             $this->act_duration_unit = 'hours';
         }
 
-        $router = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->first();
+        $router = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereNull('deleted_at')->where('status', 'online')->first()
+            ?: Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereNull('deleted_at')->first();
         $this->act_router_id = $router?->id;
         $this->showActivateModal = true;
     }
@@ -735,7 +736,10 @@ class PrepaidUsersHub extends Component
     public function syncAllFromRouters(): void
     {
         $tenantId = $this->getTenantId();
-        $routers = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->get();
+        $routers = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereNull('deleted_at')->where('status', 'online')->get();
+        if ($routers->isEmpty()) {
+            $routers = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereNull('deleted_at')->get();
+        }
         $totalSynced = 0;
         foreach ($routers as $r) {
             $totalSynced += $this->syncSingleRouter($r, $tenantId);
@@ -1092,7 +1096,7 @@ class PrepaidUsersHub extends Component
     {
         $tenantId = $this->getTenantId();
         $users = $this->buildFilteredQuery()->paginate($this->perPage);
-        $routers = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->get();
+        $routers = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereNull('deleted_at')->get();
         $packages = PackageList::withoutGlobalScopes()->where('tenant_id', $tenantId)->orderBy('price')->get();
 
         // Section summary counts strictly per tenant from DB (zero router calls on page load)
@@ -1114,3 +1118,4 @@ class PrepaidUsersHub extends Component
         ])->layout('layouts.app');
     }
 }
+

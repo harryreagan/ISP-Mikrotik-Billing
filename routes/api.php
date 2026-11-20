@@ -63,14 +63,15 @@ Route::get('/router-hello/{token}', function (\Illuminate\Http\Request $request,
     $router = \App\Services\ProvisioningTokenService::validateToken($cleanToken);
 
     if ($router) {
-        $incomingIp = $request->ip();
+        $incomingIp = $request->header('CF-Connecting-IP')
+            ?: ($request->header('X-Forwarded-For') ? trim(explode(',', $request->header('X-Forwarded-For'))[0]) : $request->ip());
         $updates = [
             'status'           => 'online',
             'last_seen_at'     => now(),
             'vpn_connected_at' => $router->vpn_connected_at ?: now(),
         ];
 
-        // Network Move Detection: router moved to a new public IP or LAN
+        // Network Move Detection: router moved to a new public IP or LAN (ignoring Cloudflare proxy edge hops)
         if (!empty($incomingIp)) {
             if (!empty($router->last_known_ip) && $router->last_known_ip !== $incomingIp) {
                 \Illuminate\Support\Facades\Log::warning("[RouterMoved] Router #{$router->id} ({$router->name}) public IP changed from '{$router->last_known_ip}' to '{$incomingIp}'. Triggering health sync.");

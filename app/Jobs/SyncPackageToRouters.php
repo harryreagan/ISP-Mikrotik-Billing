@@ -52,17 +52,27 @@ class SyncPackageToRouters implements ShouldQueue
 
         $tenantId = (int) ($package->tenant_id ?: $this->tenantId ?: 1);
 
-        // Fetch assigned routers scoped strictly to this tenant
+        // Fetch assigned non-deleted routers scoped strictly to this tenant
         $routers = $package->routers()
             ->withoutGlobalScopes()
             ->where('routers.tenant_id', $tenantId)
+            ->whereNull('routers.deleted_at')
             ->get();
 
-        // If no specific routers attached, link & sync all routers belonging to this tenant
+        // If no specific routers attached, link & sync online/active routers belonging to this tenant
         if ($routers->isEmpty()) {
             $routers = Router::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
+                ->whereNull('deleted_at')
+                ->where('status', 'online')
                 ->get();
+
+            if ($routers->isEmpty()) {
+                $routers = Router::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
+                    ->get();
+            }
 
             if ($routers->isNotEmpty()) {
                 $package->routers()->sync($routers->pluck('id')->all());
@@ -373,7 +383,7 @@ class SyncPackageToRouters implements ShouldQueue
             return;
         }
 
-        $routersQuery = Router::withoutGlobalScopes()->where('tenant_id', $tenantId);
+        $routersQuery = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereNull('deleted_at');
         if (!empty($routerIds)) {
             $routersQuery->whereIn('id', $routerIds);
         }

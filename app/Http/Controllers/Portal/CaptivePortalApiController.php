@@ -394,7 +394,7 @@ class CaptivePortalApiController extends Controller
             return null;
         }
 
-        $targetRouter = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($targetRouterId);
+        $targetRouter = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereNull('deleted_at')->find($targetRouterId);
         if (!$targetRouter) {
             return 'Router does not belong to this network.';
         }
@@ -447,6 +447,7 @@ class CaptivePortalApiController extends Controller
         if ($routerId <= 0) return;
 
         $router = Router::withoutGlobalScopes()
+            ->whereNull('deleted_at')
             ->when($tenantId > 0, fn($q) => $q->where('tenant_id', $tenantId))
             ->find($routerId);
         if (!$router) return;

@@ -167,21 +167,20 @@ class CaptivePortalTemplates
         // 3. Render Packages Cards HTML
         $packagesHtml = '';
         foreach ($packagesList as $idx => $pkg) {
-            $isSelected = ($idx === 0) ? 'checked' : '';
             $selectedClass = ($idx === 0) ? 'selected' : '';
+            $rawJsName = addslashes(htmlspecialchars_decode((string) $pkg['name'], ENT_QUOTES));
             $tvBadgeHtml = !empty($pkg['includes_tv'])
                 ? '<div style="margin-top:3px;"><span style="display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:700; background:#4f46e5; color:#ffffff; padding:2px 7px; border-radius:999px;">📺 ' . $pkg['tv_channels'] . '</span></div>'
                 : '';
             $packagesHtml .= <<<CARD
-            <label class="plan-card {$selectedClass}" onclick="selectPlan(this, '{$pkg['id']}', '{$pkg['price']}', '{$pkg['name']}')">
-                <input type="radio" name="plan_id" value="{$pkg['id']}" {$isSelected} style="display:none;">
+            <div class="plan-card {$selectedClass}" data-id="{$pkg['id']}" data-price="{$pkg['price']}" data-name="{$pkg['name']}" onclick="selectPlan(this, '{$pkg['id']}', '{$pkg['price']}', '{$rawJsName}')" style="cursor: pointer; -webkit-tap-highlight-color: transparent;">
                 <div class="plan-details">
                     <div class="plan-name">{$pkg['name']}</div>
                     <div class="plan-meta">{$pkg['duration']} &bull; {$pkg['speed']}</div>
                     {$tvBadgeHtml}
                 </div>
                 <div class="plan-price">KES {$pkg['price']}</div>
-            </label>
+            </div>
 CARD;
         }
 
@@ -293,7 +292,7 @@ CARD;
             </div>
 
             <!-- Payment Form -->
-            <form id="paymentForm" onsubmit="handleMpesaPayment(event)">
+            <form id="paymentForm" onsubmit="event.preventDefault(); handleMpesaPayment(); return false;">
                 <div class="form-group">
                     <label class="form-label" for="phoneInput">M-Pesa Mobile Number</label>
                     <input type="tel" 
@@ -301,11 +300,10 @@ CARD;
                            class="input-box" 
                            placeholder="07XXXXXXXX or 01XXXXXXXX" 
                            maxlength="13" 
-                           required 
                            autocomplete="tel">
                 </div>
 
-                <button type="submit" id="payButton" class="btn-pay">
+                <button type="button" id="payButton" class="btn-pay" onclick="handleMpesaPayment()">
                     <span id="btnIcon">📲</span>
                     <span id="btnText">Pay via M-Pesa STK Push</span>
                 </button>
@@ -370,14 +368,26 @@ const linkLoginOnly = getMikrotikVar('\$(link-login-only)', 'link-login-only', u
 const linkOrig = getMikrotikVar('\$(link-orig)', 'link-orig', urlParams.get('link_orig') || 'https://www.google.com');
 const mtError = getMikrotikVar('\$(error)', 'error', '');
 
+let autoConnectTimer = null;
+
+function cancelAllPendingTimers() {
+    if (autoConnectTimer) {
+        clearTimeout(autoConnectTimer);
+        autoConnectTimer = null;
+    }
+    if (stkPollTimer) {
+        clearInterval(stkPollTimer);
+        stkPollTimer = null;
+    }
+}
+
 function selectPlan(card, id, price, name) {
+    cancelAllPendingTimers();
     document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
-    card.classList.add('selected');
-    const radio = card.querySelector('input[type="radio"]');
-    if (radio) radio.checked = true;
-    selectedPlanId = id;
-    selectedPlanPrice = price;
-    selectedPlanName = name;
+    if (card) card.classList.add('selected');
+    selectedPlanId = String(id);
+    selectedPlanPrice = String(price);
+    selectedPlanName = String(name);
     
     const btnText = document.getElementById('btnText');
     if (btnText) {
@@ -395,7 +405,8 @@ function normalizeKenyanPhone(phone) {
 }
 
 function handleVoucherSubmit(e) {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
+    cancelAllPendingTimers();
     const codeInput = document.getElementById('voucherCodeInput');
     const passInput = document.getElementById('voucherPassInput');
     const form = document.getElementById('voucherLoginForm');
@@ -454,6 +465,7 @@ function handleVoucherSubmit(e) {
 }
 
 function autoConnectHotspot(voucherCode, password) {
+    cancelAllPendingTimers();
     const codeInput = document.getElementById('voucherCodeInput');
     const passInput = document.getElementById('voucherPassInput');
     const form = document.getElementById('voucherLoginForm');
@@ -484,7 +496,7 @@ function autoConnectHotspot(voucherCode, password) {
         if (currentAction.startsWith('$(') || !currentAction) {
             form.setAttribute('action', linkLoginOnly);
         }
-        setTimeout(() => { form.submit(); }, 1500);
+        autoConnectTimer = setTimeout(() => { form.submit(); }, 1500);
     }
 }
 
@@ -531,9 +543,10 @@ function startPaymentPolling(checkoutId, merchantRef, phone) {
 }
 
 function handleMpesaPayment(e) {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
+    cancelAllPendingTimers();
     const phoneInput = document.getElementById('phoneInput');
-    const rawPhone = phoneInput.value.trim();
+    const rawPhone = phoneInput ? phoneInput.value.trim() : '';
     const normalized = normalizeKenyanPhone(rawPhone);
     const payBtn = document.getElementById('payButton');
     const btnText = document.getElementById('btnText');
@@ -552,7 +565,7 @@ function handleMpesaPayment(e) {
         plan_id: selectedPlanId,
         package_id: selectedPlanId,
         phone: normalized,
-        amount: selectedPlanPrice,
+        amount: String(selectedPlanPrice).replace(/,/g, ''),
         tenant_id: '{$tenantId}',
         router_id: '{$routerId}',
         mac: clientMac,
@@ -592,46 +605,45 @@ function showStatus(msg, type) {
     statusDiv.style.display = 'block';
 }
 
-// Initial label & error check on load
+// Initial label, phone restore & error check on load
 document.addEventListener('DOMContentLoaded', () => {
     const btnText = document.getElementById('btnText');
     if (btnText && selectedPlanPrice) {
         btnText.innerText = 'Pay KES ' + selectedPlanPrice + ' via M-Pesa';
     }
-    // Only display login error if the user actually attempted a voucher login submission
-    const attemptedUser = urlParams.get('username') || urlParams.get('user') || urlParams.get('voucher') || urlParams.get('code');
-    if (mtError && mtError !== '' && attemptedUser) {
-        let isRecentPayment = false;
+
+    // Preserve phone input & cancel pending auto-timers when user is interacting
+    const phoneInput = document.getElementById('phoneInput');
+    if (phoneInput) {
         try {
-            const lastUser = sessionStorage.getItem('hsmart_last_connected_user');
-            const lastTime = parseInt(sessionStorage.getItem('hsmart_last_connected_time') || '0', 10);
-            if (lastUser && lastUser.toUpperCase() === attemptedUser.toUpperCase() && (Date.now() - lastTime) < 90000) {
-                isRecentPayment = true;
+            const savedPhone = sessionStorage.getItem('hsmart_typed_phone');
+            if (savedPhone && !phoneInput.value) {
+                phoneInput.value = savedPhone;
             }
         } catch(e) {}
+        phoneInput.addEventListener('focus', cancelAllPendingTimers);
+        phoneInput.addEventListener('input', () => {
+            cancelAllPendingTimers();
+            try { sessionStorage.setItem('hsmart_typed_phone', phoneInput.value); } catch(e) {}
+        });
+    }
 
-        if (isRecentPayment) {
-            showStatus('⏳ Activating your session on router... Signing in now...', 'success');
-            setTimeout(() => {
-                const retryForm = document.getElementById('voucherLoginForm');
-                if (retryForm) {
-                    const cIn = document.getElementById('voucherCodeInput');
-                    const pIn = document.getElementById('voucherPassInput');
-                    if (cIn) cIn.value = attemptedUser;
-                    if (pIn) pIn.value = attemptedUser;
-                    const cAct = retryForm.getAttribute('action') || '';
-                    if (cAct.startsWith('$(') || !cAct) {
-                        retryForm.setAttribute('action', linkLoginOnly);
-                    }
-                    retryForm.submit();
-                }
-            }, 3000);
-        } else if (mtError.toLowerCase().includes('invalid username') || (mtError.toLowerCase().includes('user') && mtError.toLowerCase().includes('not found'))) {
-            showStatus('⚠️ Invalid or expired voucher code (' + attemptedUser + '). Please verify your code or choose a package above.', 'error');
+    // Only display login error if router returned a real error
+    const attemptedUser = urlParams.get('username') || urlParams.get('user') || urlParams.get('voucher') || urlParams.get('code');
+    if (mtError && mtError !== '') {
+        cancelAllPendingTimers();
+        sessionStorage.removeItem('hsmart_last_connected_user');
+        sessionStorage.removeItem('hsmart_last_auto_submit');
+
+        if (mtError.toLowerCase().includes('invalid username') || (mtError.toLowerCase().includes('user') && mtError.toLowerCase().includes('not found'))) {
+            if (attemptedUser) {
+                showStatus('⚠️ Invalid or expired voucher (' + attemptedUser + '). Please select a package above to purchase access.', 'error');
+            }
         } else {
             showStatus('⚠️ ' + mtError, 'error');
         }
     }
+
     const form = document.getElementById('voucherLoginForm');
     if (form) {
         const act = form.getAttribute('action') || '';
@@ -640,30 +652,38 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Auto-reconnect returning users via MAC session lookup
-    if (clientMac) {
+    // Auto-reconnect returning users via MAC session lookup ONLY if no error and user hasn't typed a phone number
+    if (clientMac && (!mtError || mtError === '')) {
         fetch(apiBase + '/api/portal/check-session?mac=' + encodeURIComponent(clientMac) + '&tenant_id={$tenantId}&router_id={$routerId}', {
             headers: { 'Accept': 'application/json' }
         })
         .then(r => r.json())
         .then(res => {
             if (res && res.status === 'active') {
-                showStatus('Welcome back! Reconnecting your device...', 'success');
-                autoConnectHotspot(res.username || res.voucher_code, res.password || res.username || res.voucher_code);
+                const pIn = document.getElementById('phoneInput');
+                if (!pIn || !pIn.value.trim()) {
+                    showStatus('Welcome back! Reconnecting your device...', 'success');
+                    autoConnectHotspot(res.username || res.voucher_code, res.password || res.username || res.voucher_code);
+                }
             }
         })
         .catch(() => {});
+    }
+
     // Auto-refresh when tab becomes visible after payment on mobile
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && clientMac) {
+        if (!document.hidden && clientMac && (!mtError || mtError === '')) {
             fetch(apiBase + '/api/portal/check-session?mac=' + encodeURIComponent(clientMac) + '&tenant_id={$tenantId}&router_id={$routerId}', {
                 headers: { 'Accept': 'application/json' }
             })
             .then(r => r.json())
             .then(res => {
                 if (res && res.status === 'active') {
-                    showStatus('Payment confirmed! Reconnecting your device...', 'success');
-                    autoConnectHotspot(res.username || res.voucher_code, res.password || res.username || res.voucher_code);
+                    const pIn = document.getElementById('phoneInput');
+                    if (!pIn || !pIn.value.trim()) {
+                        showStatus('Payment confirmed! Reconnecting your device...', 'success');
+                        autoConnectHotspot(res.username || res.voucher_code, res.password || res.username || res.voucher_code);
+                    }
                 }
             })
             .catch(() => {});

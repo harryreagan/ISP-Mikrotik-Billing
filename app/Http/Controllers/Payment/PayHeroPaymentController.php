@@ -502,7 +502,7 @@ class PayHeroPaymentController extends Controller
         string $profileName = 'default',
         ?PackageList $pkg = null
     ): void {
-        $routersQuery = \App\Models\Router::withoutGlobalScopes()->where(function ($q) {
+        $routersQuery = \App\Models\Router::withoutGlobalScopes()->whereNull('deleted_at')->where(function ($q) {
             $q->where('status', 'online')
               ->orWhere('action', 'connected')
               ->orWhereNotNull('vpn_ip')
