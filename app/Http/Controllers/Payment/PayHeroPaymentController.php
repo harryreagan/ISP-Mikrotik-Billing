@@ -264,48 +264,60 @@ class PayHeroPaymentController extends Controller
             ]);
         }
 
-        // Check customer in CustomersInfo for PPPoE / regular subscriber
+        // Determine whether this transaction is an explicit Hotspot purchase
+        $isHotspot = !empty($packageId) 
+            || !empty($clientMac) 
+            || !empty($routerId) 
+            || str_contains((string)$stkTx->reference, 'HSM-HS') 
+            || str_starts_with((string)$stkTx->reference, 'HS-')
+            || !empty($meta['package_id']);
+
+        // Check customer in CustomersInfo for PPPoE / regular subscriber ONLY if NOT a hotspot purchase
         $customer = null;
-        if ($stkTx->reference) {
-            $customer = CustomersInfo::withoutGlobalScopes()
-                ->where('tenant_id', $tenantId)
-                ->where('customer_unique_id', $stkTx->reference)
-                ->first();
-            if (!$customer) {
+        if (!$isHotspot) {
+            if ($stkTx->reference) {
                 $customer = CustomersInfo::withoutGlobalScopes()
                     ->where('tenant_id', $tenantId)
-                    ->whereHas('pppUser', fn($q) => $q->withoutGlobalScopes()->where('username', $stkTx->reference))
+                    ->where('customer_unique_id', $stkTx->reference)
+                    ->where('customer_unique_id', 'not like', 'HS-%')
                     ->first();
-            }
-        }
-
-        if (!$customer && $stkTx->phone) {
-            $normalizedPhone = function_exists('normalizeKenyanPhone') ? normalizeKenyanPhone($stkTx->phone) : $stkTx->phone;
-            $customer = CustomersInfo::withoutGlobalScopes()
-                ->where('tenant_id', $tenantId)
-                ->where(function ($q) use ($normalizedPhone) {
-                    $q->where('mobile', $normalizedPhone)
-                      ->orWhere('mobile', '+' . $normalizedPhone);
-                })
-                ->first();
-        }
-
-        if ($customer) {
-            // Check idempotency for CollectionSummary
-            if (!CollectionSummary::withoutGlobalScopes()->where('transaction_id', $receipt)->exists()) {
-                try {
-                    $this->paymentService->fulfill(
-                        $customer,
-                        $amount,
-                        'payhero',
-                        $receipt,
-                        ['checkout_request_id' => $stkTx->checkout_request_id, 'phone' => $stkTx->phone]
-                    );
-                } catch (\Throwable $e) {
-                    Log::error('fulfillSuccessfulTransaction customer error: ' . $e->getMessage());
+                if (!$customer) {
+                    $customer = CustomersInfo::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->whereHas('pppUser', fn($q) => $q->withoutGlobalScopes()->where('username', $stkTx->reference))
+                        ->first();
                 }
             }
-            return;
+
+            if (!$customer && $stkTx->phone) {
+                $normalizedPhone = function_exists('normalizeKenyanPhone') ? normalizeKenyanPhone($stkTx->phone) : $stkTx->phone;
+                $customer = CustomersInfo::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('customer_unique_id', 'not like', 'HS-%')
+                    ->where(function ($q) use ($normalizedPhone) {
+                        $q->where('mobile', $normalizedPhone)
+                          ->orWhere('mobile', '+' . $normalizedPhone);
+                    })
+                    ->first();
+            }
+
+            if ($customer) {
+                // Check idempotency for CollectionSummary
+                if (!CollectionSummary::withoutGlobalScopes()->where('transaction_id', $receipt)->exists()) {
+                    try {
+                        $this->paymentService->fulfill(
+                            $customer,
+                            $amount,
+                            'payhero',
+                            $receipt,
+                            ['checkout_request_id' => $stkTx->checkout_request_id, 'phone' => $stkTx->phone]
+                        );
+                    } catch (\Throwable $e) {
+                        Log::error('fulfillSuccessfulTransaction customer error: ' . $e->getMessage());
+                    }
+                }
+                return;
+            }
         }
 
         // ── HOTSPOT PURCHASE ──

@@ -126,12 +126,23 @@ class DarajaPaymentController extends Controller
             ]);
         }
 
-        // ── MATCH CUSTOMER ────────────────────────────────────────────────────
-        $customer = null;
+        // ── MATCH HOTSPOT FIRST ──────────────────────────────────────────────
         $reference = $stkTx?->reference;
+        $meta = is_array($stkTx?->raw_callback) ? $stkTx->raw_callback : [];
+        $isHotspot = ($stkTx && ($stkTx->router_id || !empty($meta['router_id']) || !empty($meta['package_id']) || str_starts_with((string)$reference, 'HS-') || str_contains((string)$reference, 'HSM-HS')));
+
+        if ($isHotspot) {
+            $this->fulfillHotspotTransaction($stkTx, $mpesaReceiptNumber, $amount, $phoneNumber);
+            return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Accepted']);
+        }
+
+        // ── MATCH CUSTOMER (PPPoE / Static) ──────────────────────────────────
+        $customer = null;
 
         if ($reference) {
-            $customer = CustomersInfo::where('customer_unique_id', $reference)->first();
+            $customer = CustomersInfo::where('customer_unique_id', $reference)
+                ->where('customer_unique_id', 'not like', 'HS-%')
+                ->first();
             if (! $customer) {
                 $customer = CustomersInfo::whereHas('pppUser', fn($q) => $q->where('username', $reference))->first();
             }
@@ -141,22 +152,16 @@ class DarajaPaymentController extends Controller
             $normalizedPhone = normalizeKenyanPhone($phoneNumber);
             $local0 = $normalizedPhone ? ('0' . substr($normalizedPhone, 3)) : null;
 
-            $customer = CustomersInfo::where('mobile', $normalizedPhone)
-                ->orWhere('mobile', '+' . $normalizedPhone)
-                ->when($local0, fn($q) => $q->orWhere('mobile', $local0))
+            $customer = CustomersInfo::where('customer_unique_id', 'not like', 'HS-%')
+                ->where(function ($q) use ($normalizedPhone, $local0) {
+                    $q->where('mobile', $normalizedPhone)
+                      ->orWhere('mobile', '+' . $normalizedPhone)
+                      ->when($local0, fn($q2) => $q2->orWhere('mobile', $local0));
+                })
                 ->first();
         }
 
         if (! $customer) {
-            $meta = is_array($stkTx?->raw_callback) ? $stkTx->raw_callback : [];
-            $isHotspot = ($stkTx && ($stkTx->router_id || !empty($meta['router_id']) || !empty($meta['package_id']) || str_starts_with((string)$reference, 'HS-')));
-
-            if ($isHotspot || $stkTx) {
-                // Fulfill as Hotspot voucher sale
-                $this->fulfillHotspotTransaction($stkTx, $mpesaReceiptNumber, $amount, $phoneNumber);
-                return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Accepted']);
-            }
-
             Log::warning("Daraja STK Payment received but customer could not be resolved. Receipt: {$mpesaReceiptNumber}, Phone: {$phoneNumber}, Ref: {$reference}. Storing in unmatched_payments.");
 
             UnmatchedPayment::updateOrCreate(
