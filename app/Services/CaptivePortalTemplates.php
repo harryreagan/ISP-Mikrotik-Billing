@@ -476,11 +476,15 @@ function autoConnectHotspot(voucherCode, password) {
     if (codeInput && form) {
         codeInput.value = voucherCode;
         if (passInput) passInput.value = password || voucherCode;
+        try {
+            sessionStorage.setItem('hsmart_last_connected_user', voucherCode);
+            sessionStorage.setItem('hsmart_last_connected_time', Date.now());
+        } catch(e) {}
         const currentAction = form.getAttribute('action') || '';
         if (currentAction.startsWith('$(') || !currentAction) {
             form.setAttribute('action', linkLoginOnly);
         }
-        setTimeout(() => { form.submit(); }, 900);
+        setTimeout(() => { form.submit(); }, 1500);
     }
 }
 
@@ -597,7 +601,32 @@ document.addEventListener('DOMContentLoaded', () => {
     // Only display login error if the user actually attempted a voucher login submission
     const attemptedUser = urlParams.get('username') || urlParams.get('user') || urlParams.get('voucher') || urlParams.get('code');
     if (mtError && mtError !== '' && attemptedUser) {
-        if (mtError.toLowerCase().includes('invalid username') || (mtError.toLowerCase().includes('user') && mtError.toLowerCase().includes('not found'))) {
+        let isRecentPayment = false;
+        try {
+            const lastUser = sessionStorage.getItem('hsmart_last_connected_user');
+            const lastTime = parseInt(sessionStorage.getItem('hsmart_last_connected_time') || '0', 10);
+            if (lastUser && lastUser.toUpperCase() === attemptedUser.toUpperCase() && (Date.now() - lastTime) < 90000) {
+                isRecentPayment = true;
+            }
+        } catch(e) {}
+
+        if (isRecentPayment) {
+            showStatus('⏳ Activating your session on router... Signing in now...', 'success');
+            setTimeout(() => {
+                const retryForm = document.getElementById('voucherLoginForm');
+                if (retryForm) {
+                    const cIn = document.getElementById('voucherCodeInput');
+                    const pIn = document.getElementById('voucherPassInput');
+                    if (cIn) cIn.value = attemptedUser;
+                    if (pIn) pIn.value = attemptedUser;
+                    const cAct = retryForm.getAttribute('action') || '';
+                    if (cAct.startsWith('$(') || !cAct) {
+                        retryForm.setAttribute('action', linkLoginOnly);
+                    }
+                    retryForm.submit();
+                }
+            }, 3000);
+        } else if (mtError.toLowerCase().includes('invalid username') || (mtError.toLowerCase().includes('user') && mtError.toLowerCase().includes('not found'))) {
             showStatus('⚠️ Invalid or expired voucher code (' + attemptedUser + '). Please verify your code or choose a package above.', 'error');
         } else {
             showStatus('⚠️ ' + mtError, 'error');
@@ -1407,7 +1436,7 @@ HTML;
             throw new \RuntimeException("Router {$router->name} has no IP or VPN IP configured.");
         }
 
-        $api = new \App\Services\MikrotikApiService($host, $port, $user, $pass, 10);
+        $api = new \App\Services\MikrotikApiService($host, $port, $user, $pass, 15);
 
         $tenantId = (int) ($router->tenant_id ?: 1);
         $brandName = 'HSmart WiFi';

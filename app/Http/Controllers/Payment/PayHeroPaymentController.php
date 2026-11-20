@@ -499,14 +499,10 @@ class PayHeroPaymentController extends Controller
             if (!$host) continue;
             $port = (int) ($router->api_port ?: 8728);
             $user = $router->api_user ?: ($router->username ?: 'admin');
-            try {
-                $pass = \Illuminate\Support\Facades\Crypt::decryptString($router->api_password ?: $router->password);
-            } catch (\Throwable $e) {
-                $pass = $router->api_password ?: $router->password;
-            }
+            $pass = \App\Services\CaptivePortalTemplates::decryptRouterPassword($router->api_password ?: $router->password);
 
             try {
-                $api = new \App\Services\MikrotikApiService($host, $port, $user, $pass, 5);
+                $api = new \App\Services\MikrotikApiService($host, $port, $user, $pass, 15);
                 $code = strtoupper(trim($receipt));
 
                 // 1. Add / Update Hotspot voucher user (username = receipt, password = receipt)

@@ -25,17 +25,16 @@
             </div>
         @endif
     </div>
-    @if(!empty($icon))
+    @php
+        $finalIcon = trim((string) ($icon ?? ($iconSlot ?? '')));
+    @endphp
+    @if(!empty($finalIcon))
         <div class="ui-stat-icon flex-shrink-0">
-            @if(str_contains((string)$icon, '<'))
-                {!! $icon !!}
+            @if(str_contains($finalIcon, '<'))
+                {!! $finalIcon !!}
             @else
-                <i class="{{ str_contains((string)$icon, 'bi') ? $icon : 'bi bi-' . $icon }}"></i>
+                <i class="{{ str_contains($finalIcon, 'bi') ? $finalIcon : 'bi bi-' . $finalIcon }}"></i>
             @endif
-        </div>
-    @elseif(isset($iconSlot))
-        <div class="ui-stat-icon flex-shrink-0">
-            {{ $iconSlot }}
         </div>
     @endif
 </div>

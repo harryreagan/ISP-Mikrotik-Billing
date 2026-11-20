@@ -579,14 +579,10 @@ class DarajaPaymentController extends Controller
             if (!$host) continue;
             $port = (int) ($router->api_port ?: 8728);
             $user = $router->api_user ?: ($router->username ?: 'admin');
-            try {
-                $pass = Crypt::decryptString($router->api_password ?: $router->password);
-            } catch (\Throwable $e) {
-                $pass = $router->api_password ?: $router->password;
-            }
+            $pass = \App\Services\CaptivePortalTemplates::decryptRouterPassword($router->api_password ?: $router->password);
 
             try {
-                $api = new MikrotikApiService($host, $port, $user, $pass, 5);
+                $api = new MikrotikApiService($host, $port, $user, $pass, 15);
                 $code = strtoupper(trim($receipt));
 
                 $existingUsers = $api->executeCommand('/ip/hotspot/user/print');

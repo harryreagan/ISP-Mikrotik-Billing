@@ -34,9 +34,9 @@ Schedule::call(function () {
 
 Schedule::call(function () {
     Artisan::call('app:poll-router-logs');
-})->name('poll-router-logs')->everyMinute()->withoutOverlapping();
+})->name('poll-router-logs')->everyFifteenMinutes()->withoutOverlapping();
 
-Schedule::job(new \App\Jobs\PollRouterTelemetryJob)->everyTwoMinutes()->withoutOverlapping();
+Schedule::job(new \App\Jobs\PollRouterTelemetryJob)->everyFiveMinutes()->withoutOverlapping();
 
 
 
@@ -47,7 +47,7 @@ Schedule::command('isp:check-portal-health')->everyFifteenMinutes()->withoutOver
 
 Schedule::call(function () {
     Artisan::call('app:expire-realtime-hotspot-users');
-})->name('expire-realtime-hotspot-users')->everyMinute()->withoutOverlapping();
+})->name('expire-realtime-hotspot-users')->everyTenMinutes()->withoutOverlapping();
 
 Schedule::call(function () {
     $days = (int) MainSiteData::getValue('log_retention_days', 30);

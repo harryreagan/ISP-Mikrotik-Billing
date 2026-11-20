@@ -88,7 +88,7 @@ class RouterPendingActivationService
         $pass = $this->decryptRouterPassword($router);
 
         try {
-            $api = new MikrotikApiService($host, $port, $user, $pass, 5);
+            $api = new MikrotikApiService($host, $port, $user, $pass, 15);
         } catch (\Throwable $e) {
             Log::warning("[RouterPendingActivation] Cannot connect to Router #{$router->id} ({$router->name}): " . $e->getMessage());
             foreach ($pending as $act) {
