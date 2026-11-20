@@ -1370,17 +1370,38 @@ HTML;
      * Push complete Hotspot network, built-in Wi-Fi bridge (for hAP models), Walled Garden (incl. ICMP for Tenda/APs),
      * and all Captive Portal templates onto a MikroTik router via API & /tool/fetch.
      */
+    /**
+     * Resilient password decryption supporting current and legacy APP_KEYs
+     */
+    public static function decryptRouterPassword(?string $encrypted): string
+    {
+        if (empty($encrypted)) return '';
+        $keys = [
+            'base64:OsvBUcJog9u3L7RHpAXOV3lAVumKIyCIOscxYwKXufQ=',
+            'base64:NSLTh+nKIi546KF1WfENeIVjjBvu0SSvE2kgyiFu7CE=',
+            'base64:motZaNhPAm6uv5uffwL6kbrJdtOu3qgrdgjtXarDoaU=',
+            'base64:CGygtTkIhnvb+mwr8Mv5j5DjDkgmbq9ej3mmKwHcS5g=',
+        ];
+        try {
+            return \Illuminate\Support\Facades\Crypt::decryptString($encrypted);
+        } catch (\Throwable $e) {
+            foreach ($keys as $k) {
+                try {
+                    $rawKey = base64_decode(substr($k, 7));
+                    $enc = new \Illuminate\Encryption\Encrypter($rawKey, 'AES-256-CBC');
+                    return $enc->decryptString($encrypted);
+                } catch (\Throwable $e2) {}
+            }
+        }
+        return $encrypted;
+    }
+
     public static function pushAllToRouter(\App\Models\Router $router, array $extraWalledGarden = []): array
     {
         $host = $router->vpn_ip ?: $router->ip;
         $port = (int) ($router->api_port ?: 8728);
         $user = $router->api_user ?: ($router->username ?: 'admin');
-        $pass = '';
-        try {
-            $pass = \Illuminate\Support\Facades\Crypt::decryptString($router->api_password ?: $router->password);
-        } catch (\Throwable $e) {
-            $pass = $router->api_password ?: $router->password;
-        }
+        $pass = self::decryptRouterPassword($router->api_password ?: $router->password);
 
         if (!$host) {
             throw new \RuntimeException("Router {$router->name} has no IP or VPN IP configured.");
@@ -2009,12 +2030,7 @@ HTML;
         $host = $router->vpn_ip ?: $router->ip;
         $port = (int) ($router->api_port ?: 8728);
         $user = $router->api_user ?: ($router->username ?: 'admin');
-        $pass = '';
-        try {
-            $pass = \Illuminate\Support\Facades\Crypt::decryptString($router->api_password ?: $router->password);
-        } catch (\Throwable $e) {
-            $pass = $router->api_password ?: $router->password;
-        }
+        $pass = self::decryptRouterPassword($router->api_password ?: $router->password);
 
         if (!$host) {
             throw new \RuntimeException("Router {$router->name} has no IP or VPN IP configured.");
