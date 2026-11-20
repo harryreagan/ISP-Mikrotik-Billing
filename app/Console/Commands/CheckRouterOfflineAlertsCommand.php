@@ -98,13 +98,28 @@ class CheckRouterOfflineAlertsCommand extends Command
                 // Router is ONLINE
                 if ($existingAlert) {
                     // ── RECOVERY: Router Restored ──
-                    DB::table('isp_router_alerts')
-                        ->where('id', $existingAlert->id)
-                        ->update([
-                            'is_resolved' => true,
-                            'resolved_at' => now(),
-                            'updated_at'  => now(),
-                        ]);
+                    try {
+                        DB::table('isp_router_alerts')
+                            ->where('id', $existingAlert->id)
+                            ->update([
+                                'is_resolved' => true,
+                                'resolved_at' => now(),
+                                'updated_at'  => now(),
+                            ]);
+                    } catch (\Throwable $e) {
+                        DB::table('isp_router_alerts')
+                            ->where('router_id', $router->id)
+                            ->where('alert_type', 'offline')
+                            ->where('is_resolved', true)
+                            ->delete();
+                        DB::table('isp_router_alerts')
+                            ->where('id', $existingAlert->id)
+                            ->update([
+                                'is_resolved' => true,
+                                'resolved_at' => now(),
+                                'updated_at'  => now(),
+                            ]);
+                    }
 
                     $res = IspNotificationService::notifyAdminRouterRestored($router);
                     $this->info("Router #{$router->id} ({$router->name}) is back ONLINE. Sent recovery alert: " . json_encode($res));
