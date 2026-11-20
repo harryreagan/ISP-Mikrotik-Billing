@@ -127,6 +127,13 @@
                         {{-- Card Body --}}
                         <div class="card-body p-4">
                             <h4 class="ui-section-title mb-1">{{ $pkg->package }}</h4>
+                            @if($pkg->includes_tv)
+                                <div class="mb-1">
+                                    <span class="badge rounded-pill" style="background: #4f46e5; color: #fff; font-size: 11px;">
+                                        <i class="bi bi-tv me-1"></i>{{ $pkg->tv_channels ?: 'Smart TV & Live Channels' }}
+                                    </span>
+                                </div>
+                            @endif
                             <div class="text-2xl fw-semibold text-dark my-2 tabular-nums">
                                 <span class="text-sm text-muted">KES</span> {{ number_format($pkg->price, 0) }}
                                 <span class="text-xs text-muted fw-normal">/ {{ $pkg->formatted_validity }}</span>
@@ -405,6 +412,30 @@
                                             <div class="input-group mt-2">
                                                 <input type="number" wire:model="data_limit_mb" class="form-control" placeholder="e.g. 5000">
                                                 <span class="input-group-text bg-white">MB (Megabytes)</span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                {{-- TV Package Feature --}}
+                                <div class="col-12">
+                                    <div class="card p-3" style="background: #f5f3ff; border: 1.5px solid #ddd6fe;">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <label class="form-label mb-0 fw-bold text-indigo-900 d-flex align-items-center gap-2">
+                                                <i class="bi bi-tv fs-5 text-indigo-600"></i>
+                                                <span>Smart TV &amp; IPTV Channels Included</span>
+                                            </label>
+                                            <div class="form-check form-switch mb-0">
+                                                <input class="form-check-input" type="checkbox" wire:model.live="includes_tv" id="includesTvSwitch" style="accent-color: #6366f1;">
+                                                <label class="form-check-label fw-bold text-indigo-700" for="includesTvSwitch">Include TV</label>
+                                            </div>
+                                        </div>
+                                        <div class="small text-muted mb-2">Showcase this package on the Captive Portal as a TV streaming package with live channels.</div>
+                                        @if($includes_tv)
+                                            <div class="mt-2">
+                                                <label class="form-label small fw-semibold text-indigo-900">TV Channels / Streaming Perks</label>
+                                                <input type="text" wire:model="tv_channels" class="form-control" placeholder="e.g. 50+ HD Live Sports, DSTV Channels, Movies, Premier League">
+                                                <div class="form-text text-indigo-700 small">Highlight what channels or streaming access is included with this pass.</div>
                                             </div>
                                         @endif
                                     </div>

@@ -37,6 +37,8 @@ class PackagesManager extends Component
     public bool $unlimited_data = true;
     public $data_limit_mb = null;
     public int $shared_users = 1;
+    public bool $includes_tv = false;
+    public string $tv_channels = '';
     public array $selected_routers = []; // router IDs or ['all']
     public bool $show_public = true;
     public int $sort_order = 0;
@@ -61,6 +63,8 @@ class PackagesManager extends Component
             'validity_value'      => 'required|integer|min:1',
             'validity_unit'       => 'required|in:minutes,hours,days,months',
             'shared_users'        => $this->type === 'hotspot' ? 'required|integer|min:1|max:50' : 'nullable|integer|min:1|max:50',
+            'includes_tv'         => 'nullable|boolean',
+            'tv_channels'         => 'nullable|string|max:255',
             'sort_order'          => 'nullable|integer',
             'description'         => 'nullable|string|max:500',
         ];
@@ -111,6 +115,8 @@ class PackagesManager extends Component
         $this->unlimited_data = true;
         $this->data_limit_mb = null;
         $this->shared_users = 1;
+        $this->includes_tv = false;
+        $this->tv_channels = '';
         $this->selected_routers = [];
         $this->show_public = true;
         $this->is_active = true;
@@ -151,6 +157,8 @@ class PackagesManager extends Component
         $this->unlimited_data      = empty($pkg->data_limit_mb) && empty($pkg->data_cap_mb);
         $this->data_limit_mb       = $pkg->data_limit_mb ?: $pkg->data_cap_mb;
         $this->shared_users        = $pkg->shared_users ?: 1;
+        $this->includes_tv         = (bool) ($pkg->includes_tv ?? false);
+        $this->tv_channels         = (string) ($pkg->tv_channels ?? '');
         $this->show_public         = (bool) ($pkg->show_public ?? $pkg->show_on_site);
         $this->sort_order          = (int) $pkg->sort_order;
         $this->description         = $pkg->description ?: '';
@@ -190,6 +198,8 @@ class PackagesManager extends Component
                 'data_limit_mb'       => $this->unlimited_data ? null : ($this->data_limit_mb ?: null),
                 'data_cap_mb'         => $this->unlimited_data ? null : ($this->data_limit_mb ?: null),
                 'shared_users'        => $this->type === 'hotspot' ? max(1, (int) $this->shared_users) : 1,
+                'includes_tv'         => (bool) $this->includes_tv,
+                'tv_channels'         => $this->includes_tv ? trim($this->tv_channels ?: 'Smart TV & Live Channels') : null,
                 'show_public'         => (bool) $this->show_public,
                 'show_on_site'        => (bool) $this->show_public,
                 'sort_order'          => (int) ($this->sort_order ?: 0),

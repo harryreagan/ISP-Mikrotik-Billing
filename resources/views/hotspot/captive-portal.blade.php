@@ -12,8 +12,9 @@
             (object)['id' => 2, 'package' => '3 Hours Super', 'speed' => '15 Mbps', 'price' => 20, 'duration' => '3 Hours', 'is_featured' => false, 'devices' => '1 Device'],
             (object)['id' => 3, 'package' => '12 Hours Day Pass', 'speed' => '15 Mbps', 'price' => 35, 'duration' => '12 Hours', 'is_featured' => false, 'devices' => '1 Device'],
             (object)['id' => 4, 'package' => '24 Hours Unlimited', 'speed' => '20 Mbps', 'price' => 50, 'duration' => '24 Hours', 'is_featured' => true, 'devices' => '2 Devices'],
-            (object)['id' => 5, 'package' => '7 Days Unlimited', 'speed' => '20 Mbps', 'price' => 250, 'duration' => '7 Days', 'is_featured' => false, 'devices' => '3 Devices'],
-            (object)['id' => 6, 'package' => '30 Days Monthly Pass', 'speed' => '25 Mbps', 'price' => 800, 'duration' => '30 Days', 'is_featured' => false, 'devices' => '5 Devices'],
+            (object)['id' => 5, 'package' => '7 Days Unlimited', 'speed' => '20 Mbps', 'price' => 250, 'duration' => '7 Days', 'is_featured' => false, 'includes_tv' => false, 'tv_channels' => '', 'devices' => '3 Devices'],
+            (object)['id' => 6, 'package' => 'Smart TV & WiFi (24h)', 'speed' => '25 Mbps', 'price' => 100, 'duration' => '24 Hours', 'is_featured' => false, 'includes_tv' => true, 'tv_channels' => 'Smart TV & Live Channels', 'devices' => '2 Devices'],
+            (object)['id' => 7, 'package' => '30 Days Monthly Pass', 'speed' => '25 Mbps', 'price' => 800, 'duration' => '30 Days', 'is_featured' => false, 'includes_tv' => false, 'tv_channels' => '', 'devices' => '5 Devices'],
         ]);
     } else {
         $packages = $dbPackages->map(function($p) {
@@ -46,6 +47,8 @@
                 'price' => (float)$p->price,
                 'duration' => $duration,
                 'is_featured' => (bool)$p->is_featured,
+                'includes_tv' => (bool)($p->includes_tv ?? false) || ($p->type ?? '') === 'tv',
+                'tv_channels' => $p->tv_channels ?: 'Smart TV & Live Channels',
                 'devices' => 'Unlimited',
             ];
         });
@@ -853,7 +856,9 @@
                          role="radio"
                          aria-checked="{{ $pkg->id === $defaultPackage->id ? 'true' : 'false' }}"
                          tabindex="0">
-                        @if($pkg->is_featured)
+                        @if(!empty($pkg->includes_tv))
+                            <span class="pkg-badge" style="background: #4f46e5;">📺 TV Included</span>
+                        @elseif($pkg->is_featured)
                             <span class="pkg-badge">Best Value</span>
                         @endif
                         <div>
@@ -862,6 +867,11 @@
                                 <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM4.5 7.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm5.854-3.354a.5.5 0 0 1 0 .708L8.707 8.5l1.647 1.646a.5.5 0 0 1-.708.708l-2-2a.5.5 0 0 1 0-.708l2-2a.5.5 0 0 1 .708 0z"/></svg>
                                 {{ $pkg->speed }}
                             </div>
+                            @if(!empty($pkg->includes_tv))
+                                <div style="font-size: 0.68rem; font-weight: 700; color: #4f46e5; margin-top: 3px;">
+                                    📺 {{ $pkg->tv_channels ?: 'Smart TV & Live Channels' }}
+                                </div>
+                            @endif
                         </div>
                         <div class="pkg-price">
                             <span class="curr">KES</span> {{ number_format($pkg->price) }}

@@ -133,6 +133,9 @@ class CaptivePortalTemplates
                 }
                 $rawSpeed = $rawSpeed ?: ($obj->rate_limit ?? '10 Mbps');
 
+                $includesTv = !empty($obj->includes_tv) || ($obj->type ?? '') === 'tv';
+                $tvChannels = $includesTv ? htmlspecialchars((string)($obj->tv_channels ?: 'Smart TV & Live Channels'), ENT_QUOTES, 'UTF-8') : '';
+
                 $packagesList[] = [
                     'id'          => $obj->id ?? 1,
                     'name'        => htmlspecialchars((string)$rawName, ENT_QUOTES, 'UTF-8'),
@@ -140,6 +143,8 @@ class CaptivePortalTemplates
                     'duration'    => htmlspecialchars((string)$rawDuration, ENT_QUOTES, 'UTF-8'),
                     'speed'       => htmlspecialchars((string)$rawSpeed, ENT_QUOTES, 'UTF-8'),
                     'description' => htmlspecialchars((string)($obj->description ?? ''), ENT_QUOTES, 'UTF-8'),
+                    'includes_tv' => $includesTv,
+                    'tv_channels' => $tvChannels,
                 ];
             }
         }
@@ -147,11 +152,12 @@ class CaptivePortalTemplates
         // Fallback default sample packages if database has no active packages
         if (empty($packagesList)) {
             $packagesList = [
-                ['id' => 1, 'name' => '1 Hour Unlimited', 'price' => '20',  'duration' => '1 Hour',   'speed' => '10 Mbps', 'description' => 'Superfast browsing'],
-                ['id' => 2, 'name' => '3 Hours Blast',    'price' => '30',  'duration' => '3 Hours',  'speed' => '12 Mbps', 'description' => 'Social media & music'],
-                ['id' => 3, 'name' => '12 Hours Day Pass', 'price' => '50', 'duration' => '12 Hours', 'speed' => '15 Mbps', 'description' => 'Best value for daytime'],
-                ['id' => 4, 'name' => '24 Hours Full Day', 'price' => '70', 'duration' => '24 Hours', 'speed' => '20 Mbps', 'description' => 'Non-stop high speed streaming'],
-                ['id' => 5, 'name' => '7 Days Weekly',    'price' => '350', 'duration' => '7 Days',   'speed' => '25 Mbps', 'description' => 'Great for weekly work'],
+                ['id' => 1, 'name' => '1 Hour Unlimited', 'price' => '20',  'duration' => '1 Hour',   'speed' => '10 Mbps', 'description' => 'Superfast browsing', 'includes_tv' => false, 'tv_channels' => ''],
+                ['id' => 2, 'name' => '3 Hours Blast',    'price' => '30',  'duration' => '3 Hours',  'speed' => '12 Mbps', 'description' => 'Social media & music', 'includes_tv' => false, 'tv_channels' => ''],
+                ['id' => 3, 'name' => '12 Hours Day Pass', 'price' => '50', 'duration' => '12 Hours', 'speed' => '15 Mbps', 'description' => 'Best value for daytime', 'includes_tv' => false, 'tv_channels' => ''],
+                ['id' => 4, 'name' => '24 Hours Full Day', 'price' => '70', 'duration' => '24 Hours', 'speed' => '20 Mbps', 'description' => 'Non-stop high speed streaming', 'includes_tv' => false, 'tv_channels' => ''],
+                ['id' => 5, 'name' => '24h WiFi + Smart TV', 'price' => '100', 'duration' => '24 Hours', 'speed' => '25 Mbps', 'description' => 'Live sports, entertainment & movies', 'includes_tv' => true, 'tv_channels' => 'Smart TV & Live Channels'],
+                ['id' => 6, 'name' => '7 Days Weekly',    'price' => '350', 'duration' => '7 Days',   'speed' => '25 Mbps', 'description' => 'Great for weekly work', 'includes_tv' => false, 'tv_channels' => ''],
             ];
         }
 
@@ -163,12 +169,16 @@ class CaptivePortalTemplates
         foreach ($packagesList as $idx => $pkg) {
             $isSelected = ($idx === 0) ? 'checked' : '';
             $selectedClass = ($idx === 0) ? 'selected' : '';
+            $tvBadgeHtml = !empty($pkg['includes_tv'])
+                ? '<div style="margin-top:3px;"><span style="display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:700; background:#4f46e5; color:#ffffff; padding:2px 7px; border-radius:999px;">📺 ' . $pkg['tv_channels'] . '</span></div>'
+                : '';
             $packagesHtml .= <<<CARD
             <label class="plan-card {$selectedClass}" onclick="selectPlan(this, '{$pkg['id']}', '{$pkg['price']}', '{$pkg['name']}')">
                 <input type="radio" name="plan_id" value="{$pkg['id']}" {$isSelected} style="display:none;">
                 <div class="plan-details">
                     <div class="plan-name">{$pkg['name']}</div>
                     <div class="plan-meta">{$pkg['duration']} &bull; {$pkg['speed']}</div>
+                    {$tvBadgeHtml}
                 </div>
                 <div class="plan-price">KES {$pkg['price']}</div>
             </label>
@@ -1703,7 +1713,7 @@ HTML;
                             'hotspot-address'   => '10.5.50.1',
                             'dns-name'          => 'hotspot.hsmart.lan',
                             'html-directory'    => $htmlDir,
-                            'login-by'          => 'http-pap,http-chap,cookie',
+                            'login-by'          => 'http-pap,http-chap',
                             'keepalive-timeout' => '2m',
                         ], ['.id' => $pr['.id']]);
                         $hasProf = true;
@@ -1717,7 +1727,7 @@ HTML;
                     'hotspot-address'   => '10.5.50.1',
                     'dns-name'          => 'hotspot.hsmart.lan',
                     'html-directory'    => $htmlDir,
-                    'login-by'          => 'http-pap,http-chap,cookie',
+                    'login-by'          => 'http-pap,http-chap',
                     'keepalive-timeout' => '2m',
                 ]);
             }

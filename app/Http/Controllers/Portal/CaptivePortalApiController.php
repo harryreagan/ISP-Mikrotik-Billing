@@ -188,7 +188,60 @@ class CaptivePortalApiController extends Controller
         }
 
         try {
-            // Find recent transaction matching this MAC within validity window
+            $now = Carbon::now('Africa/Nairobi');
+
+            // 1. Check latest HotspotSale for this MAC
+            $sale = HotspotSale::withoutGlobalScopes()
+                ->where('mac', $mac)
+                ->when($tenantId > 0, fn($q) => $q->where('tenant_id', $tenantId))
+                ->latest('id')
+                ->first();
+
+            if ($sale) {
+                $isExpired = false;
+                if ($sale->status === 'expired') {
+                    $isExpired = true;
+                } elseif ($sale->expires_at) {
+                    $saleExp = Carbon::parse($sale->expires_at, 'Africa/Nairobi');
+                    if ($now->greaterThanOrEqualTo($saleExp)) {
+                        $isExpired = true;
+                        if ($sale->status !== 'expired') {
+                            $sale->update(['status' => 'expired']);
+                        }
+                    }
+                }
+
+                if ($isExpired) {
+                    return $this->withCors(response()->json([
+                        'status'  => 'expired',
+                        'message' => 'Your internet package has expired. Please select a package below to purchase a new pass.',
+                    ]));
+                }
+
+                // If sale is still active and valid:
+                if ($sale->expires_at) {
+                    $saleExp = Carbon::parse($sale->expires_at, 'Africa/Nairobi');
+                    $remainingMins = $now->diffInMinutes($saleExp, false);
+                    if ($remainingMins > 0) {
+                        $voucher = $sale->voucher_code ?: ($sale->username ?: strtoupper($sale->mpesa_receipt ?? ''));
+                        if (!empty($voucher)) {
+                            $durationHours = max(1, (int) ceil($remainingMins / 60));
+                            $this->ensureHotspotUserOnRouter($routerId, $voucher, $durationHours);
+
+                            return $this->withCors(response()->json([
+                                'status'          => 'active',
+                                'username'        => $voucher,
+                                'password'        => $voucher,
+                                'voucher_code'    => $voucher,
+                                'remaining_human' => $remainingMins . ' minutes remaining',
+                                'message'         => 'Welcome back! Your package is active. Reconnecting...',
+                            ]));
+                        }
+                    }
+                }
+            }
+
+            // 2. Fallback to check MpesaStkTransaction
             $tx = MpesaStkTransaction::withoutGlobalScopes()
                 ->where('status', 'completed')
                 ->where('mac', $mac)
@@ -201,7 +254,7 @@ class CaptivePortalApiController extends Controller
                 $createdAt = Carbon::parse($tx->updated_at ?: $tx->created_at)->timezone('Africa/Nairobi');
                 $expiresAt = (clone $createdAt)->addHours($durationHours);
 
-                if (now()->timezone('Africa/Nairobi')->lt($expiresAt)) {
+                if ($now->lt($expiresAt)) {
                     $receipt = strtoupper($tx->mpesa_receipt_number ?: $tx->checkout_request_id);
                     $this->ensureHotspotUserOnRouter($routerId, $receipt, $durationHours);
 
@@ -210,8 +263,13 @@ class CaptivePortalApiController extends Controller
                         'username'        => $receipt,
                         'password'        => $receipt,
                         'voucher_code'    => $receipt,
-                        'remaining_human' => now()->timezone('Africa/Nairobi')->diffInMinutes($expiresAt) . ' minutes remaining',
+                        'remaining_human' => $now->diffInMinutes($expiresAt) . ' minutes remaining',
                         'message'         => 'Welcome back! Your package is active. Reconnecting...',
+                    ]));
+                } else {
+                    return $this->withCors(response()->json([
+                        'status'  => 'expired',
+                        'message' => 'Your previous internet pass has expired. Please select a package below to purchase a new pass.',
                     ]));
                 }
             }
@@ -250,10 +308,27 @@ class CaptivePortalApiController extends Controller
             }
         }
 
-        // Amount based heuristic fallback (KES 10-20 = 1-3 hours, KES 50 = 24h, KES 250 = 7 days)
+        // Match by price in PackageList for accuracy
         $amt = (float) $tx->amount;
-        if ($amt <= 15) return 2;
-        if ($amt <= 30) return 6;
+        $matchedPlan = PackageList::withoutGlobalScopes()
+            ->where('price', $amt)
+            ->first();
+        if ($matchedPlan) {
+            $val = (int) ($matchedPlan->validity_value ?: ($matchedPlan->duration_value ?: 0));
+            $unit = strtolower((string) ($matchedPlan->validity_unit ?: ($matchedPlan->duration_unit ?: 'hours')));
+            if ($val > 0) {
+                if (str_starts_with($unit, 'min')) return max(1, (int) ceil($val / 60));
+                if (str_starts_with($unit, 'hour')) return $val;
+                if (str_starts_with($unit, 'day')) return $val * 24;
+                if (str_starts_with($unit, 'week')) return $val * 168;
+                if (str_starts_with($unit, 'month')) return $val * 720;
+            }
+        }
+
+        // Strict amount based fallback (No more multi-day leakage for small amounts)
+        if ($amt <= 10) return 1;
+        if ($amt <= 20) return 3;
+        if ($amt <= 35) return 12;
         if ($amt <= 60) return 24;
         if ($amt <= 300) return 168;
         return 720;

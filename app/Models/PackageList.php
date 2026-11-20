@@ -11,7 +11,7 @@ class PackageList extends Model
     use HasFactory, BelongsToTenant;
 
     protected $fillable = [
-        'tenant_id', 'package', 'type', 'price', 'description', 'merchant_company',
+        'tenant_id', 'package', 'type', 'includes_tv', 'tv_channels', 'price', 'description', 'merchant_company',
         'plan_label', 'speed', 'speed_download', 'speed_download_unit', 'speed_upload', 'speed_upload_unit',
         'burst_speed', 'features', 'is_featured', 'show_on_site', 'is_active', 'show_public', 'sort_order',
         'mikrotik_rate_limit', 'push_to_mikrotik', 'mikrotik_local_address', 'mikrotik_remote_address',
@@ -23,6 +23,7 @@ class PackageList extends Model
 
     protected $casts = [
         'features'        => 'array',
+        'includes_tv'     => 'boolean',
         'is_featured'     => 'boolean',
         'show_on_site'    => 'boolean',
         'is_active'       => 'boolean',
