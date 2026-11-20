@@ -614,6 +614,7 @@
             align-items: flex-start;
             gap: 8px;
         }
+        
         .alert-success {
             background: rgba(16, 185, 129, 0.1);
             border: 1px solid rgba(16, 185, 129, 0.25);
