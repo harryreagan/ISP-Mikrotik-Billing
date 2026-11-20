@@ -89,7 +89,8 @@
     <div class="row g-3">
         @forelse($routers as $router)
             @php
-                $isOnline = $router->status === 'online' && $router->last_seen_at && $router->last_seen_at->gt(now()->subMinutes(5));
+                $isOnline = ($router->status === 'online' || $router->action === 'connected') && 
+                            (empty($router->last_seen_at) || $router->last_seen_at->gt(now()->subMinutes(15)) || ($router->updated_at && $router->updated_at->gt(now()->subMinutes(15))));
                 $cpu = (int) ($router->cpu_load ?? 0);
                 $ram = (int) ($router->memory_load ?? 0);
             @endphp

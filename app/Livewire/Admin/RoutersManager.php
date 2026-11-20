@@ -163,7 +163,7 @@ class RoutersManager extends Component
         }
 
         try {
-            $api = new MikrotikApiService($host, $port, $user, $pass, 3);
+            $api = new MikrotikApiService($host, $port, $user, $pass, 6);
 
             // 1. Fetch System Resource (CPU, RAM, Uptime, Version, Architecture)
             $res = $api->executeCommand('/system/resource/print');
@@ -484,7 +484,7 @@ class RoutersManager extends Component
         }
 
         try {
-            $api = new MikrotikApiService($host, $port, $user, $pass, 3);
+            $api = new MikrotikApiService($host, $port, $user, $pass, 6);
             $ifaces = $api->executeCommand('/interface/print');
             if (is_array($ifaces)) {
                 $this->portInterfaces = collect($ifaces)
@@ -1506,7 +1506,9 @@ class RoutersManager extends Component
         $allTenantRouters = Router::where('tenant_id', $tenantId)->get();
         $totalRouters = $allTenantRouters->count();
         $onlineRouters = $allTenantRouters->filter(function ($r) {
-            return $r->status === 'online' && $r->last_seen_at && $r->last_seen_at->gt(now()->subMinutes(5));
+            $isOnline = ($r->status === 'online' || $r->action === 'connected');
+            $seenRecently = empty($r->last_seen_at) || $r->last_seen_at->gt(now()->subMinutes(15)) || ($r->updated_at && $r->updated_at->gt(now()->subMinutes(15)));
+            return $isOnline && $seenRecently;
         })->count();
 
         $avgCpu = $onlineRouters > 0 

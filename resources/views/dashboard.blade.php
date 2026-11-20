@@ -122,7 +122,7 @@
                     $dbOnline = $allTenantRouters->filter(function ($r) {
                         $st = strtolower($r->status ?? ($r->action ?? ''));
                         $isOnline = in_array($st, ['online', 'connected', 'ready', 'active']);
-                        $seenRecently = empty($r->last_seen_at) || \Carbon\Carbon::parse($r->last_seen_at)->gt(now()->subMinutes(10));
+                        $seenRecently = empty($r->last_seen_at) || \Carbon\Carbon::parse($r->last_seen_at)->gt(now()->subMinutes(15)) || ($r->updated_at && $r->updated_at->gt(now()->subMinutes(15)));
                         return $isOnline && $seenRecently;
                     })->count();
 
@@ -154,41 +154,45 @@
         }
     @endphp
 
-    {{-- Reseller Overview Stat Cards Row (2 per row on mobile) --}}
+    {{-- Hotspot Sessions, Users & Income Overview Stat Cards Row (2 per row on mobile) --}}
     <div class="row g-2 g-sm-3 mb-4">
-        <!-- Card 1: Total Resellers -->
+        <!-- Card 1: Active In-Session Hotspot -->
         <div class="col-6 col-xl-3">
-            <x-ui.stat-card :label="__('Total resellers')" :value="$resellerData['total_resellers'] ?? 0" color="navy">
+            <x-ui.stat-card :label="__('Active hotspot in-session')" :value="$hotspotOverview['live_sessions'] ?? 0" :sub="__('Live connected hotspot users')" color="navy">
+                <x-slot:icon><i class="bi bi-wifi"></i></x-slot:icon>
+                <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
+                    <span>{{ __('Online now:') }} <strong>{{ $hotspotOverview['live_sessions'] ?? 0 }}</strong></span>
+                    <span>{{ __('Vouchers today:') }} <strong>{{ $hotspotOverview['today_sales'] ?? 0 }}</strong></span>
+                </div>
+            </x-ui.stat-card>
+        </div>
+
+        <!-- Card 2: Hotspot Users: Active vs Expired -->
+        <div class="col-6 col-xl-3">
+            <x-ui.stat-card :label="__('Hotspot users')" :value="($hotspotOverview['active_users'] ?? 0) . ' Active'" :sub="($hotspotOverview['total_users'] ?? 0) . ' total registered'" color="purple">
                 <x-slot:icon><i class="bi bi-people"></i></x-slot:icon>
                 <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
-                    <span>{{ __('Active:') }} <strong>{{ $resellerData['active_resellers'] ?? 0 }}</strong></span>
-                    <span>{{ __('Suspended:') }} <strong>{{ $resellerData['suspended_resellers'] ?? 0 }}</strong></span>
+                    <span><i class="bi bi-check-circle-fill me-1 text-success"></i>{{ __('Active:') }} <strong>{{ $hotspotOverview['active_users'] ?? 0 }}</strong></span>
+                    <span><i class="bi bi-hourglass-bottom me-1 text-warning"></i>{{ __('Expired:') }} <strong>{{ $hotspotOverview['expired_users'] ?? 0 }}</strong></span>
                 </div>
             </x-ui.stat-card>
         </div>
 
-        <!-- Card 2: Reseller Customers -->
+        <!-- Card 3: Income Today (Reconciled M-Pesa & Cash Collections) -->
         <div class="col-6 col-xl-3">
-            <x-ui.stat-card :label="__('Reseller customers')" :value="$resellerData['total_customers'] ?? 0" color="purple">
-                <x-slot:icon><i class="bi bi-person-check"></i></x-slot:icon>
+            <x-ui.stat-card :label="__('Income today')" :value="'KES ' . number_format($revenueReport['today_revenue'] ?? 0, 2)" :sub="__('Total collections today.')" color="green">
+                <x-slot:icon><i class="bi bi-cash-coin"></i></x-slot:icon>
                 <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
-                    <span>{{ __('Active:') }} <strong>{{ $resellerData['active_customers'] ?? 0 }}</strong></span>
-                    <span>{{ __('Pending:') }} <strong>{{ $resellerData['pending_customers'] ?? 0 }}</strong></span>
+                    <span>{{ __('Hotspot:') }} <strong>KES {{ number_format($revenueReport['today_hotspot'] ?? 0, 0) }}</strong></span>
+                    <span>{{ __('PPPoE:') }} <strong>KES {{ number_format($revenueReport['today_pppoe'] ?? 0, 0) }}</strong></span>
                 </div>
-            </x-ui.stat-card>
-        </div>
-
-        <!-- Card 3: Total Reseller Balance -->
-        <div class="col-6 col-xl-3">
-            <x-ui.stat-card :label="__('Wallet balances')" :value="'KES ' . number_format($resellerData['total_balance'] ?? 0, 2)" :sub="__('Cumulative reseller wallet balance.')" color="blue">
-                <x-slot:icon><i class="bi bi-cash-stack"></i></x-slot:icon>
             </x-ui.stat-card>
         </div>
 
         <!-- Card 4: Online Routers / Total -->
         <div class="col-6 col-xl-3">
             <a href="{{ route('admin.routers') }}" class="text-decoration-none d-block">
-                <x-ui.stat-card :label="__('Online routers')" :value="$onlineRoutersCount . ' / ' . $totalRoutersCount" :sub="__('Live heartbeat verified routers.')" color="pink">
+                <x-ui.stat-card :label="__('Online routers')" :value="$onlineRoutersCount . ' / ' . $totalRoutersCount" :sub="__('Live heartbeat verified routers.')" color="blue">
                     <x-slot:icon><i class="bi bi-router"></i></x-slot:icon>
                     <div class="d-none d-sm-flex justify-content-between align-items-center w-100">
                         <span><i class="bi bi-broadcast me-1 text-success"></i>{{ __('Online:') }} <strong>{{ $onlineRoutersCount }}</strong></span>

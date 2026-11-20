@@ -250,29 +250,9 @@ class DashboardController extends Controller
 
                 foreach ($dbRouters as $r) {
                     $rName = $r->name ?: ($r->router_name ?: ('Router #' . $r->id));
-                    $liveInfo = [];
-                    $hasLive = false;
-
-                    // Query live telemetry only for this tenant's online/connected router
-                    if ($r->status === 'online' || $r->action === 'connected') {
-                        try {
-                            if (class_exists(MikrotikController::class)) {
-                                $liveRes = app(MikrotikController::class)->routerList($rName, '/system/resource/print', '/system resource print', [], false);
-                                if (isset($liveRes[$rName]) && is_array($liveRes[$rName]) && ($liveRes[$rName]['status'] ?? false)) {
-                                    $hasLive = true;
-                                    $liveInfo = is_array($liveRes[$rName]['data'] ?? null)
-                                        ? ($liveRes[$rName]['data'][0] ?? $liveRes[$rName]['data'])
-                                        : [];
-                                }
-                            }
-                        } catch (\Throwable $e) {}
-                    }
-
-                    if (!is_array($liveInfo)) {
-                        $liveInfo = [];
-                    }
-
-                    $isOnline = $hasLive || ($r->status === 'online' && $r->last_seen_at && $r->last_seen_at->gt(now()->subMinutes(5)));
+                    // Use cached telemetry from DB for blazing-fast page load without blocking network calls
+                    $isOnline = ($r->status === 'online' || $r->action === 'connected') &&
+                        (empty($r->last_seen_at) || $r->last_seen_at->gt(now()->subMinutes(15)) || ($r->updated_at && $r->updated_at->gt(now()->subMinutes(15))));
                     $connType = $r->vpn_ip ? 'WireGuard' : 'API';
 
                     $portRoles = is_array($r->port_roles) ? $r->port_roles : [];
@@ -280,8 +260,8 @@ class DashboardController extends Controller
                     $activePpp = (int) ($portRoles['active_ppp'] ?? 0);
                     $activeTotal = (int) ($portRoles['active_total'] ?? ($activeHs + $activePpp));
 
-                    $totalMem = (int) ($liveInfo['total-memory'] ?? ($r->total_memory ?? 0));
-                    $freeMem = (int) ($liveInfo['free-memory'] ?? ($r->free_memory ?? 0));
+                    $totalMem = (int) ($r->total_memory ?? 0);
+                    $freeMem = (int) ($r->free_memory ?? 0);
                     $memLoad = (int) ($r->memory_load ?? ($totalMem > 0 ? round((($totalMem - $freeMem) / $totalMem) * 100) : 0));
 
                     $systemOverview[$rName] = [
@@ -300,23 +280,23 @@ class DashboardController extends Controller
                         'active_total'  => $activeTotal,
                         'memory_load'   => $memLoad,
                         'data'          => [[
-                            'board-name'              => $liveInfo['board-name'] ?? ($r->model ?: ($r->board ?: $rName)),
-                            'platform'                => $liveInfo['platform'] ?? 'MikroTik',
-                            'architecture-name'       => $liveInfo['architecture-name'] ?? ($r->architecture ?: 'RouterOS'),
-                            'uptime'                  => $liveInfo['uptime'] ?? ($r->uptime ?: ($isOnline ? 'Active' : 'Offline')),
-                            'version'                 => $liveInfo['version'] ?? ($r->version ?: 'N/A'),
-                            'cpu'                     => $liveInfo['cpu'] ?? ($r->board ?: 'MikroTik CPU'),
-                            'cpu-count'               => $liveInfo['cpu-count'] ?? '1',
-                            'cpu-frequency'           => $liveInfo['cpu-frequency'] ?? '-',
-                            'cpu-load'                => $liveInfo['cpu-load'] ?? ($r->cpu_load ?? 0),
+                            'board-name'              => $r->model ?: ($r->board ?: $rName),
+                            'platform'                => 'MikroTik',
+                            'architecture-name'       => $r->architecture ?: 'RouterOS',
+                            'uptime'                  => $r->uptime ?: ($isOnline ? 'Active' : 'Offline'),
+                            'version'                 => $r->version ?: 'N/A',
+                            'cpu'                     => $r->board ?: 'MikroTik CPU',
+                            'cpu-count'               => '1',
+                            'cpu-frequency'           => '-',
+                            'cpu-load'                => (int) ($r->cpu_load ?? 0),
                             'total-memory'            => $totalMem,
                             'free-memory'             => $freeMem,
-                            'total-hdd-space'         => (int) ($liveInfo['total-hdd-space'] ?? 0),
-                            'free-hdd-space'          => (int) ($liveInfo['free-hdd-space'] ?? 0),
-                            'factory-software'        => $liveInfo['factory-software'] ?? ($r->version ?: 'N/A'),
-                            'build-time'              => $liveInfo['build-time'] ?? ($r->last_seen_at ? $r->last_seen_at->format('M d, Y H:i') : 'N/A'),
-                            'write-sect-total'        => $liveInfo['write-sect-total'] ?? '0',
-                            'write-sect-since-reboot' => $liveInfo['write-sect-since-reboot'] ?? '0',
+                            'total-hdd-space'         => 0,
+                            'free-hdd-space'          => 0,
+                            'factory-software'        => $r->version ?: 'N/A',
+                            'build-time'              => $r->last_seen_at ? $r->last_seen_at->format('M d, Y H:i') : 'N/A',
+                            'write-sect-total'        => '0',
+                            'write-sect-since-reboot' => '0',
                         ]],
                     ];
                 }
@@ -372,6 +352,76 @@ class DashboardController extends Controller
             }
         } catch (\Throwable $e) {}
 
-        return view('dashboard', compact('results', 'customersData', 'billInformationData', 'systemOverview', 'resellerData', 'revenueReport', 'selectedYear', 'availableYears'));
+        // 5. Hotspot Sessions & Vouchers Overview
+        $hotspotOverview = [
+            'live_sessions' => 0,
+            'active_users'  => 0,
+            'expired_users' => 0,
+            'total_users'   => 0,
+            'today_sales'   => 0,
+            'today_income'  => (float) ($revenueReport['today_hotspot'] ?? 0.0),
+        ];
+
+        try {
+            if (Schema::hasTable('hotspot_sales')) {
+                $tenantId = auth()->user()?->tenant_id ?: (session('tenant_id') ?: (session('impersonated_tenant_id') ?: 1));
+                $todayDate = Carbon::now('Africa/Nairobi')->toDateString();
+
+                $hsBase = DB::table('hotspot_sales');
+                if (!$isSuperAdmin && Schema::hasColumn('hotspot_sales', 'tenant_id')) {
+                    if ($tenantId == 1) {
+                        $hsBase->where(function ($q) {
+                            $q->where('tenant_id', 1)->orWhereNull('tenant_id');
+                        });
+                    } else {
+                        $hsBase->where('tenant_id', $tenantId);
+                    }
+                }
+
+                $activeHotspot = (clone $hsBase)
+                    ->where('status', 'active')
+                    ->where(function ($q) {
+                        $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                    })
+                    ->count();
+
+                $expiredHotspot = (clone $hsBase)
+                    ->where(function ($q) {
+                        $q->where('status', 'expired')->orWhere(function ($q2) {
+                            $q2->whereNotNull('expires_at')->where('expires_at', '<=', now());
+                        });
+                    })
+                    ->count();
+
+                $todaySalesCount = (clone $hsBase)
+                    ->where(function ($q) use ($todayDate) {
+                        $q->whereDate('sale_date', $todayDate)->orWhereDate('created_at', $todayDate);
+                    })
+                    ->count();
+
+                // Sum live connected hotspot users reported by this tenant's routers
+                $routerLiveHs = 0;
+                if (isset($dbRouters)) {
+                    foreach ($dbRouters as $dr) {
+                        $pr = is_array($dr->port_roles) ? $dr->port_roles : [];
+                        $routerLiveHs += (int) ($pr['active_hs'] ?? 0);
+                    }
+                }
+
+                $liveSessions = max($activeHotspot, $routerLiveHs);
+                $totalUsers = $activeHotspot + $expiredHotspot;
+
+                $hotspotOverview = [
+                    'live_sessions' => $liveSessions,
+                    'active_users'  => $activeHotspot,
+                    'expired_users' => $expiredHotspot,
+                    'total_users'   => $totalUsers,
+                    'today_sales'   => $todaySalesCount,
+                    'today_income'  => (float) ($revenueReport['today_hotspot'] ?? 0.0),
+                ];
+            }
+        } catch (\Throwable $e) {}
+
+        return view('dashboard', compact('results', 'customersData', 'billInformationData', 'systemOverview', 'resellerData', 'revenueReport', 'selectedYear', 'availableYears', 'hotspotOverview'));
     }
 }

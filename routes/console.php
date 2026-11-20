@@ -36,6 +36,8 @@ Schedule::call(function () {
     Artisan::call('app:poll-router-logs');
 })->name('poll-router-logs')->everyMinute()->withoutOverlapping();
 
+Schedule::job(new \App\Jobs\PollRouterTelemetryJob)->everyTwoMinutes()->withoutOverlapping();
+
 
 
 Schedule::command('isp:lifecycle-automations')->everyMinute()->withoutOverlapping();

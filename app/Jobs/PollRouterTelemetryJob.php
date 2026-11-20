@@ -50,7 +50,7 @@ class PollRouterTelemetryJob implements ShouldQueue
         $pass = $this->decryptRouterPassword($router->api_password ?: $router->password);
 
         try {
-            $api = new MikrotikApiService($host, $port, $user, $pass, 3);
+            $api = new MikrotikApiService($host, $port, $user, $pass, 6);
 
             // 1. Resource query (CPU, Memory, Uptime, Version, Board)
             $res = $api->executeCommand('/system/resource/print');
