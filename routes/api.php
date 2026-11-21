@@ -26,6 +26,13 @@ Route::options('/payment/{any}', function () {
         ->header('Access-Control-Allow-Headers', 'Content-Type, Accept, X-Requested-With, Authorization');
 })->where('any', '.*');
 
+Route::options('/portal/{any}', function () {
+    return response('', 204)
+        ->header('Access-Control-Allow-Origin', '*')
+        ->header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        ->header('Access-Control-Allow-Headers', 'Content-Type, Accept, X-Requested-With, Authorization');
+})->where('any', '.*');
+
 // 2. M-Pesa Daraja (STK Callback, C2B, STK Push & Polling Status)
 Route::prefix('payment/daraja')->group(function () {
     Route::post('/stk-callback', [DarajaPaymentController::class, 'handleStkCallback'])->middleware(['throttle:60,1', 'webhook.log']);
@@ -42,6 +49,7 @@ Route::get('/payment/status', [PayHeroPaymentController::class, 'checkPortalStat
 // Returning User & Captive Portal Session Endpoints
 Route::post('/portal/returning-user', [\App\Http\Controllers\Portal\CaptivePortalApiController::class, 'returningUser'])->middleware('throttle:60,1');
 Route::get('/portal/check-session', [\App\Http\Controllers\Portal\CaptivePortalApiController::class, 'checkSession'])->middleware('throttle:120,1');
+Route::get('/portal/network-devices', [\App\Http\Controllers\Portal\CaptivePortalApiController::class, 'getNetworkDevices'])->middleware('throttle:60,1');
 
 // 3. PayHero (Webhook, STK Push & Polling)
 Route::prefix('payment/payhero')->group(function () {

@@ -502,5 +502,179 @@ class CaptivePortalApiController extends Controller
             Log::warning("[ensureHotspotUserOnRouter] Error for router #{$routerId}: " . $e->getMessage());
         }
     }
+
+    /**
+     * Get discovered network devices (Smart TVs, consoles, devices on this router hotspot/DHCP).
+     */
+    public function getNetworkDevices(Request $request): JsonResponse
+    {
+        $routerId = (int) $request->input('router_id', 0);
+        $tenantId = (int) ($request->input('tenant_id', 1) ?: 1);
+        $currentMac = strtoupper(trim((string) $request->input('mac', '')));
+
+        try {
+            $router = null;
+            if ($routerId > 0) {
+                $router = Router::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereNull('deleted_at')->find($routerId);
+            }
+            if (!$router) {
+                $router = Router::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
+                    ->where('status', 'online')
+                    ->orderByDesc('last_seen_at')
+                    ->first();
+            }
+
+            if (!$router) {
+                return $this->withCors(response()->json(['success' => true, 'devices' => []]));
+            }
+
+            $host = $router->vpn_ip ?: ($router->last_known_ip ?: $router->ip);
+            if (!$host) {
+                return $this->withCors(response()->json(['success' => true, 'devices' => []]));
+            }
+
+            $port = (int) ($router->api_port ?: 8728);
+            $user = $router->api_user ?: ($router->username ?: 'admin');
+            $pass = CaptivePortalTemplates::decryptRouterPassword($router->api_password ?: $router->password);
+
+            $api = new MikrotikApiService($host, $port, $user, $pass, 6);
+
+            $hosts = $api->executeCommand('/ip/hotspot/host/print');
+            $leases = $api->executeCommand('/ip/dhcp-server/lease/print');
+            $ipBindings = $api->executeCommand('/ip/hotspot/ip-binding/print');
+
+            if (!is_array($hosts)) $hosts = [];
+            if (!is_array($leases)) $leases = [];
+            if (!is_array($ipBindings)) $ipBindings = [];
+
+            $boundMacs = [];
+            foreach ($ipBindings as $ib) {
+                $m = strtoupper(trim((string) ($ib['mac-address'] ?? '')));
+                if ($m !== '') {
+                    $boundMacs[$m] = $ib['type'] ?? 'bypassed';
+                }
+            }
+
+            $leaseMap = [];
+            foreach ($leases as $l) {
+                $m = strtoupper(trim((string) ($l['mac-address'] ?? '')));
+                if ($m !== '') {
+                    $leaseMap[$m] = [
+                        'ip'       => $l['address'] ?? null,
+                        'hostname' => $l['host-name'] ?? null,
+                        'status'   => $l['status'] ?? null,
+                    ];
+                }
+            }
+
+            $devices = [];
+            $seenMacs = [];
+
+            // 1. Process Hotspot Hosts
+            foreach ($hosts as $h) {
+                $mac = strtoupper(trim((string) ($h['mac-address'] ?? '')));
+                if ($mac === '' || isset($seenMacs[$mac])) continue;
+                $seenMacs[$mac] = true;
+
+                $ip = $h['address'] ?? ($leaseMap[$mac]['ip'] ?? '');
+                $hostname = $leaseMap[$mac]['hostname'] ?? ($h['comment'] ?? null);
+                $isBypassed = ($h['bypassed'] ?? 'false') === 'true' || isset($boundMacs[$mac]);
+                $isAuthorized = ($h['authorized'] ?? 'false') === 'true';
+
+                $friendlyName = $this->resolveDeviceFriendlyName($mac, $hostname, $ip);
+
+                $devices[] = [
+                    'mac'        => $mac,
+                    'ip'         => $ip,
+                    'name'       => $friendlyName,
+                    'raw_name'   => $hostname,
+                    'is_current' => ($currentMac !== '' && $currentMac === $mac),
+                    'bypassed'   => $isBypassed,
+                    'authorized' => $isAuthorized,
+                ];
+            }
+
+            // 2. Also include active DHCP leases not in hotspot hosts
+            foreach ($leaseMap as $mac => $info) {
+                if (isset($seenMacs[$mac])) continue;
+                $seenMacs[$mac] = true;
+
+                $friendlyName = $this->resolveDeviceFriendlyName($mac, $info['hostname'], $info['ip']);
+                $devices[] = [
+                    'mac'        => $mac,
+                    'ip'         => $info['ip'] ?? '',
+                    'name'       => $friendlyName,
+                    'raw_name'   => $info['hostname'] ?? null,
+                    'is_current' => ($currentMac !== '' && $currentMac === $mac),
+                    'bypassed'   => isset($boundMacs[$mac]),
+                    'authorized' => false,
+                ];
+            }
+
+            // Sort: current phone first, then unbypassed devices first
+            usort($devices, function ($a, $b) {
+                if ($a['is_current'] !== $b['is_current']) {
+                    return $a['is_current'] ? 1 : -1;
+                }
+                return ($a['bypassed'] ? 1 : 0) <=> ($b['bypassed'] ? 1 : 0);
+            });
+
+            return $this->withCors(response()->json([
+                'success' => true,
+                'devices' => array_values($devices),
+            ]));
+        } catch (\Throwable $e) {
+            Log::warning('[getNetworkDevices] Error: ' . $e->getMessage());
+            return $this->withCors(response()->json([
+                'success' => true,
+                'devices' => [],
+                'message' => 'Could not fetch live router hosts: ' . $e->getMessage(),
+            ]));
+        }
+    }
+
+    /**
+     * Resolve friendly human name for discovered network device based on hostname and MAC vendor heuristic.
+     */
+    protected function resolveDeviceFriendlyName(string $mac, ?string $hostname, ?string $ip): string
+    {
+        $cleanHost = trim((string) $hostname);
+        $displayIp = $ip ?: 'Network device';
+
+        if ($cleanHost !== '') {
+            if (stripos($cleanHost, 'samsung') !== false) return "Samsung Smart TV ({$displayIp})";
+            if (stripos($cleanHost, 'lg') !== false || stripos($cleanHost, 'webos') !== false) return "LG webOS TV ({$displayIp})";
+            if (stripos($cleanHost, 'hisense') !== false) return "Hisense TV ({$displayIp})";
+            if (stripos($cleanHost, 'tcl') !== false) return "TCL Smart TV ({$displayIp})";
+            if (stripos($cleanHost, 'sony') !== false || stripos($cleanHost, 'bravia') !== false) return "Sony BRAVIA TV ({$displayIp})";
+            if (stripos($cleanHost, 'apple') !== false) return "Apple TV ({$displayIp})";
+            if (stripos($cleanHost, 'fire') !== false || stripos($cleanHost, 'aft') !== false) return "Amazon Fire TV ({$displayIp})";
+            if (stripos($cleanHost, 'roku') !== false) return "Roku TV ({$displayIp})";
+            if (stripos($cleanHost, 'chromecast') !== false) return "Chromecast / Google TV ({$displayIp})";
+            if (stripos($cleanHost, 'playstation') !== false || stripos($cleanHost, 'ps4') !== false || stripos($cleanHost, 'ps5') !== false) return "PlayStation ({$displayIp})";
+            if (stripos($cleanHost, 'xbox') !== false) return "Xbox ({$displayIp})";
+            return "{$cleanHost} ({$displayIp})";
+        }
+
+        $prefix = strtoupper(str_replace([':', '-'], '', substr($mac, 0, 8)));
+        $tvVendors = [
+            '500FF5' => 'Smart TV / Media Device',
+            'FCF136' => 'Samsung Smart TV',
+            'AC5F3E' => 'Samsung Smart TV',
+            'B479A7' => 'LG webOS TV',
+            'A823FE' => 'LG webOS TV',
+            'E076D0' => 'Sony Corporation',
+            '102CBF' => 'Hisense Smart TV',
+            '440010' => 'TCL Smart TV',
+            'AC83F3' => 'Apple TV',
+            '38F9D3' => 'Amazon Fire TV',
+            '20DFB9' => 'LG Electronics',
+        ];
+
+        $vendor = $tvVendors[$prefix] ?? 'Smart TV / Device';
+        return "{$vendor} ({$displayIp})";
+    }
 }
 

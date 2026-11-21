@@ -184,6 +184,11 @@ class CaptivePortalTemplates
 CARD;
         }
 
+        $tvPackagesOptionsHtml = '';
+        foreach ($packagesList as $pkg) {
+            $tvPackagesOptionsHtml .= "<option value=\"{$pkg['id']}\" data-price=\"{$pkg['price']}\" data-name=\"{$pkg['name']}\">{$pkg['name']} - KES {$pkg['price']}</option>\n";
+        }
+
         $logoHtml = $logoUrl 
             ? "<img src=\"{$logoUrl}\" alt=\"{$brandName}\" class=\"brand-logo\">"
             : "<div class=\"brand-badge\"><span class=\"brand-icon\">⚡</span><span class=\"brand-title\">{$brandName}</span></div>";
@@ -311,6 +316,14 @@ CARD;
 
             <div id="statusMessage" class="status-msg"></div>
 
+            <!-- Connect TV / Device Button (Smart TV, Console, Apple TV bypass) -->
+            <div style="margin-top: 14px;">
+                <button type="button" onclick="openTvModal()" style="width: 100%; padding: 13px 18px; background: #eab308; color: #0f172a; border: none; border-radius: 10px; font-size: 15px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: transform 0.15s, background 0.15s; -webkit-tap-highlight-color: transparent;">
+                    <span style="font-size: 18px;">📺</span>
+                    <span>Connect TV Here</span>
+                </button>
+            </div>
+
             <!-- Voucher / Access Code Login Form (Works on MikroTik Hotspot & Cloud Portal) -->
             <div style="margin-top: 18px; padding-top: 16px; border-top: 1px dashed rgba(148, 163, 184, 0.35);">
                 <form id="voucherLoginForm" name="login" action="$(link-login-only)" method="post" onsubmit="return handleVoucherSubmit(event)">
@@ -347,11 +360,98 @@ CARD;
     </div>
 </div>
 
+<!-- Modal: Connect TV / Device -->
+<div id="tvModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.8); z-index:999999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(4px); box-sizing:border-box;">
+    <div style="background:#ffffff; color:#0f172a; width:100%; max-width:440px; border-radius:16px; padding:22px 20px; max-height:92vh; overflow-y:auto; box-shadow:0 20px 25px -5px rgba(0,0,0,0.3); box-sizing:border-box; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+            <h2 style="font-size:20px; font-weight:800; color:#0f172a; margin:0; line-height:1.2;">Connect Your TV / Device</h2>
+            <button type="button" onclick="closeTvModal()" style="background:transparent; border:none; font-size:24px; font-weight:700; color:#64748b; cursor:pointer; line-height:1; padding:0 4px;">&times;</button>
+        </div>
+
+        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:10px 12px; margin-bottom:12px; font-size:12px; line-height:1.45; color:#1e40af;">
+            <strong>Tip:</strong> If your TV can open this page, you don't need to enter a MAC address. Just click on a package above and buy normally. Only use this form if your TV cannot show the sign-in page.
+        </div>
+
+        <p style="font-size:12.5px; color:#64748b; text-align:center; margin-bottom:12px;">
+            Enter the MAC address from your TV settings, choose a package, and pay.
+        </p>
+
+        <details style="margin-bottom:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; font-size:12px; color:#334155;">
+            <summary style="font-weight:700; cursor:pointer; color:#0284c7; outline:none; user-select:none;">
+                ▶ How do I find my TV MAC address?
+            </summary>
+            <div style="margin-top:8px; font-size:11.5px; line-height:1.5; color:#475569;">
+                <ul style="padding-left:18px; margin:0;">
+                    <li><strong>Samsung:</strong> Settings &gt; General &gt; Network &gt; Network Status</li>
+                    <li><strong>LG webOS:</strong> Settings &gt; Network &gt; Wi-Fi Connection &gt; Advanced</li>
+                    <li><strong>Android / Google TV:</strong> Settings &gt; Network &amp; Internet &gt; [Wi-Fi] &gt; MAC</li>
+                    <li><strong>Fire TV / Roku:</strong> Settings &gt; System / Network &gt; About &gt; MAC</li>
+                    <li>Or check the sticker on the back of your TV / media box.</li>
+                </ul>
+            </div>
+        </details>
+
+        <div class="form-group" style="margin-bottom:12px; text-align:left;">
+            <label style="font-size:12px; font-weight:700; color:#334155; margin-bottom:4px; display:block;">Device MAC Address</label>
+            <input type="text" id="tvMacInput" class="input-box" placeholder="e.g. AA:BB:CC:DD:EE:FF" maxlength="17" autocapitalize="characters" oninput="handleTvMacInput(this)" style="font-family:monospace; font-weight:700; letter-spacing:1px; text-transform:uppercase; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; width:100%; font-size:14px; color:#0f172a; background:#fff; box-sizing:border-box;">
+        </div>
+
+        <div style="margin-bottom:12px; text-align:left;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <label style="font-size:12px; font-weight:700; color:#334155;">Devices on this network</label>
+                <button type="button" onclick="loadNetworkDevices(true)" style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:600; color:#475569; cursor:pointer;">Refresh</button>
+            </div>
+            <div id="networkDevicesContainer" style="border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; padding:6px; max-height:130px; overflow-y:auto;">
+                <div id="devicesListPlaceholder" style="font-size:12px; color:#94a3b8; padding:8px; text-align:center;">Looking for devices on this network...</div>
+                <div id="devicesListItems" style="display:none; flex-direction:column; gap:4px;"></div>
+            </div>
+            <p style="font-size:11px; color:#94a3b8; margin-top:3px;">Start typing the MAC above to filter this list, then tap your device.</p>
+        </div>
+
+        <div class="form-group" style="margin-bottom:12px; text-align:left;">
+            <label style="font-size:12px; font-weight:700; color:#334155; margin-bottom:4px; display:block;">Device Name <span style="font-weight:400; color:#94a3b8;">(optional)</span></label>
+            <input type="text" id="tvNameInput" class="input-box" placeholder="e.g. Living Room TV" maxlength="40" style="border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; width:100%; font-size:13.5px; color:#0f172a; background:#fff; box-sizing:border-box;">
+        </div>
+
+        <div class="form-group" style="margin-bottom:12px; text-align:left;">
+            <label style="font-size:12px; font-weight:700; color:#334155; margin-bottom:4px; display:block;">Select Package</label>
+            <select id="tvPackageSelect" onchange="updateTvSelectedPackage()" style="width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:13.5px; color:#0f172a; background:#fff; font-weight:600; outline:none; box-sizing:border-box;">
+                <option value="">-- Choose a package --</option>
+                {$tvPackagesOptionsHtml}
+            </select>
+        </div>
+
+        <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:8px 10px; margin-bottom:12px; font-size:11.5px; line-height:1.4; color:#9a3412;">
+            <strong>One device per package.</strong> This package works on this one device only. Please do not buy one package for several devices.
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px; text-align:left;">
+            <label style="font-size:12px; font-weight:700; color:#334155; margin-bottom:4px; display:block;">Phone Number (M-Pesa)</label>
+            <input type="tel" id="tvPhoneInput" class="input-box" placeholder="e.g. 0712345678" maxlength="13" style="border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; width:100%; font-size:14px; color:#0f172a; background:#fff; box-sizing:border-box;">
+        </div>
+
+        <div id="tvStatusMsg" style="display:none; padding:10px 12px; border-radius:8px; font-size:12px; margin-bottom:12px; line-height:1.4;"></div>
+
+        <div style="display:flex; gap:10px;">
+            <button type="button" id="tvBindBtn" onclick="submitTvBindPayment()" style="flex:1; background:#10b981; color:#fff; border:none; border-radius:8px; padding:12px 14px; font-size:15px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+                <span id="tvBtnText">Bind &amp; Pay</span>
+            </button>
+            <button type="button" onclick="closeTvModal()" style="background:#64748b; color:#fff; border:none; border-radius:8px; padding:12px 18px; font-size:15px; font-weight:600; cursor:pointer;">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 let selectedPlanId = '{$packagesList[0]['id']}';
 let selectedPlanPrice = '{$packagesList[0]['price']}';
 let selectedPlanName = '{$packagesList[0]['name']}';
 let stkPollTimer = null;
+let tvSelectedPackageId = '';
+let tvSelectedPackagePrice = '0';
+let tvPollTimer = null;
+let networkDevicesCache = [];
 
 const apiBase = window.location.hostname.includes('hsmart.co.ke') ? '' : 'https://isp.hsmart.co.ke';
 const urlParams = new URLSearchParams(window.location.search);
@@ -603,6 +703,294 @@ function showStatus(msg, type) {
     statusDiv.innerText = msg;
     statusDiv.className = 'status-msg status-' + type;
     statusDiv.style.display = 'block';
+}
+
+function openTvModal() {
+    cancelAllPendingTimers();
+    const modal = document.getElementById('tvModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        const mainPhone = document.getElementById('phoneInput');
+        const tvPhone = document.getElementById('tvPhoneInput');
+        if (mainPhone && tvPhone && mainPhone.value.trim() && !tvPhone.value.trim()) {
+            tvPhone.value = mainPhone.value.trim();
+        }
+        const select = document.getElementById('tvPackageSelect');
+        if (select && selectedPlanId) {
+            select.value = selectedPlanId;
+            updateTvSelectedPackage();
+        }
+        loadNetworkDevices();
+    }
+}
+
+function closeTvModal() {
+    if (tvPollTimer) {
+        clearInterval(tvPollTimer);
+        tvPollTimer = null;
+    }
+    const modal = document.getElementById('tvModal');
+    if (modal) modal.style.display = 'none';
+    const status = document.getElementById('tvStatusMsg');
+    if (status) status.style.display = 'none';
+}
+
+function handleTvMacInput(input) {
+    let val = input.value.replace(/[^a-fA-F0-9]/g, '').toUpperCase();
+    let formatted = '';
+    for (let i = 0; i < val.length && i < 12; i++) {
+        if (i > 0 && i % 2 === 0) formatted += ':';
+        formatted += val[i];
+    }
+    input.value = formatted;
+    filterNetworkDevices(formatted);
+}
+
+function updateTvSelectedPackage() {
+    const select = document.getElementById('tvPackageSelect');
+    const btnText = document.getElementById('tvBtnText');
+    if (select && select.selectedIndex > 0) {
+        const opt = select.options[select.selectedIndex];
+        tvSelectedPackageId = opt.value;
+        tvSelectedPackagePrice = opt.getAttribute('data-price') || '0';
+        if (btnText) btnText.innerText = 'Bind & Pay KES ' + tvSelectedPackagePrice;
+    } else {
+        tvSelectedPackageId = '';
+        tvSelectedPackagePrice = '0';
+        if (btnText) btnText.innerText = 'Bind & Pay';
+    }
+}
+
+function loadNetworkDevices(force) {
+    const placeholder = document.getElementById('devicesListPlaceholder');
+    const itemsContainer = document.getElementById('devicesListItems');
+    if (!placeholder || !itemsContainer) return;
+
+    if (!force && networkDevicesCache.length > 0) {
+        renderNetworkDevices(networkDevicesCache);
+        return;
+    }
+
+    placeholder.style.display = 'block';
+    placeholder.innerText = 'Looking for devices on this network...';
+    itemsContainer.style.display = 'none';
+
+    const q = new URLSearchParams({
+        router_id: '{$routerId}',
+        tenant_id: '{$tenantId}',
+        mac: clientMac
+    });
+
+    fetch(apiBase + '/api/portal/network-devices?' + q.toString(), {
+        headers: { 'Accept': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data && data.success && Array.isArray(data.devices)) {
+            networkDevicesCache = data.devices;
+            renderNetworkDevices(data.devices);
+        } else {
+            placeholder.innerText = 'No devices found yet. Make sure your TV is connected to this Wi-Fi.';
+        }
+    })
+    .catch(() => {
+        placeholder.innerText = 'Enter your TV MAC address above if not listed.';
+    });
+}
+
+function renderNetworkDevices(devices) {
+    const placeholder = document.getElementById('devicesListPlaceholder');
+    const itemsContainer = document.getElementById('devicesListItems');
+    if (!placeholder || !itemsContainer) return;
+
+    const filtered = devices.filter(d => !d.is_current);
+    const listToRender = filtered.length > 0 ? filtered : devices;
+
+    if (listToRender.length === 0) {
+        placeholder.style.display = 'block';
+        placeholder.innerText = 'No unauthorized devices detected. Ensure your TV is connected to Wi-Fi.';
+        itemsContainer.style.display = 'none';
+        return;
+    }
+
+    placeholder.style.display = 'none';
+    itemsContainer.innerHTML = '';
+    itemsContainer.style.display = 'flex';
+
+    listToRender.forEach(d => {
+        const row = document.createElement('div');
+        row.style.cssText = 'padding:6px 8px; border-radius:6px; background:#fff; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; cursor:pointer; font-size:12px; transition:background 0.15s;';
+        row.onmouseover = () => { row.style.background = '#f1f5f9'; };
+        row.onmouseout = () => { row.style.background = '#fff'; };
+        row.onclick = () => selectNetworkDevice(d.mac, d.name, d.raw_name);
+
+        const isTv = d.name.toLowerCase().includes('tv') || d.name.toLowerCase().includes('bravia') || d.name.toLowerCase().includes('roku') || d.name.toLowerCase().includes('box');
+        const icon = isTv ? '📺' : '📱';
+
+        row.innerHTML =
+            '<div style="display:flex; align-items:center; gap:6px; overflow:hidden;">' +
+                '<span style="font-size:14px;">' + icon + '</span>' +
+                '<div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' +
+                    '<div style="font-weight:700; color:#1e293b; font-size:12px;">' + d.name + '</div>' +
+                    '<div style="font-family:monospace; color:#64748b; font-size:11px;">' + d.mac + '</div>' +
+                '</div>' +
+            '</div>' +
+            '<button type="button" style="background:#e0f2fe; color:#0369a1; border:none; border-radius:4px; padding:2px 8px; font-size:11px; font-weight:700; cursor:pointer;">Select</button>';
+        itemsContainer.appendChild(row);
+    });
+}
+
+function filterNetworkDevices(query) {
+    if (!networkDevicesCache.length) return;
+    const cleanQ = query.toUpperCase();
+    const matched = networkDevicesCache.filter(d => d.mac.toUpperCase().includes(cleanQ) || (d.name && d.name.toUpperCase().includes(cleanQ)));
+    renderNetworkDevices(matched);
+}
+
+function selectNetworkDevice(mac, name, rawName) {
+    const macInput = document.getElementById('tvMacInput');
+    const nameInput = document.getElementById('tvNameInput');
+    if (macInput) macInput.value = mac;
+    if (nameInput && !nameInput.value.trim()) {
+        nameInput.value = rawName || name.replace(/\s*\([0-9.]+\)/, '');
+    }
+}
+
+function showTvStatus(msg, type) {
+    const el = document.getElementById('tvStatusMsg');
+    if (!el) return;
+    el.style.display = 'block';
+    if (type === 'success') {
+        el.style.background = '#dcfce7';
+        el.style.border = '1px solid #86efac';
+        el.style.color = '#15803d';
+    } else {
+        el.style.background = '#fee2e2';
+        el.style.border = '1px solid #fca5a5';
+        el.style.color = '#b91c1c';
+    }
+    el.innerHTML = msg;
+}
+
+function submitTvBindPayment() {
+    const macInput = document.getElementById('tvMacInput');
+    const phoneInput = document.getElementById('tvPhoneInput');
+    const nameInput = document.getElementById('tvNameInput');
+    const bindBtn = document.getElementById('tvBindBtn');
+    const btnText = document.getElementById('tvBtnText');
+
+    const rawMac = macInput ? macInput.value.trim().toUpperCase() : '';
+    const rawPhone = phoneInput ? phoneInput.value.trim() : '';
+    const deviceName = nameInput && nameInput.value.trim() ? nameInput.value.trim() : 'Smart TV';
+
+    const macRegex = /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/;
+    if (!macRegex.test(rawMac)) {
+        showTvStatus('Please enter a valid 12-character MAC Address (e.g. AA:BB:CC:DD:EE:FF).', 'error');
+        if (macInput) macInput.focus();
+        return;
+    }
+
+    if (!tvSelectedPackageId) {
+        showTvStatus('Please select a package from the dropdown list.', 'error');
+        return;
+    }
+
+    const normalizedPhone = normalizeKenyanPhone(rawPhone);
+    if (!normalizedPhone) {
+        showTvStatus('Please enter a valid M-Pesa phone number (e.g. 07XXXXXXXX or 01XXXXXXXX).', 'error');
+        if (phoneInput) phoneInput.focus();
+        return;
+    }
+
+    if (bindBtn) bindBtn.disabled = true;
+    if (btnText) btnText.innerText = '⏳ Sending M-Pesa STK...';
+    showTvStatus('Sending M-Pesa prompt to ' + normalizedPhone + '...', 'success');
+
+    const payload = {
+        phone: normalizedPhone,
+        amount: String(tvSelectedPackagePrice).replace(/,/g, ''),
+        package_id: tvSelectedPackageId,
+        plan_id: tvSelectedPackageId,
+        router_id: '{$routerId}',
+        tenant_id: '{$tenantId}',
+        is_tv_bind: 1,
+        target_mac: rawMac,
+        device_name: deviceName,
+        mac: clientMac,
+        ip: clientIp
+    };
+
+    fetch(apiBase + '/api/payment/stk-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res && res.success) {
+            showTvStatus('📲 <strong>M-Pesa STK Prompt sent!</strong> Please enter your PIN on ' + normalizedPhone + ' to connect your TV.', 'success');
+            if (btnText) btnText.innerText = '⏳ Waiting for M-Pesa PIN...';
+            startTvPaymentPolling(res.checkout_request_id || res.reference, res.reference || res.checkout_request_id, normalizedPhone, rawMac, deviceName);
+        } else {
+            if (bindBtn) bindBtn.disabled = false;
+            if (btnText) btnText.innerText = 'Bind & Pay KES ' + tvSelectedPackagePrice;
+            showTvStatus('❌ ' + (res.message || 'Failed to initiate M-Pesa payment. Please try again.'), 'error');
+        }
+    })
+    .catch(err => {
+        if (bindBtn) bindBtn.disabled = false;
+        if (btnText) btnText.innerText = 'Bind & Pay KES ' + tvSelectedPackagePrice;
+        showTvStatus('❌ Network error connecting to payment gateway. Please try again.', 'error');
+    });
+}
+
+function startTvPaymentPolling(checkoutId, merchantRef, phone, targetMac, deviceName) {
+    if (tvPollTimer) clearInterval(tvPollTimer);
+    let attempts = 0;
+    const bindBtn = document.getElementById('tvBindBtn');
+    const btnText = document.getElementById('tvBtnText');
+
+    tvPollTimer = setInterval(() => {
+        attempts++;
+        if (attempts > 48) {
+            clearInterval(tvPollTimer);
+            if (bindBtn) bindBtn.disabled = false;
+            if (btnText) btnText.innerText = 'Bind & Pay KES ' + tvSelectedPackagePrice;
+            showTvStatus('Still waiting for payment confirmation. If already deducted, your TV will connect automatically in a moment.', 'error');
+            return;
+        }
+
+        const q = new URLSearchParams({
+            checkout_id: checkoutId || '',
+            reference: merchantRef || checkoutId || '',
+            phone: phone || '',
+            tenant_id: '{$tenantId}',
+            router_id: '{$routerId}'
+        });
+
+        fetch(apiBase + '/api/payment/status?' + q.toString(), {
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (!res) return;
+            if (res.status === 'completed') {
+                clearInterval(tvPollTimer);
+                if (btnText) btnText.innerText = '✅ TV Connected!';
+                showTvStatus('🎉 <strong>TV Connected Successfully!</strong><br>' + deviceName + ' (' + targetMac + ') has been bound. Your TV can now stream freely without entering any password!', 'success');
+                setTimeout(() => {
+                    closeTvModal();
+                    showStatus('✅ TV (' + targetMac + ') successfully connected and authorized for streaming!', 'success');
+                }, 4000);
+            } else if (res.status === 'failed') {
+                clearInterval(tvPollTimer);
+                if (bindBtn) bindBtn.disabled = false;
+                if (btnText) btnText.innerText = 'Bind & Pay KES ' + tvSelectedPackagePrice;
+                showTvStatus('❌ ' + (res.message || 'Payment cancelled or declined.'), 'error');
+            }
+        })
+        .catch(() => {});
+    }, 2500);
 }
 
 // Initial label, phone restore & error check on load

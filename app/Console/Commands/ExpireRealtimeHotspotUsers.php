@@ -302,15 +302,28 @@ class ExpireRealtimeHotspotUsers extends Command
                 }
             }
 
-            // D. Remove any /ip/hotspot/ip-binding entries for expired MACs or IPs
+            // D. Remove any /ip/hotspot/ip-binding entries for expired MACs, IPs, or expired TV exp comments
             foreach ($ipBindings as $ib) {
                 $ibId = $ib['.id'] ?? null;
                 $ibMac = strtoupper(trim((string) ($ib['mac-address'] ?? '')));
                 $ibAddr = trim((string) ($ib['address'] ?? ''));
+                $comment = (string) ($ib['comment'] ?? '');
                 if (!$ibId) continue;
 
-                if (($ibMac !== '' && isset($expiredMacs[$ibMac])) || ($ibAddr !== '' && isset($expiredIps[$ibAddr]))) {
+                $commentExpired = false;
+                if (preg_match('/exp:([0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2})/', $comment, $m)) {
+                    try {
+                        if (now()->greaterThan(\Carbon\Carbon::parse($m[1]))) {
+                            $commentExpired = true;
+                        }
+                    } catch (\Throwable $ce) {}
+                }
+
+                if ($commentExpired || ($ibMac !== '' && isset($expiredMacs[$ibMac])) || ($ibAddr !== '' && isset($expiredIps[$ibAddr]))) {
                     $api->executeCommand('/ip/hotspot/ip-binding/remove', [], ['.id' => $ibId]);
+                    if ($ibMac !== '') {
+                        $expiredMacs[$ibMac] = true;
+                    }
                 }
             }
 

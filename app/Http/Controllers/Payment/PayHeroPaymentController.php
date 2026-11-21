@@ -76,12 +76,23 @@ class PayHeroPaymentController extends Controller
             $tenantId = 1;
         }
 
+        $isTvBind = $request->boolean('is_tv_bind') || $request->input('device_type') === 'tv';
+        $targetMac = $request->input('target_mac') ? strtoupper(trim((string)$request->input('target_mac'))) : null;
+        $deviceName = $request->input('device_name') ? trim((string)$request->input('device_name')) : 'Smart TV';
+
+        $customerRef = ($isTvBind && $targetMac)
+            ? ('TV-' . substr(preg_replace('/[^0-9A-Fa-f]/', '', $targetMac), -6))
+            : ($request->account_reference ?: ('HS-' . substr(preg_replace('/[^0-9]/', '', $phone), -4)));
+
         $meta = [
-            'package_id' => $request->plan_id ?? $request->package_id ?? null,
-            'router_id'  => $request->router_id ? (int) $request->router_id : null,
-            'mac'        => $request->mac ?: null,
-            'ip'         => $request->ip ?: null,
-            'tenant_id'  => $tenantId,
+            'package_id'  => $request->plan_id ?? $request->package_id ?? null,
+            'router_id'   => $request->router_id ? (int) $request->router_id : null,
+            'mac'         => $request->mac ?: null,
+            'ip'          => $request->ip ?: null,
+            'tenant_id'   => $tenantId,
+            'is_tv_bind'  => $isTvBind,
+            'target_mac'  => $targetMac,
+            'device_name' => $deviceName,
         ];
 
         try {
@@ -146,11 +157,17 @@ class PayHeroPaymentController extends Controller
             // 1. Completed in DB (set by webhook or prior poll)
             if ($stkTx->status === 'completed') {
                 $code = strtoupper($stkTx->mpesa_receipt_number ?: $stkTx->checkout_request_id);
+                $meta = is_array($stkTx->raw_callback) ? $stkTx->raw_callback : [];
                 return $this->withCors(response()->json([
                     'status'       => 'completed',
                     'voucher_code' => $code,
                     'password'     => $code,
-                    'message'      => 'Payment confirmed! Connecting you to Wi-Fi...',
+                    'is_tv_bind'   => !empty($meta['is_tv_bind']),
+                    'target_mac'   => $meta['target_mac'] ?? null,
+                    'device_name'  => $meta['device_name'] ?? null,
+                    'message'      => !empty($meta['is_tv_bind'])
+                        ? 'Payment confirmed! Your TV / Device has been authorized on Wi-Fi.'
+                        : 'Payment confirmed! Connecting you to Wi-Fi...',
                 ]));
             }
 
@@ -195,11 +212,17 @@ class PayHeroPaymentController extends Controller
 
                         $this->fulfillSuccessfulTransaction($stkTx, $apiReceipt, $apiAmount);
 
+                        $meta = is_array($stkTx->raw_callback) ? $stkTx->raw_callback : [];
                         return $this->withCors(response()->json([
                             'status'       => 'completed',
                             'voucher_code' => $apiReceipt,
                             'password'     => $apiReceipt,
-                            'message'      => 'Payment confirmed! Connecting you to Wi-Fi...',
+                            'is_tv_bind'   => !empty($meta['is_tv_bind']),
+                            'target_mac'   => $meta['target_mac'] ?? null,
+                            'device_name'  => $meta['device_name'] ?? null,
+                            'message'      => !empty($meta['is_tv_bind'])
+                                ? 'Payment confirmed! Your TV / Device has been authorized on Wi-Fi.'
+                                : 'Payment confirmed! Connecting you to Wi-Fi...',
                         ]));
                     } elseif (!empty($verifyResult['is_failed'])) {
                         $desc = $verifyResult['message'] ?: 'Payment cancelled or failed.';
@@ -259,6 +282,19 @@ class PayHeroPaymentController extends Controller
         $clientIp = $meta['ip'] ?? null;
         $clientMac = $meta['mac'] ?? null;
 
+        $isTvBind = !empty($meta['is_tv_bind']) 
+            || !empty($meta['target_mac']) 
+            || str_starts_with((string)$stkTx->reference, 'HSM-TV') 
+            || str_starts_with((string)$stkTx->reference, 'TV-');
+        $targetMac = !empty($meta['target_mac']) ? strtoupper(trim((string)$meta['target_mac'])) : null;
+        $deviceName = !empty($meta['device_name']) ? trim((string)$meta['device_name']) : 'Smart TV';
+
+        $effectiveMac = ($isTvBind && $targetMac) ? $targetMac : ($clientMac ? strtoupper(trim($clientMac)) : null);
+        $hotspotUsername = ($isTvBind && $targetMac) ? ('TV-' . $targetMac) : ($stkTx->phone ?: $receipt);
+        $saleNote = ($isTvBind && $targetMac)
+            ? ('TV Bind: ' . $deviceName . ' (' . $receipt . ')')
+            : ('M-Pesa Captive Portal STK (' . $receipt . ')');
+
         // Ensure STK transaction has tenant_id and router_id recorded
         if (!$stkTx->tenant_id || !$stkTx->router_id) {
             MpesaStkTransaction::withoutGlobalScopes()->where('id', $stkTx->id)->update([
@@ -271,6 +307,7 @@ class PayHeroPaymentController extends Controller
         $isHotspot = !empty($packageId) 
             || !empty($clientMac) 
             || !empty($routerId) 
+            || $isTvBind
             || str_contains((string)$stkTx->reference, 'HSM-HS') 
             || str_starts_with((string)$stkTx->reference, 'HS-')
             || !empty($meta['package_id']);
@@ -372,9 +409,10 @@ class PayHeroPaymentController extends Controller
         // 3. Stacking calculation (if user has active session, add duration to current expires_at)
         $existingActive = HotspotSale::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->where(function ($q) use ($stkTx, $clientMac) {
+            ->where(function ($q) use ($stkTx, $effectiveMac, $hotspotUsername) {
                 if ($stkTx->phone) $q->where('phone', $stkTx->phone);
-                if ($clientMac) $q->orWhere('mac_address', strtoupper($clientMac));
+                if ($effectiveMac) $q->orWhere('mac_address', strtoupper($effectiveMac));
+                if ($hotspotUsername) $q->orWhere('username', $hotspotUsername);
             })
             ->where('expires_at', '>', now())
             ->whereIn('status', ['completed', 'active', 'pending_router'])
@@ -405,9 +443,9 @@ class PayHeroPaymentController extends Controller
                     'router_id'        => $routerId,
                     'router_name'      => $routerName,
                     'profile'          => $profileName,
-                    'username'         => $stkTx->phone ?: $receipt,
+                    'username'         => $hotspotUsername,
                     'phone'            => $stkTx->phone,
-                    'mac_address'      => $clientMac ? strtoupper($clientMac) : null,
+                    'mac_address'      => $effectiveMac ? strtoupper($effectiveMac) : null,
                     'ip_address'       => $clientIp,
                     'amount'           => $amount,
                     'payment_method'   => 'mpesa_payhero',
@@ -415,7 +453,7 @@ class PayHeroPaymentController extends Controller
                     'duration_minutes' => $totalMinutes,
                     'started_at'       => $startedAt,
                     'expires_at'       => $expiresAt,
-                    'note'             => 'M-Pesa Captive Portal STK (' . $receipt . ')',
+                    'note'             => $saleNote,
                     'sale_date'        => now()->timezone('Africa/Nairobi')->toDateString(),
                 ]
             );
@@ -440,18 +478,20 @@ class PayHeroPaymentController extends Controller
             if (!CollectionSummary::withoutGlobalScopes()->where('transaction_id', $receipt)->exists()) {
                 $maxInvoice = CollectionSummary::withoutGlobalScopes()->max('invoice_no');
                 $invoiceNo = $maxInvoice ? ($maxInvoice + 1) : 100001;
-                $subLabel = $receipt . ($stkTx->phone ? ' (' . $stkTx->phone . ')' : '');
+                $subLabel = ($isTvBind && $targetMac)
+                    ? ($deviceName . ' [' . $targetMac . '] (' . ($stkTx->phone ?: $receipt) . ')')
+                    : ($receipt . ($stkTx->phone ? ' (' . $stkTx->phone . ')' : ''));
 
                 CollectionSummary::withoutGlobalScopes()->create([
                     'tenant_id'                     => $tenantId,
-                    'customer_collection_unique_id' => $stkTx->phone ?: $receipt,
+                    'customer_collection_unique_id' => $hotspotUsername,
                     'subscriber_name'               => $subLabel,
                     'phone'                         => $stkTx->phone,
-                    'mac_address'                   => $clientMac ? strtoupper($clientMac) : null,
+                    'mac_address'                   => $effectiveMac ? strtoupper($effectiveMac) : null,
                     'router_id'                     => $routerId,
                     'collection_date'               => now(),
                     'collection_amount'             => $amount,
-                    'collected_by'                  => 'Hotspot M-Pesa (PAYHERO)',
+                    'collected_by'                  => $isTvBind ? 'Smart TV M-Pesa (PAYHERO)' : 'Hotspot M-Pesa (PAYHERO)',
                     'payment_type'                  => 'hotspot',
                     'service_type'                  => 'hotspot',
                     'package_id'                    => $pkg?->id ?: ($packageId ? (int) $packageId : null),
@@ -477,11 +517,14 @@ class PayHeroPaymentController extends Controller
                 $limitUptime,
                 $limitBytes,
                 $clientIp,
-                $clientMac,
+                $effectiveMac,
                 $expiresAt,
                 $hotspotSale?->id,
                 $profileName,
-                $pkg
+                $pkg,
+                $isTvBind,
+                $targetMac,
+                $deviceName
             );
         } catch (\Throwable $he) {
             Log::warning('[PayHero] Hotspot router provisioning note: ' . $he->getMessage());
@@ -505,7 +548,10 @@ class PayHeroPaymentController extends Controller
         \Carbon\Carbon $expiresAt,
         ?int $saleId,
         string $profileName = 'default',
-        ?PackageList $pkg = null
+        ?PackageList $pkg = null,
+        bool $isTvBind = false,
+        ?string $targetMac = null,
+        ?string $deviceName = 'Smart TV'
     ): void {
         $routersQuery = \App\Models\Router::withoutGlobalScopes()->whereNull('deleted_at')->where(function ($q) {
             $q->where('status', 'online')
@@ -639,6 +685,50 @@ class PayHeroPaymentController extends Controller
                         $loginParams['mac-address'] = strtoupper($clientMac);
                     }
                     $api->executeCommand('/ip/hotspot/active/login', $loginParams);
+                }
+
+                // 4. If TV / Device binding, set bypass in /ip/hotspot/ip-binding
+                if ($isTvBind && $targetMac) {
+                    try {
+                        $existingBindings = $api->executeCommand('/ip/hotspot/ip-binding/print');
+                        $matchedBinding = null;
+                        if (is_array($existingBindings)) {
+                            foreach ($existingBindings as $b) {
+                                if (strtoupper(trim((string)($b['mac-address'] ?? ''))) === $targetMac) {
+                                    $matchedBinding = $b;
+                                    break;
+                                }
+                            }
+                        }
+
+                        $bindingComment = "TV: {$deviceName} (" . ($stkTx->phone ?: '') . ") exp:{$expiresAt->toDateTimeString()}";
+                        $bindingPayload = [
+                            'mac-address' => $targetMac,
+                            'type'        => 'bypassed',
+                            'comment'     => $bindingComment,
+                        ];
+
+                        if ($matchedBinding && !empty($matchedBinding['.id'])) {
+                            $bindingPayload['.id'] = $matchedBinding['.id'];
+                            $api->executeCommand('/ip/hotspot/ip-binding/set', $bindingPayload);
+                        } else {
+                            $api->executeCommand('/ip/hotspot/ip-binding/add', $bindingPayload);
+                        }
+
+                        // Remove stale host entry so bypass takes effect immediately
+                        $hosts = $api->executeCommand('/ip/hotspot/host/print');
+                        if (is_array($hosts)) {
+                            foreach ($hosts as $h) {
+                                if (strtoupper(trim((string)($h['mac-address'] ?? ''))) === $targetMac && !empty($h['.id'])) {
+                                    $api->executeCommand('/ip/hotspot/host/remove', ['.id' => $h['.id']]);
+                                }
+                            }
+                        }
+
+                        Log::info("[PayHero] Bound TV MAC {$targetMac} ({$deviceName}) as bypassed on router {$router->name}");
+                    } catch (\Throwable $tve) {
+                        Log::warning("[PayHero] TV ip-binding exception on router {$router->name}: " . $tve->getMessage());
+                    }
                 }
 
                 $provisionedAny = true;
