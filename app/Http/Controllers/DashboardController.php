@@ -258,6 +258,16 @@ class DashboardController extends Controller
                     $portRoles = is_array($r->port_roles) ? $r->port_roles : [];
                     $activeHs = (int) ($portRoles['active_hs'] ?? 0);
                     $activePpp = (int) ($portRoles['active_ppp'] ?? 0);
+
+                    if ($activeHs === 0 && Schema::hasTable('hotspot_sales')) {
+                        $activeHs = (int) DB::table('hotspot_sales')
+                            ->where('router_id', $r->id)
+                            ->whereIn('status', ['completed', 'active', 'paid', 'pending_router'])
+                            ->where(function ($q) {
+                                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                            })
+                            ->count();
+                    }
                     $activeTotal = (int) ($portRoles['active_total'] ?? ($activeHs + $activePpp));
 
                     $totalMem = (int) ($r->total_memory ?? 0);
@@ -379,7 +389,7 @@ class DashboardController extends Controller
                 }
 
                 $activeHotspot = (clone $hsBase)
-                    ->where('status', 'active')
+                    ->whereIn('status', ['active', 'completed', 'paid', 'pending_router'])
                     ->where(function ($q) {
                         $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
                     })
@@ -392,6 +402,27 @@ class DashboardController extends Controller
                         });
                     })
                     ->count();
+
+                // Cross-check prepaid_users for active and online users
+                $prepaidActive = 0;
+                $prepaidOnline = 0;
+                if (Schema::hasTable('prepaid_users')) {
+                    $puQuery = \App\Models\PrepaidUser::withoutGlobalScopes()
+                        ->where(function ($q) {
+                            $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                        })
+                        ->whereNotIn('status', ['expired', 'disabled']);
+
+                    if (!$isSuperAdmin && $tenantId) {
+                        $puQuery->where('tenant_id', $tenantId);
+                    }
+                    $prepaidActive = (clone $puQuery)->count();
+                    $prepaidOnline = (clone $puQuery)->where(function ($q) {
+                        $q->where('is_online', true)->orWhere('status', 'online');
+                    })->count();
+                }
+
+                $activeHotspot = max($activeHotspot, $prepaidActive);
 
                 $todaySalesCount = (clone $hsBase)
                     ->where(function ($q) use ($todayDate) {
@@ -408,7 +439,7 @@ class DashboardController extends Controller
                     }
                 }
 
-                $liveSessions = max($activeHotspot, $routerLiveHs);
+                $liveSessions = max($routerLiveHs, $prepaidOnline, $activeHotspot);
                 $totalUsers = $activeHotspot + $expiredHotspot;
 
                 $hotspotOverview = [

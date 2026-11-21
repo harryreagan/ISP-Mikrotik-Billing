@@ -147,8 +147,39 @@
         <ul class="navbar-nav flex-column mb-3" id="navbarVerticalNav">
 
             {{-- ══════════════════════════════════════════════════════════════ --}}
-            {{-- 1. CUSTOMERS                                                   --}}
             {{-- ══════════════════════════════════════════════════════════════ --}}
+            {{-- 1. CUSTOMERS & ACTIVATIONS (UNIFIED)                           --}}
+            {{-- ══════════════════════════════════════════════════════════════ --}}
+            @php
+                $sidebarTenantId = auth()->user()?->tenant_id ?: (session('tenant_id') ?: (session('impersonated_tenant_id') ?: 1));
+                $sbOnlineCount = 0;
+                $sbActiveCount = 0;
+                $sbExpiredCount = 0;
+                $sbTotalCount = 0;
+                try {
+                    if (\Illuminate\Support\Facades\Schema::hasTable('prepaid_users')) {
+                        $sbBase = \App\Models\PrepaidUser::withoutGlobalScopes();
+                        if (!in_array(strtolower(auth()->user()->role ?? ''), ['superadmin', 'super_admin']) && $sidebarTenantId) {
+                            $sbBase->where('tenant_id', $sidebarTenantId);
+                        }
+                        $sbTotalCount = (clone $sbBase)->count();
+                        $sbActiveCount = (clone $sbBase)->whereNotIn('status', ['expired', 'disabled'])->where(fn($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))->count();
+                        $sbOnlineCount = (clone $sbBase)->where(fn($q) => $q->where('is_online', true)->orWhere('status', 'online'))->count();
+                        $sbExpiredCount = (clone $sbBase)->where(fn($q) => $q->where('status', 'expired')->orWhere(fn($s) => $s->whereNotNull('expires_at')->where('expires_at', '<=', now())))->count();
+                    }
+                    if (\Illuminate\Support\Facades\Schema::hasTable('hotspot_sales')) {
+                        $sbHsActive = \App\Models\HotspotSale::withoutGlobalScopes()
+                            ->where('tenant_id', $sidebarTenantId)
+                            ->whereIn('status', ['active', 'completed', 'paid', 'pending_router'])
+                            ->where(fn($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+                            ->count();
+                        $sbActiveCount = max($sbActiveCount, $sbHsActive);
+                        $sbOnlineCount = max($sbOnlineCount, $sbHsActive);
+                    }
+                } catch (\Throwable $e) {}
+                $isCustomersOpen = request()->routeIs('admin.customers') || request()->routeIs('customers.index') || request()->routeIs('admin.activation.*') || request()->routeIs('new-customer');
+            @endphp
+
             <li class="nav-item">
                 <div class="row navbar-vertical-label-wrapper mt-3 mb-1">
                     <div class="col-auto navbar-vertical-label">{{ __('Customers') }}</div>
@@ -162,95 +193,74 @@
                     </div>
                 </a>
 
-                {{-- Customers --}}
-                <a wire:navigate.hover wire:current="active" class="nav-link {{ request()->routeIs('admin.customers') || request()->routeIs('customers.index') || request()->routeIs('new-customer') ? 'active' : '' }}" href="{{ route('admin.customers') }}" role="button">
-                    <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-people"></i></span>
-                        <span class="nav-link-text ps-1">{{ __('Customers') }}</span>
+                {{-- Combined Customers & Activation Hub --}}
+                <a class="nav-link dropdown-indicator {{ $isCustomersOpen ? '' : 'collapsed' }}" href="#customersDropdown" role="button"
+                    data-bs-toggle="collapse" aria-expanded="{{ $isCustomersOpen ? 'true' : 'false' }}" aria-controls="customersDropdown">
+                    <div class="d-flex align-items-center w-100">
+                        <span class="nav-link-icon"><i class="bi bi-people text-primary"></i></span>
+                        <span class="nav-link-text ps-1 fw-semibold">{{ __('Customers') }}</span>
+                        @if($sbOnlineCount > 0)
+                            <span class="badge rounded-pill ms-auto bg-success text-white font-monospace" title="{{ $sbOnlineCount }} Online Now">{{ $sbOnlineCount }} online</span>
+                        @elseif($sbActiveCount > 0)
+                            <span class="badge rounded-pill ms-auto bg-info text-white font-monospace" title="{{ $sbActiveCount }} Active">{{ $sbActiveCount }} active</span>
+                        @endif
                     </div>
                 </a>
-
-                {{-- Support Tickets --}}
-                <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin-tickets') }}" role="button">
-                    <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-chat-left-text"></i></span>
-                        <span class="nav-link-text ps-1">{{ __('Support Tickets') }}</span>
-                    </div>
-                </a>
-            </li>
-
-            {{-- ══════════════════════════════════════════════════════════════ --}}
-            {{-- 1B. ACTIVATION / PREPAID USERS                                 --}}
-            {{-- ══════════════════════════════════════════════════════════════ --}}
-            <li class="nav-item">
-                <div class="row navbar-vertical-label-wrapper mt-3 mb-1">
-                    <div class="col-auto navbar-vertical-label">{{ __('Activation') }}</div>
-                </div>
-
-                @php
-                    $isActivationOpen = request()->routeIs('admin.activation.*');
-                @endphp
-                <a class="nav-link dropdown-indicator {{ $isActivationOpen ? '' : 'collapsed' }}" href="#activationMenuDropdown" role="button"
-                    data-bs-toggle="collapse" aria-expanded="{{ $isActivationOpen ? 'true' : 'false' }}" aria-controls="activationMenuDropdown">
-                    <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-lightning-charge text-primary"></i></span>
-                        <span class="nav-link-text ps-1 fw-semibold">{{ __('Activation') }}</span>
-                    </div>
-                </a>
-                <ul class="nav collapse {{ $isActivationOpen ? 'show' : '' }}" id="activationMenuDropdown">
+                <ul class="nav collapse {{ $isCustomersOpen ? 'show' : '' }}" id="customersDropdown">
                     <li class="nav-item">
-                        <a wire:navigate.hover wire:current.exact="active" class="nav-link {{ request()->routeIs('admin.activation.prepaid-users') ? 'active' : '' }}" href="{{ route('admin.activation.prepaid-users') }}">
-                            <div class="d-flex align-items-center">
-                                <span class="nav-link-icon"><i class="bi bi-people"></i></span>
-                                <span class="nav-link-text ps-1">{{ __('Prepaid Users') }}</span>
+                        <a wire:navigate.hover wire:current.exact="active" class="nav-link {{ request()->routeIs('admin.customers') || request()->routeIs('customers.index') ? 'active' : '' }}" href="{{ route('admin.customers') }}">
+                            <div class="d-flex align-items-center w-100">
+                                <span class="nav-link-icon"><i class="bi bi-person-lines-fill"></i></span>
+                                <span class="nav-link-text ps-1">{{ __('All Customers') }}</span>
                             </div>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a wire:navigate.hover wire:current.exact="active" class="nav-link {{ request()->routeIs('admin.activation.active-users') ? 'active' : '' }}" href="{{ route('admin.activation.active-users') }}">
-                            <div class="d-flex align-items-center">
-                                <span class="nav-link-icon"><i class="bi bi-check-circle"></i></span>
+                            <div class="d-flex align-items-center w-100">
+                                <span class="nav-link-icon"><i class="bi bi-check-circle text-success"></i></span>
                                 <span class="nav-link-text ps-1">{{ __('Active Users') }}</span>
-                            </div>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a wire:navigate.hover wire:current.exact="active" class="nav-link {{ request()->routeIs('admin.activation.expired-users') ? 'active' : '' }}" href="{{ route('admin.activation.expired-users') }}">
-                            <div class="d-flex align-items-center">
-                                <span class="nav-link-icon"><i class="bi bi-clock-history"></i></span>
-                                <span class="nav-link-text ps-1">{{ __('Expired Users') }}</span>
+                                @if($sbActiveCount > 0)
+                                    <span class="badge rounded-pill ms-auto bg-success text-white font-monospace">{{ $sbActiveCount }}</span>
+                                @endif
                             </div>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a wire:navigate.hover wire:current.exact="active" class="nav-link {{ request()->routeIs('admin.activation.online-users') ? 'active' : '' }}" href="{{ route('admin.activation.online-users') }}">
-                            <div class="d-flex align-items-center">
-                                <span class="nav-link-icon"><i class="bi bi-broadcast"></i></span>
+                            <div class="d-flex align-items-center w-100">
+                                <span class="nav-link-icon"><i class="bi bi-broadcast text-info"></i></span>
                                 <span class="nav-link-text ps-1">{{ __('Online Users') }}</span>
+                                @if($sbOnlineCount > 0)
+                                    <span class="badge rounded-pill ms-auto bg-info text-white font-monospace">{{ $sbOnlineCount }}</span>
+                                @endif
                             </div>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a wire:navigate.hover wire:current.exact="active" class="nav-link {{ request()->routeIs('admin.activation.offline-users') ? 'active' : '' }}" href="{{ route('admin.activation.offline-users') }}">
-                            <div class="d-flex align-items-center">
-                                <span class="nav-link-icon"><i class="bi bi-wifi-off"></i></span>
-                                <span class="nav-link-text ps-1">{{ __('Offline Users') }}</span>
+                        <a wire:navigate.hover wire:current.exact="active" class="nav-link {{ request()->routeIs('admin.activation.expired-users') ? 'active' : '' }}" href="{{ route('admin.activation.expired-users') }}">
+                            <div class="d-flex align-items-center w-100">
+                                <span class="nav-link-icon"><i class="bi bi-clock-history text-warning"></i></span>
+                                <span class="nav-link-text ps-1">{{ __('Expired Users') }}</span>
+                                @if($sbExpiredCount > 0)
+                                    <span class="badge rounded-pill ms-auto bg-warning text-dark font-monospace">{{ $sbExpiredCount }}</span>
+                                @endif
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a wire:navigate.hover wire:current.exact="active" class="nav-link {{ request()->routeIs('admin.activation.prepaid-users') ? 'active' : '' }}" href="{{ route('admin.activation.prepaid-users') }}">
+                            <div class="d-flex align-items-center w-100">
+                                <span class="nav-link-icon"><i class="bi bi-ticket-perforated"></i></span>
+                                <span class="nav-link-text ps-1">{{ __('Prepaid & Vouchers') }}</span>
                             </div>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a wire:navigate.hover wire:current.exact="active" class="nav-link {{ request()->routeIs('admin.activation.activate-user') ? 'active' : '' }}" href="{{ route('admin.activation.activate-user') }}">
-                            <div class="d-flex align-items-center">
-                                <span class="nav-link-icon"><i class="bi bi-person-plus"></i></span>
+                            <div class="d-flex align-items-center w-100">
+                                <span class="nav-link-icon"><i class="bi bi-person-plus text-primary"></i></span>
                                 <span class="nav-link-text ps-1">{{ __('Activate User') }}</span>
-                            </div>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a wire:navigate.hover wire:current.exact="active" class="nav-link {{ request()->routeIs('admin.activation.roaming-users') ? 'active' : '' }}" href="{{ route('admin.activation.roaming-users') }}">
-                            <div class="d-flex align-items-center">
-                                <span class="nav-link-icon"><i class="bi bi-arrow-left-right"></i></span>
-                                <span class="nav-link-text ps-1">{{ __('Roaming Users') }}</span>
                             </div>
                         </a>
                     </li>

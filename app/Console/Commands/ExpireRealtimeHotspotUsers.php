@@ -27,7 +27,37 @@ class ExpireRealtimeHotspotUsers extends Command
         $now = Carbon::now('Africa/Nairobi');
         $sendSmsFlag = (bool) $this->option('sms');
 
-        // 1. Collect newly expired PrepaidUsers per router/tenant before marking them expired
+        // 1. Map active/unexpired users per tenant to protect them from false expiries
+        $activeTargetsByTenant = [];
+        if (Schema::hasTable('hotspot_sales')) {
+            $activeSales = HotspotSale::withoutGlobalScopes()
+                ->whereIn('status', ['completed', 'active', 'pending_router'])
+                ->where(function ($q) use ($now) {
+                    $q->whereNull('expires_at')->orWhere('expires_at', '>', $now);
+                })
+                ->get(['tenant_id', 'voucher_code', 'username', 'mac_address']);
+            foreach ($activeSales as $as) {
+                $tId = (int) ($as->tenant_id ?: 1);
+                if (!empty($as->voucher_code)) $activeTargetsByTenant[$tId][strtolower(trim($as->voucher_code))] = true;
+                if (!empty($as->username)) $activeTargetsByTenant[$tId][strtolower(trim($as->username))] = true;
+                if (!empty($as->mac_address)) $activeTargetsByTenant[$tId][strtoupper(trim($as->mac_address))] = true;
+            }
+        }
+        if (Schema::hasTable('prepaid_users')) {
+            $activePrepaid = PrepaidUser::withoutGlobalScopes()
+                ->whereNotIn('status', ['expired', 'disabled'])
+                ->where(function ($q) use ($now) {
+                    $q->whereNull('expires_at')->orWhere('expires_at', '>', $now);
+                })
+                ->get(['tenant_id', 'username', 'mac_address', 'phone']);
+            foreach ($activePrepaid as $ap) {
+                $tId = (int) ($ap->tenant_id ?: 1);
+                if (!empty($ap->username)) $activeTargetsByTenant[$tId][strtolower(trim($ap->username))] = true;
+                if (!empty($ap->mac_address)) $activeTargetsByTenant[$tId][strtoupper(trim($ap->mac_address))] = true;
+            }
+        }
+
+        // 1B. Collect newly expired PrepaidUsers per router/tenant before marking them expired
         $expiredPrepaid = collect();
         if (Schema::hasTable('prepaid_users')) {
             $expiredPrepaid = PrepaidUser::withoutGlobalScopes()
@@ -37,11 +67,16 @@ class ExpireRealtimeHotspotUsers extends Command
                 ->get();
         }
 
-        // Map expired usernames/MACs/IPs per tenant for thorough cleanup on routers
+        // Map expired usernames/MACs/IPs per tenant for thorough cleanup on routers (excluding users with active packages)
         $expiredTargetsByTenant = [];
         foreach ($expiredPrepaid as $pu) {
             $tId = (int) $pu->tenant_id;
-            $expiredTargetsByTenant[$tId][strtolower(trim($pu->username))] = $pu;
+            $uKey = strtolower(trim($pu->username));
+            $mKey = strtoupper(trim((string)$pu->mac_address));
+            if (!empty($activeTargetsByTenant[$tId][$uKey]) || (!empty($mKey) && !empty($activeTargetsByTenant[$tId][$mKey]))) {
+                continue; // Protected: User bought a newer active package
+            }
+            $expiredTargetsByTenant[$tId][$uKey] = $pu;
         }
 
         // 2. Audit active, online, non-deleted routers (deduplicated by tunnel/IP so pending/stale peers never trigger bad logins)
@@ -202,6 +237,27 @@ class ExpireRealtimeHotspotUsers extends Command
                     }
                 }
 
+                // Safety override: Never disconnect if user or device has any active, unexpired package in DB
+                if ($shouldDisconnect) {
+                    $hasActiveSale = HotspotSale::withoutGlobalScopes()
+                        ->where('tenant_id', $router->tenant_id ?: 1)
+                        ->whereIn('status', ['completed', 'active', 'pending_router'])
+                        ->where(function ($q) use ($username, $sessMac) {
+                            $q->where('voucher_code', $username)
+                              ->orWhere('username', $username);
+                            if ($sessMac !== '') {
+                                $q->orWhere('mac_address', $sessMac);
+                            }
+                        })
+                        ->whereNotNull('expires_at')
+                        ->where('expires_at', '>', $now)
+                        ->exists();
+
+                    if ($hasActiveSale) {
+                        $shouldDisconnect = false;
+                    }
+                }
+
                 if ($shouldDisconnect) {
                     $expiredUsernames[$uKey] = true;
                     if ($sessMac !== '') $expiredMacs[$sessMac] = true;
@@ -278,6 +334,24 @@ class ExpireRealtimeHotspotUsers extends Command
                     if ($dbSale && now()->greaterThanOrEqualTo($dbSale->expires_at)) {
                         $shouldRemoveUser = true;
                         $removeWhy = 'dbsale_expired_' . $dbSale->expires_at;
+                    }
+                }
+
+                if ($shouldRemoveUser) {
+                    // Safety override: Never remove user from router if any active unexpired package exists
+                    $hasActivePackage = HotspotSale::withoutGlobalScopes()
+                        ->where('tenant_id', $router->tenant_id ?: 1)
+                        ->whereIn('status', ['completed', 'active', 'pending_router'])
+                        ->where(function ($q) use ($uName) {
+                            $q->where('voucher_code', $uName)
+                              ->orWhere('username', $uName);
+                        })
+                        ->whereNotNull('expires_at')
+                        ->where('expires_at', '>', $now)
+                        ->exists();
+
+                    if ($hasActivePackage) {
+                        $shouldRemoveUser = false;
                     }
                 }
 

@@ -42,18 +42,35 @@ class MikrotikDuration
                 $seconds = (int) round($val);
             }
         } else {
-            // String parsing (e.g. "30 mins", "30 minutes", "1 hour", "0.5 hr", "2 days", "1 week")
-            if (preg_match('/([0-9.]+)\s*(min|minute|m\b)/i', $str, $matches)) {
-                $seconds = (int) round(((float)$matches[1]) * 60);
-            } elseif (preg_match('/([0-9.]+)\s*(hour|hr|h\b)/i', $str, $matches)) {
-                $seconds = (int) round(((float)$matches[1]) * 3600);
-            } elseif (preg_match('/([0-9.]+)\s*(day|d\b)/i', $str, $matches)) {
-                $seconds = (int) round(((float)$matches[1]) * 86400);
-            } elseif (preg_match('/([0-9.]+)\s*(week|wk|w\b)/i', $str, $matches)) {
-                $seconds = (int) round(((float)$matches[1]) * 604800);
+            // 1. Compound MikroTik duration parsing (e.g. "1w2d3h4m5s", "1h34m30s", "45m", "30s")
+            $compoundMatched = false;
+            $totalCompound = 0;
+            if (preg_match_all('/([0-9.]+)\s*([wdhms])/i', $str, $allParts, PREG_SET_ORDER)) {
+                foreach ($allParts as $part) {
+                    $val = (float) $part[1];
+                    $unitKey = strtolower($part[2]);
+                    $compoundMatched = true;
+                    if ($unitKey === 'w') $totalCompound += (int) round($val * 604800);
+                    elseif ($unitKey === 'd') $totalCompound += (int) round($val * 86400);
+                    elseif ($unitKey === 'h') $totalCompound += (int) round($val * 3600);
+                    elseif ($unitKey === 'm') $totalCompound += (int) round($val * 60);
+                    elseif ($unitKey === 's') $totalCompound += (int) round($val);
+                }
+            }
+
+            if ($compoundMatched && $totalCompound > 0) {
+                $seconds = $totalCompound;
             } elseif (preg_match('/([0-9.]+)\s*(month|mon)/i', $str, $matches)) {
                 $seconds = (int) round(((float)$matches[1]) * 2592000);
-            } elseif (preg_match('/([0-9.]+)\s*(sec|second|s\b)/i', $str, $matches)) {
+            } elseif (preg_match('/([0-9.]+)\s*(week|wk)/i', $str, $matches)) {
+                $seconds = (int) round(((float)$matches[1]) * 604800);
+            } elseif (preg_match('/([0-9.]+)\s*(day)/i', $str, $matches)) {
+                $seconds = (int) round(((float)$matches[1]) * 86400);
+            } elseif (preg_match('/([0-9.]+)\s*(hour|hr)/i', $str, $matches)) {
+                $seconds = (int) round(((float)$matches[1]) * 3600);
+            } elseif (preg_match('/([0-9.]+)\s*(min|minute)/i', $str, $matches)) {
+                $seconds = (int) round(((float)$matches[1]) * 60);
+            } elseif (preg_match('/([0-9.]+)\s*(sec|second)/i', $str, $matches)) {
                 $seconds = (int) round((float)$matches[1]);
             } else {
                 // Fallback numeric extract

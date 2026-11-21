@@ -214,6 +214,33 @@ class RoutersManager extends Component
                 }
             } catch (\Throwable $e) {}
 
+            // Also check bypassed bindings (e.g. Smart TV / Device bindings)
+            try {
+                $bindings = $api->executeCommand('/ip/hotspot/ip-binding/print');
+                if (is_array($bindings)) {
+                    $bypassedCount = 0;
+                    foreach ($bindings as $b) {
+                        if (($b['type'] ?? '') === 'bypassed' && empty($b['disabled']) && ($b['disabled'] ?? '') !== 'true') {
+                            $bypassedCount++;
+                        }
+                    }
+                    $hsCount += $bypassedCount;
+                }
+            } catch (\Throwable $e) {}
+
+            // Fallback to active valid sales for this router if router was recently flushed
+            if ($hsCount === 0) {
+                try {
+                    $hsCount = \App\Models\HotspotSale::withoutGlobalScopes()
+                        ->where('router_id', $router->id)
+                        ->whereIn('status', ['completed', 'active', 'paid', 'pending_router'])
+                        ->where(function ($q) {
+                            $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                        })
+                        ->count();
+                } catch (\Throwable $e) {}
+            }
+
             $pppCount = 0;
             try {
                 $pppActive = $api->executeCommand('/ppp/active/print');
