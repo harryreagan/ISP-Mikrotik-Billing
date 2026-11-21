@@ -224,6 +224,7 @@ class ExpireRealtimeHotspotUsers extends Command
                 }
 
                 $shouldRemoveUser = isset($expiredUsernames[$uKey]);
+                $removeWhy = $shouldRemoveUser ? 'in_expiredUsernames' : '';
 
                 if (!$shouldRemoveUser) {
                     $comment = $hu['comment'] ?? '';
@@ -231,6 +232,7 @@ class ExpireRealtimeHotspotUsers extends Command
                         try {
                             if ($now->greaterThanOrEqualTo(Carbon::parse($m[1], 'Africa/Nairobi'))) {
                                 $shouldRemoveUser = true;
+                                $removeWhy = 'comment_exp_' . $m[1];
                             }
                         } catch (\Throwable $t) {}
                     }
@@ -241,6 +243,7 @@ class ExpireRealtimeHotspotUsers extends Command
                     $uptimeSec = MikrotikDuration::parse($hu['uptime'])['seconds'];
                     if ($limitSec > 0 && $uptimeSec >= $limitSec) {
                         $shouldRemoveUser = true;
+                        $removeWhy = 'uptime_reached_' . $uptimeSec . '_ge_' . $limitSec;
                     }
                 }
 
@@ -253,6 +256,7 @@ class ExpireRealtimeHotspotUsers extends Command
                         ->first();
                     if ($dbSale && now()->greaterThanOrEqualTo($dbSale->expires_at)) {
                         $shouldRemoveUser = true;
+                        $removeWhy = 'dbsale_expired_' . $dbSale->expires_at;
                     }
                 }
 
@@ -261,7 +265,7 @@ class ExpireRealtimeHotspotUsers extends Command
                     if (!empty($hu['mac-address'])) $expiredMacs[strtoupper(trim($hu['mac-address']))] = true;
                     $api->executeCommand('/ip/hotspot/user/remove', [], ['.id' => $huId]);
                     unset($userMap[$uKey]);
-                    Log::info("[hotspot:expire] Removed expired hotspot user '{$uName}' on router {$router->name}");
+                    Log::info("[hotspot:expire] Removed expired hotspot user '{$uName}' on router {$router->name} (reason: {$removeWhy})");
                 }
             }
 
