@@ -22,7 +22,6 @@ class MikrotikApiService
 
             for ($attempt = 1; $attempt <= $attempts; $attempt++) {
                 try {
-                    // Try modern auth first (RouterOS v6.43+ and RouterOS v7)
                     $config = new Config([
                         'host'           => $host,
                         'user'           => (string) $username,
@@ -32,31 +31,9 @@ class MikrotikApiService
                         'socket_timeout' => $effectiveTimeout,
                         'attempts'       => 1,
                         'delay'          => 1,
-                        'legacy'         => false,
                     ]);
 
-                    try {
-                        $this->client = new Client($config);
-                    } catch (\Throwable $modernEx) {
-                        // If modern auth failed, attempt legacy pre-6.43 auth fallback
-                        try {
-                            $configLegacy = new Config([
-                                'host'           => $host,
-                                'user'           => (string) $username,
-                                'pass'           => (string) $password,
-                                'port'           => $targetPort,
-                                'timeout'        => $effectiveTimeout,
-                                'socket_timeout' => $effectiveTimeout,
-                                'attempts'       => 1,
-                                'delay'          => 1,
-                                'legacy'         => true,
-                            ]);
-                            $this->client = new Client($configLegacy);
-                        } catch (\Throwable $legacyEx) {
-                            throw $modernEx;
-                        }
-                    }
-
+                    $this->client = new RobustRouterosClient($config);
                     $lastEx = null;
                     break;
                 } catch (\Throwable $e) {
@@ -92,15 +69,23 @@ class MikrotikApiService
             // Add filters (?) for /print queries, or (=) equal parameters for /set, /remove, /enable, /disable
             foreach ($filters as $key => $value) {
                 if ($isPrint) {
-                    $query->where($key, $value);
+                    $cleanKey = ltrim((string) $key, '?');
+                    $query->where($cleanKey, (string) $value);
                 } else {
-                    $query->equal($key, $value);
+                    $cleanKey = ltrim((string) $key, '=');
+                    $query->equal($cleanKey, (string) $value);
                 }
             }
 
             // Add parameters (=)
             foreach ($params as $key => $value) {
-                $query->equal($key, $value);
+                $strKey = (string) $key;
+                if ($isPrint && str_starts_with($strKey, '?')) {
+                    $query->where(substr($strKey, 1), (string) $value);
+                } else {
+                    $cleanKey = ltrim($strKey, '=');
+                    $query->equal($cleanKey, (string) $value);
+                }
             }
 
             $response = $this->client->query($query)->read();
@@ -109,6 +94,11 @@ class MikrotikApiService
         } catch (Exception $e) {
             return 'Error: '.$e->getMessage();
         }
+    }
+
+    public function comm(string $command, array $params = [])
+    {
+        return $this->executeCommand($command, $params);
     }
 
     /**
