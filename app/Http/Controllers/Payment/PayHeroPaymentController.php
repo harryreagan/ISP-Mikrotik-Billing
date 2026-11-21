@@ -559,10 +559,9 @@ class PayHeroPaymentController extends Controller
               ->orWhereNotNull('vpn_ip')
               ->orWhereNotNull('last_known_ip');
         });
+        $routersQuery->where('tenant_id', $tenantId);
         if ($routerId) {
             $routersQuery->where('id', $routerId);
-        } else {
-            $routersQuery->where('tenant_id', $tenantId);
         }
         $routers = $routersQuery->get();
 

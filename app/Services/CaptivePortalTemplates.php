@@ -2569,6 +2569,35 @@ HTML;
             } catch (\Throwable $e) {}
         }
 
+        // Guard: Ensure Hotspot server profile uses http-pap and user profiles disable transparent-proxy
+        try {
+            $hsprofName = 'hsmart-hsprof';
+            $profs = $api->executeCommand('/ip/hotspot/profile/print');
+            if (is_array($profs)) {
+                foreach ($profs as $pr) {
+                    if (($pr['name'] ?? '') === $hsprofName) {
+                        $api->executeCommand('/ip/hotspot/profile/set', [
+                            'hotspot-address'   => '10.5.50.1',
+                            'dns-name'          => 'hotspot.hsmart.lan',
+                            'login-by'          => 'http-pap',
+                        ], ['.id' => $pr['.id']]);
+                        break;
+                    }
+                }
+            }
+            $userProfs = $api->executeCommand('/ip/hotspot/user/profile/print');
+            if (is_array($userProfs)) {
+                foreach ($userProfs as $upr) {
+                    if (!empty($upr['.id']) && ($upr['transparent-proxy'] ?? '') === 'true') {
+                        $api->executeCommand('/ip/hotspot/user/profile/set', [
+                            'transparent-proxy' => 'no',
+                            'open-status-page'  => 'http-login',
+                        ], ['.id' => $upr['.id']]);
+                    }
+                }
+            }
+        } catch (\Throwable $ge) {}
+
         // Clear unauthorized hotspot hosts so phones immediately reload the new Captive Portal design
         try {
             $hosts = $api->executeCommand('/ip/hotspot/host/print');
