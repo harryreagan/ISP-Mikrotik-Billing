@@ -970,8 +970,16 @@ class PrepaidUsersHub extends Component
 
                 if (is_array($existing) && !empty($existing[0]['.id'])) {
                     $api->executeCommand('/ip/hotspot/user/set', $payload, ['.id' => $existing[0]['.id']]);
+                    try {
+                        $api->executeCommand('/ip/hotspot/user/reset-counters', [], ['.id' => $existing[0]['.id']]);
+                    } catch (\Throwable $rce) {}
                 } else {
-                    $api->executeCommand('/ip/hotspot/user/add', $payload);
+                    $addRes = $api->executeCommand('/ip/hotspot/user/add', $payload);
+                    try {
+                        if (is_array($addRes) && !empty($addRes['after']['ret'])) {
+                            $api->executeCommand('/ip/hotspot/user/reset-counters', [], ['.id' => $addRes['after']['ret']]);
+                        }
+                    } catch (\Throwable $rce) {}
                 }
             } else {
                 $existing = $api->executeCommand('/ppp/secret/print', [], ['name' => $user->username]);

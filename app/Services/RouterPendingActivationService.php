@@ -141,8 +141,16 @@ class RouterPendingActivationService
                     // Update user
                     $userPayload['.id'] = $matchedUser['.id'];
                     $api->executeCommand('/ip/hotspot/user/set', $userPayload);
+                    try {
+                        $api->executeCommand('/ip/hotspot/user/reset-counters', [], ['.id' => $matchedUser['.id']]);
+                    } catch (\Throwable $rce) {}
                 } else {
-                    $api->executeCommand('/ip/hotspot/user/add', $userPayload);
+                    $addRes = $api->executeCommand('/ip/hotspot/user/add', $userPayload);
+                    try {
+                        if (is_array($addRes) && !empty($addRes['after']['ret'])) {
+                            $api->executeCommand('/ip/hotspot/user/reset-counters', [], ['.id' => $addRes['after']['ret']]);
+                        }
+                    } catch (\Throwable $rce) {}
                 }
 
                 // Remove any stale cookies for this user so uptime is enforced strictly
