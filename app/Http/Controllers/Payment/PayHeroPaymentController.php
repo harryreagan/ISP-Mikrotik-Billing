@@ -674,15 +674,32 @@ class PayHeroPaymentController extends Controller
                     }
                 } catch (\Throwable $ckEx) {}
 
-                // 3. Directly authorize the client session on MikroTik if valid IP is known
-                if ($clientIp && filter_var($clientIp, FILTER_VALIDATE_IP)) {
+                // 3. Directly authorize the client session on MikroTik if valid IP or MAC is known
+                $loginIp = $clientIp && filter_var($clientIp, FILTER_VALIDATE_IP) ? $clientIp : null;
+                $loginMac = $clientMac && preg_match('/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/', $clientMac) ? strtoupper($clientMac) : null;
+
+                if (!$loginIp && $loginMac) {
+                    try {
+                        $hosts = $api->executeCommand('/ip/hotspot/host/print');
+                        if (is_array($hosts)) {
+                            foreach ($hosts as $h) {
+                                if (strtoupper(trim((string)($h['mac-address'] ?? ''))) === $loginMac && !empty($h['address'])) {
+                                    $loginIp = $h['address'];
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (\Throwable $he) {}
+                }
+
+                if ($loginIp) {
                     $loginParams = [
                         'user'     => $code,
                         'password' => $code,
-                        'ip'       => $clientIp,
+                        'ip'       => $loginIp,
                     ];
-                    if ($clientMac && preg_match('/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/', $clientMac)) {
-                        $loginParams['mac-address'] = strtoupper($clientMac);
+                    if ($loginMac) {
+                        $loginParams['mac-address'] = $loginMac;
                     }
                     $api->executeCommand('/ip/hotspot/active/login', $loginParams);
                 }

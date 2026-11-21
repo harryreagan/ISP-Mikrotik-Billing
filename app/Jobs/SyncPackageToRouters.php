@@ -207,7 +207,7 @@ class SyncPackageToRouters implements ShouldQueue
                     } else {
                         $this->execOrFail($api, '/ip/hotspot/user/profile/add', array_merge($profilePayload, [
                             'name'              => $profileName,
-                            'transparent-proxy' => 'yes',
+                            'transparent-proxy' => 'no',
                         ]));
                     }
 
