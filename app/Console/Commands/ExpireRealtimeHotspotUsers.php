@@ -242,8 +242,29 @@ class ExpireRealtimeHotspotUsers extends Command
                     $limitSec = MikrotikDuration::parse($hu['limit-uptime'])['seconds'];
                     $uptimeSec = MikrotikDuration::parse($hu['uptime'])['seconds'];
                     if ($limitSec > 0 && $uptimeSec >= $limitSec) {
-                        $shouldRemoveUser = true;
-                        $removeWhy = 'uptime_reached_' . $uptimeSec . '_ge_' . $limitSec;
+                        // Check if user still has unexpired valid package in DB
+                        $activeSale = HotspotSale::withoutGlobalScopes()
+                            ->where('tenant_id', $router->tenant_id ?: 1)
+                            ->where(fn($q) => $q->where('voucher_code', $uName)->orWhere('username', $uName))
+                            ->whereNotNull('expires_at')
+                            ->where('expires_at', '>', $now)
+                            ->latest('id')
+                            ->first();
+
+                        if ($activeSale) {
+                            $remSec = max(60, $now->diffInSeconds(Carbon::parse($activeSale->expires_at), false));
+                            $newLimit = MikrotikDuration::secondsToMikrotik($remSec);
+                            try {
+                                $api->executeCommand('/ip/hotspot/user/set', [
+                                    '.id'          => $huId,
+                                    'limit-uptime' => $newLimit,
+                                ]);
+                                $api->executeCommand('/ip/hotspot/user/reset-counters', [], ['.id' => $huId]);
+                            } catch (\Throwable $re) {}
+                        } else {
+                            $shouldRemoveUser = true;
+                            $removeWhy = 'uptime_reached_' . $uptimeSec . '_ge_' . $limitSec;
+                        }
                     }
                 }
 

@@ -460,6 +460,8 @@ class DarajaPaymentController extends Controller
             $startedAt = $existingActive->started_at ?: now();
             $expiresAt = Carbon::parse($existingActive->expires_at)->addSeconds($durationSeconds);
             $totalMinutes = (int) $existingActive->duration_minutes + $durationMinutes;
+            $remSeconds = max(60, now()->diffInSeconds($expiresAt, false));
+            $limitUptime = \App\Services\MikrotikDuration::secondsToMikrotik($remSeconds);
         } else {
             $startedAt = now();
             $expiresAt = now()->addSeconds($durationSeconds);
@@ -671,8 +673,16 @@ class DarajaPaymentController extends Controller
                 if ($matchedUser && !empty($matchedUser['.id'])) {
                     $userPayload['.id'] = $matchedUser['.id'];
                     $api->executeCommand('/ip/hotspot/user/set', $userPayload);
+                    try {
+                        $api->executeCommand('/ip/hotspot/user/reset-counters', [], ['.id' => $matchedUser['.id']]);
+                    } catch (\Throwable $rce) {}
                 } else {
-                    $api->executeCommand('/ip/hotspot/user/add', $userPayload);
+                    $addRes = $api->executeCommand('/ip/hotspot/user/add', $userPayload);
+                    try {
+                        if (is_array($addRes) && !empty($addRes['after']['ret'])) {
+                            $api->executeCommand('/ip/hotspot/user/reset-counters', [], ['.id' => $addRes['after']['ret']]);
+                        }
+                    } catch (\Throwable $rce) {}
                 }
 
                 try {

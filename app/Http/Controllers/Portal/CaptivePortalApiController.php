@@ -475,13 +475,28 @@ class CaptivePortalApiController extends Controller
             }
 
             if (empty($existing) || !is_array($existing)) {
-                $api->executeCommand('/ip/hotspot/user/add', [
+                $addRes = $api->executeCommand('/ip/hotspot/user/add', [
                     'name'         => $username,
                     'password'     => $username,
                     'profile'      => $resolvedProfile,
                     'limit-uptime' => $uptimeLimit,
                     'comment'      => 'HSmart Hotspot exp:' . $expiresAt->toDateTimeString(),
                 ]);
+                if (is_array($addRes) && !empty($addRes['after']['ret'])) {
+                    try {
+                        $api->executeCommand('/ip/hotspot/user/reset-counters', [], ['.id' => $addRes['after']['ret']]);
+                    } catch (\Throwable $rce) {}
+                }
+            } else {
+                $api->executeCommand('/ip/hotspot/user/set', [
+                    '.id'          => $existing[0]['.id'],
+                    'profile'      => $resolvedProfile,
+                    'limit-uptime' => $uptimeLimit,
+                    'comment'      => 'HSmart Hotspot exp:' . $expiresAt->toDateTimeString(),
+                ]);
+                try {
+                    $api->executeCommand('/ip/hotspot/user/reset-counters', [], ['.id' => $existing[0]['.id']]);
+                } catch (\Throwable $rce) {}
             }
         } catch (\Throwable $e) {
             Log::warning("[ensureHotspotUserOnRouter] Error for router #{$routerId}: " . $e->getMessage());
