@@ -258,20 +258,11 @@ class PollPrepaidActiveSessionsCommand extends Command
                         }
                     }
                 } catch (\Throwable $e) {
-                    Log::warning("[PollPrepaidActiveSessions] Router #{$router->id} ({$router->name}) unreachable: " . $e->getMessage());
-
-                    // Mark currently online users on unreachable router as offline with 'router offline'
-                    PrepaidUser::withoutGlobalScopes()
-                        ->where('tenant_id', $tenantId)
-                        ->where(function ($q) use ($router) {
-                            $q->where('router_id', $router->id)->orWhere('roaming_router_id', $router->id);
-                        })
-                        ->where('is_online', true)
-                        ->update([
-                            'is_online'            => false,
-                            'status'               => 'offline',
-                            'disconnection_reason' => 'router offline',
-                        ]);
+                    Log::warning("[PollPrepaidActiveSessions] Router #{$router->id} ({$router->name}) poll check delayed: " . $e->getMessage());
+                } finally {
+                    if (isset($api)) {
+                        $api->close();
+                    }
                 }
             }
 

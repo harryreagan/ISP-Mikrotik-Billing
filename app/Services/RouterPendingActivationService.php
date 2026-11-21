@@ -216,6 +216,10 @@ class RouterPendingActivationService
                     'last_error' => $e->getMessage(),
                 ]);
             }
+        } finally {
+            if (isset($api)) {
+                $api->close();
+            }
         }
 
         return $processedCount;

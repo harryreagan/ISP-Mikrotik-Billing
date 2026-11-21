@@ -137,6 +137,10 @@ class PollRouterTelemetryJob implements ShouldQueue
             }
         } catch (\Throwable $e) {
             $this->handleRouterOffline($router, $e->getMessage());
+        } finally {
+            if (isset($api)) {
+                $api->close();
+            }
         }
     }
 

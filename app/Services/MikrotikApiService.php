@@ -15,83 +15,48 @@ class MikrotikApiService
     {
         try {
             $effectiveTimeout = max($timeout, 8);
-            $config = new Config([
-                'host'           => $host,
-                'user'           => $username,
-                'pass'           => $password,
-                'port'           => $port ?? 8728,
-                'timeout'        => $effectiveTimeout,
-                'socket_timeout' => $effectiveTimeout,
-                'attempts'       => 1,
-            ]);
+            $targetPort = (int) ($port ?: 8728);
 
             $attempts = 2;
             $lastEx = null;
 
             for ($attempt = 1; $attempt <= $attempts; $attempt++) {
                 try {
-                    // Instantiate Client without autoConnect so we control the login handshake
-                    $client = new Client($config, false);
-
-                    $refMethod = new \ReflectionMethod(Client::class, 'openSocket');
-                    $refMethod->setAccessible(true);
-                    $refMethod->invoke($client);
-
-                    $socket = $client->getSocket();
-                    if (!$socket) {
-                        throw new Exception('Socket connection failed to ' . $host . ':' . $port);
-                    }
-
-                    $stream = new \RouterOS\Streams\ResourceStream($socket);
-                    $stream->setThrowTimeoutException($config->get('throw_timeout_exception'));
-
-                    $refProp = new \ReflectionProperty(Client::class, 'connector');
-                    $refProp->setAccessible(true);
-                    $refProp->setValue($client, new \RouterOS\APIConnector($stream));
-
-                    $user = (string) $username;
-                    $pass = (string) $password;
-
-                    // 1. Initial /login handshake query (RouterOS v6 & v7)
-                    $handshake = $client->query(new Query('/login'))->read(false);
-                    $salt = null;
-                    if (is_array($handshake)) {
-                        foreach ($handshake as $line) {
-                            if (is_string($line) && str_starts_with($line, '=ret=')) {
-                                $salt = substr($line, 5);
-                                break;
-                            }
-                        }
-                    }
-
-                    // 2. Modern login with plaintext credentials (RouterOS v6.43+ and v7)
-                    $qModern = new Query('/login', [
-                        '=name=' . $user,
-                        '=password=' . $pass,
+                    // Try modern auth first (RouterOS v6.43+ and RouterOS v7)
+                    $config = new Config([
+                        'host'           => $host,
+                        'user'           => (string) $username,
+                        'pass'           => (string) $password,
+                        'port'           => $targetPort,
+                        'timeout'        => $effectiveTimeout,
+                        'socket_timeout' => $effectiveTimeout,
+                        'attempts'       => 1,
+                        'delay'          => 1,
+                        'legacy'         => false,
                     ]);
-                    $resp = $client->query($qModern)->read(false);
 
-                    // 3. Fallback to legacy MD5 challenge if !trap returned and salt present (pre-6.43)
-                    if (is_array($resp) && isset($resp[0]) && $resp[0] === '!trap' && $salt) {
-                        $qLegacy = new Query('/login', [
-                            '=name=' . $user,
-                            '=response=00' . md5(chr(0) . $pass . pack('H*', $salt)),
-                        ]);
-                        $resp = $client->query($qLegacy)->read(false);
-                    }
-
-                    if (is_array($resp) && isset($resp[0]) && $resp[0] === '!trap') {
-                        $msg = 'Invalid username or password';
-                        foreach ($resp as $w) {
-                            if (is_string($w) && str_starts_with($w, '=message=')) {
-                                $msg = substr($w, 9);
-                                break;
-                            }
+                    try {
+                        $this->client = new Client($config);
+                    } catch (\Throwable $modernEx) {
+                        // If modern auth failed, attempt legacy pre-6.43 auth fallback
+                        try {
+                            $configLegacy = new Config([
+                                'host'           => $host,
+                                'user'           => (string) $username,
+                                'pass'           => (string) $password,
+                                'port'           => $targetPort,
+                                'timeout'        => $effectiveTimeout,
+                                'socket_timeout' => $effectiveTimeout,
+                                'attempts'       => 1,
+                                'delay'          => 1,
+                                'legacy'         => true,
+                            ]);
+                            $this->client = new Client($configLegacy);
+                        } catch (\Throwable $legacyEx) {
+                            throw $modernEx;
                         }
-                        throw new Exception('MikroTik API authentication failed: ' . $msg);
                     }
 
-                    $this->client = $client;
                     $lastEx = null;
                     break;
                 } catch (\Throwable $e) {
@@ -144,5 +109,28 @@ class MikrotikApiService
         } catch (Exception $e) {
             return 'Error: '.$e->getMessage();
         }
+    }
+
+    /**
+     * Explicitly close API socket stream to prevent router socket pool exhaustion
+     */
+    public function close(): void
+    {
+        if ($this->client) {
+            try {
+                $refProp = new \ReflectionProperty(Client::class, 'socket');
+                $refProp->setAccessible(true);
+                $sock = $refProp->getValue($this->client);
+                if (is_resource($sock)) {
+                    @fclose($sock);
+                }
+            } catch (\Throwable $e) {}
+            $this->client = null;
+        }
+    }
+
+    public function __destruct()
+    {
+        $this->close();
     }
 }

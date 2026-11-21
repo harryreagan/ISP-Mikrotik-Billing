@@ -239,7 +239,7 @@ class ExpireRealtimeHotspotUsers extends Command
 
                 // Safety override: Never disconnect if user or device has any active, unexpired package in DB
                 if ($shouldDisconnect) {
-                    $hasActiveSale = HotspotSale::withoutGlobalScopes()
+                    $hasActivePackage = HotspotSale::withoutGlobalScopes()
                         ->where('tenant_id', $router->tenant_id ?: 1)
                         ->whereIn('status', ['completed', 'active', 'pending_router'])
                         ->where(function ($q) use ($username, $sessMac) {
@@ -253,7 +253,21 @@ class ExpireRealtimeHotspotUsers extends Command
                         ->where('expires_at', '>', $now)
                         ->exists();
 
-                    if ($hasActiveSale) {
+                    if (!$hasActivePackage) {
+                        $hasActivePackage = PrepaidUser::withoutGlobalScopes()
+                            ->where('tenant_id', $router->tenant_id ?: 1)
+                            ->where(function ($q) use ($username, $sessMac) {
+                                $q->where('username', $username);
+                                if ($sessMac !== '') {
+                                    $q->orWhere('mac_address', $sessMac);
+                                }
+                            })
+                            ->whereNotNull('expires_at')
+                            ->where('expires_at', '>', $now)
+                            ->exists();
+                    }
+
+                    if ($hasActivePackage) {
                         $shouldDisconnect = false;
                     }
                 }
@@ -350,6 +364,15 @@ class ExpireRealtimeHotspotUsers extends Command
                         ->where('expires_at', '>', $now)
                         ->exists();
 
+                    if (!$hasActivePackage) {
+                        $hasActivePackage = PrepaidUser::withoutGlobalScopes()
+                            ->where('tenant_id', $router->tenant_id ?: 1)
+                            ->where('username', $uName)
+                            ->whereNotNull('expires_at')
+                            ->where('expires_at', '>', $now)
+                            ->exists();
+                    }
+
                     if ($hasActivePackage) {
                         $shouldRemoveUser = false;
                     }
@@ -394,9 +417,25 @@ class ExpireRealtimeHotspotUsers extends Command
                 }
 
                 if ($commentExpired || ($ibMac !== '' && isset($expiredMacs[$ibMac])) || ($ibAddr !== '' && isset($expiredIps[$ibAddr]))) {
-                    $api->executeCommand('/ip/hotspot/ip-binding/remove', [], ['.id' => $ibId]);
-                    if ($ibMac !== '') {
-                        $expiredMacs[$ibMac] = true;
+                    $hasActiveDevice = ($ibMac !== '' && (
+                        HotspotSale::withoutGlobalScopes()
+                            ->where('tenant_id', $router->tenant_id ?: 1)
+                            ->where('mac_address', $ibMac)
+                            ->whereIn('status', ['completed', 'active', 'paid'])
+                            ->where('expires_at', '>', $now)
+                            ->exists()
+                        || PrepaidUser::withoutGlobalScopes()
+                            ->where('tenant_id', $router->tenant_id ?: 1)
+                            ->where('mac_address', $ibMac)
+                            ->where('expires_at', '>', $now)
+                            ->exists()
+                    ));
+
+                    if (!$hasActiveDevice) {
+                        $api->executeCommand('/ip/hotspot/ip-binding/remove', [], ['.id' => $ibId]);
+                        if ($ibMac !== '') {
+                            $expiredMacs[$ibMac] = true;
+                        }
                     }
                 }
             }
@@ -438,6 +477,10 @@ class ExpireRealtimeHotspotUsers extends Command
             }
         } catch (\Throwable $e) {
             Log::warning("[hotspot:expire] Router {$router->name} audit failed: " . $e->getMessage());
+        } finally {
+            if (isset($api)) {
+                $api->close();
+            }
         }
     }
 

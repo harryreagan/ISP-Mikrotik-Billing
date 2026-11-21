@@ -521,7 +521,25 @@ class PrepaidUsersHub extends Component
             if ($router) {
                 $err = $this->provisionPrepaidUserOnRouter($user->fresh(), $router, $pkg, $limitUptime);
                 if ($err) {
-                    $errors[] = "{$user->username}: {$err}";
+                    try {
+                        app(RouterPendingActivationService::class)->queuePendingActivation(
+                            tenantId: $tenantId,
+                            routerId: $router->id,
+                            voucherCode: $user->username,
+                            username: $user->username,
+                            password: $user->password ?: $user->username,
+                            profile: $pkg?->package ?: 'default',
+                            limitUptime: $limitUptime,
+                            clientIp: $user->ip_address,
+                            clientMac: $user->mac_address,
+                            expiresAt: $user->expires_at,
+                            saleId: $user->hotspot_sale_id,
+                            initialError: $err
+                        );
+                        $errors[] = "{$user->username}: Queued for background router update ({$err})";
+                    } catch (\Throwable $qe) {
+                        $errors[] = "{$user->username}: {$err}";
+                    }
                 }
             }
             $count++;
@@ -855,6 +873,10 @@ class PrepaidUsersHub extends Component
         } catch (\Throwable $e) {
             Log::warning("[PrepaidUsersHub] syncSingleRouter failed on {$router->name}: " . $e->getMessage());
             $this->errorMessage = "Could not connect to router '{$router->name}': " . $e->getMessage();
+        } finally {
+            if (isset($api)) {
+                $api->close();
+            }
         }
         return $synced;
     }
@@ -1000,6 +1022,10 @@ class PrepaidUsersHub extends Component
             return null;
         } catch (\Throwable $e) {
             return $e->getMessage();
+        } finally {
+            if (isset($api)) {
+                $api->close();
+            }
         }
     }
 
@@ -1050,6 +1076,10 @@ class PrepaidUsersHub extends Component
             return null;
         } catch (\Throwable $e) {
             return $e->getMessage();
+        } finally {
+            if (isset($api)) {
+                $api->close();
+            }
         }
     }
 
@@ -1097,6 +1127,10 @@ class PrepaidUsersHub extends Component
             return null;
         } catch (\Throwable $e) {
             return $e->getMessage();
+        } finally {
+            if (isset($api)) {
+                $api->close();
+            }
         }
     }
 
