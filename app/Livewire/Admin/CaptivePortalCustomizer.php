@@ -12,7 +12,7 @@ use Livewire\Component;
 
 class CaptivePortalCustomizer extends Component
 {
-    // Design Template Choice (8 catalog choices)
+    // Design Template Choice (11 catalog choices)
     public string $template = 'midnight';
 
     // Branding & Identity

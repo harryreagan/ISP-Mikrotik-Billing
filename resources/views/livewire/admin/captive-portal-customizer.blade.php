@@ -2,7 +2,7 @@
     {{-- Header --}}
     <x-ui.page-header
         title="Captive portal brand customizer"
-        subtitle="Select from 8 crafted designs, customize your branding, and deploy directly to your MikroTik routers."
+        subtitle="Select from 11 crafted designs (including Christmas festive, side-by-side packages & ambient glow), customize your branding, and deploy directly to your MikroTik routers."
     >
         <x-slot:actions>
             <a href="{{ route('captive-portal.preview', ['template' => $template]) }}" target="_blank" class="btn btn-outline-primary me-2">
@@ -48,7 +48,7 @@
         <div class="card-header d-flex justify-content-between align-items-center">
             <div>
                 <h5 class="ui-section-title mb-0"><i class="bi bi-grid-fill text-orange-500 me-2"></i>Choose a Design</h5>
-                <small class="text-muted">Select any of the 8 responsive layouts. All your branding and packages automatically adapt.</small>
+                <small class="text-muted">Select any of the 11 responsive layouts. All your branding and packages automatically adapt.</small>
             </div>
             <span class="badge bg-primary">Active: {{ ucfirst($template) }}</span>
         </div>

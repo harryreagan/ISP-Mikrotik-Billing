@@ -10,61 +10,82 @@ class CaptivePortalTemplates
     public static function catalog(): array
     {
         return [
+            'christmas' => [
+                'name'      => 'Christmas Festive',
+                'vibe'      => 'Pine green & crimson backdrop, gentle CSS snowfall, festive holiday ribbon, and golden gift-tier cards.',
+                'gradient'  => 'radial-gradient(ellipse at 50% 20%, #0d3a2b 0%, #061e16 60%, #020f0a 100%)',
+                'accent'    => '#dc2626',
+                'textColor' => '#ffffff',
+            ],
             'midnight' => [
-                'name'      => 'Midnight',
-                'vibe'      => 'Dark background with vibrant plan tags. Modern tech and cyber aesthetic.',
-                'gradient'  => 'linear-gradient(135deg, #0b0f19 0%, #1e293b 100%)',
+                'name'      => 'Midnight Cyber',
+                'vibe'      => 'Obsidian black canvas with ambient radial orange/amber back-glow, glowing side-by-side cards, and telemetry.',
+                'gradient'  => 'linear-gradient(135deg, #07090e 0%, #0f172a 100%)',
                 'accent'    => '#ff6600',
                 'textColor' => '#ffffff',
             ],
             'glass' => [
-                'name'      => 'Glass',
-                'vibe'      => 'Frosted-glass panel over a deep purple-indigo gradient, rounded 26px.',
-                'gradient'  => 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #db2777 100%)',
+                'name'      => 'Aurora Glass',
+                'vibe'      => 'Frosted glassmorphism over vibrant purple-cyan mesh gradient, blurred refraction, and floating orbs.',
+                'gradient'  => 'linear-gradient(135deg, #312e81 0%, #4c1d95 40%, #0369a1 80%, #0f766e 100%)',
                 'accent'    => '#6366f1',
                 'textColor' => '#ffffff',
             ],
-            'minimal' => [
-                'name'      => 'Minimal',
-                'vibe'      => 'Clean off-white canvas, soft diffuse shadow, Apple-like system typography.',
-                'gradient'  => 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-                'accent'    => '#0284c7',
-                'textColor' => '#0f172a',
+            'hotel' => [
+                'name'      => 'Resort & Hotel',
+                'vibe'      => 'Luxury hospitality suite in warm alabaster, golden champagne accents, Playfair serif typography, and guest concierge pass.',
+                'gradient'  => 'linear-gradient(135deg, #fdfbf7 0%, #f3ede2 100%)',
+                'accent'    => '#b45309',
+                'textColor' => '#292524',
+            ],
+            'voucher' => [
+                'name'      => 'Voucher Express',
+                'vibe'      => 'Kiosk scratch-card first layout with prominent fast-pass ticket hero, high-contrast inputs, and side-by-side M-Pesa fallbacks.',
+                'gradient'  => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                'accent'    => '#ea580c',
+                'textColor' => '#ffffff',
             ],
             'neon' => [
-                'name'      => 'Neon',
-                'vibe'      => 'Near-black canvas, monospace typography, glowing borders and text shadows.',
-                'gradient'  => 'linear-gradient(135deg, #050508 0%, #111118 100%)',
-                'accent'    => '#10b981',
-                'textColor' => '#10b981',
+                'name'      => 'Neon Cyberpunk',
+                'vibe'      => 'Pure OLED black, laser cyan & magenta scanlines, monospace terminal telemetry, and high-voltage glowing borders.',
+                'gradient'  => 'linear-gradient(135deg, #040406 0%, #0c0c14 100%)',
+                'accent'    => '#00f3ff',
+                'textColor' => '#00f3ff',
+            ],
+            'split' => [
+                'name'      => 'Dual Split Hero',
+                'vibe'      => 'Asymmetric dual-column desk hero with live speed gauge and carrier perks on the left, 2-column checkout on the right.',
+                'gradient'  => 'linear-gradient(135deg, #0284c7 0%, #1d4ed8 100%)',
+                'accent'    => '#0284c7',
+                'textColor' => '#ffffff',
             ],
             'sunset' => [
-                'name'      => 'Sunset',
-                'vibe'      => 'Warm orange-pink-purple gradient with big 30px rounded white friendly card.',
-                'gradient'  => 'linear-gradient(135deg, #f97316 0%, #ec4899 50%, #8b5cf6 100%)',
+                'name'      => 'Savannah Sunset',
+                'vibe'      => 'Warm African sunset gradient with soft pebble cards, sunny amber tags, and friendly energetic vibe.',
+                'gradient'  => 'linear-gradient(135deg, #f97316 0%, #ec4899 50%, #7c3aed 100%)',
                 'accent'    => '#f97316',
                 'textColor' => '#ffffff',
             ],
+            'minimal' => [
+                'name'      => 'Starlink Minimal',
+                'vibe'      => 'Ultra-refined Scandinavian monochrome, razor-thin borders, clean radio side-by-side pills, and crisp contrast.',
+                'gradient'  => 'linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%)',
+                'accent'    => '#0f172a',
+                'textColor' => '#0f172a',
+            ],
             'corporate' => [
-                'name'      => 'Corporate',
-                'vibe'      => 'Crisp 8px card, solid primary header block with logo, white body for hotels & offices.',
-                'gradient'  => 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)',
-                'accent'    => '#1d4ed8',
+                'name'      => 'Enterprise Campus',
+                'vibe'      => 'Corporate navy dual-tone header, verified security badge, solid tabular side-by-side cards for offices and co-working.',
+                'gradient'  => 'linear-gradient(135deg, #1e3a8a 0%, #172554 100%)',
+                'accent'    => '#2563eb',
                 'textColor' => '#ffffff',
             ],
             'cafe' => [
-                'name'      => 'Cafe',
-                'vibe'      => 'Warm cream paper background, Georgia serif, dashed border cards and outlined tags.',
-                'gradient'  => 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                'accent'    => '#b45309',
+                'name'      => 'Artisan Cafe',
+                'vibe'      => 'Warm parchment paper, Georgia serif headings, dashed stitching borders, and cozy coffeehouse warmth.',
+                'gradient'  => 'linear-gradient(135deg, #fdf8ed 0%, #fef3c7 100%)',
+                'accent'    => '#854d0e',
                 'textColor' => '#451a03',
-            ],
-            'split' => [
-                'name'      => 'Split',
-                'vibe'      => 'Dual-column hero layout with brand showcase on left, checkout on right.',
-                'gradient'  => 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)',
-                'accent'    => '#2563eb',
-                'textColor' => '#ffffff',
             ],
         ];
     }
@@ -89,7 +110,11 @@ class CaptivePortalTemplates
 
         $tenantId       = (int)($s->tenant_id ?? 1);
         $routerId       = (int)($s->router_id ?? 0);
-        $defaultBrand   = (function_exists('siteUrlSettings') ? siteUrlSettings('site_name') : null) ?: 'HSmart WiFi';
+        try {
+            $defaultBrand = (function_exists('siteUrlSettings') ? siteUrlSettings('site_name') : null) ?: 'HSmart WiFi';
+        } catch (\Throwable $e) {
+            $defaultBrand = 'HSmart WiFi';
+        }
         $brandName      = htmlspecialchars(!empty($s->brand_name) && strtolower($s->brand_name) !== 'high-speed wifi' ? $s->brand_name : $defaultBrand, ENT_QUOTES, 'UTF-8');
         $headline       = htmlspecialchars($s->headline ?? 'Welcome to Fast Internet', ENT_QUOTES, 'UTF-8');
         $subheadline    = htmlspecialchars($s->subheadline ?? 'Choose a package and pay via M-Pesa for instant connection.', ENT_QUOTES, 'UTF-8');
@@ -104,7 +129,11 @@ class CaptivePortalTemplates
         $buttonTextCol  = self::getContrastColor($primaryColor);
 
         // Validate URLs (http / https only)
-        $logoUrl        = self::sanitizeUrl($s->logo_url ?? null) ?: (function_exists('asset') ? asset('images/hsmart-isp-logo.svg') : '/images/hsmart-isp-logo.svg');
+        try {
+            $logoUrl    = self::sanitizeUrl($s->logo_url ?? null) ?: (function_exists('asset') ? asset('images/hsmart-isp-logo.svg') : '/images/hsmart-isp-logo.svg');
+        } catch (\Throwable $e) {
+            $logoUrl    = '/images/hsmart-isp-logo.svg';
+        }
         $backgroundUrl  = self::sanitizeUrl($s->background_url ?? null);
 
         // Normalize packages list
@@ -164,22 +193,33 @@ class CaptivePortalTemplates
         // 2. Generate Template Specific Styles
         $templateCss = self::getTemplateStyles($templateKey, $primaryColor, $secondaryColor, $buttonTextCol, $backgroundUrl);
 
-        // 3. Render Packages Cards HTML
+        // 3. Render Packages Cards HTML (Responsive 2-Column Side-By-Side Grid)
         $packagesHtml = '';
         foreach ($packagesList as $idx => $pkg) {
             $selectedClass = ($idx === 0) ? 'selected' : '';
             $rawJsName = addslashes(htmlspecialchars_decode((string) $pkg['name'], ENT_QUOTES));
             $tvBadgeHtml = !empty($pkg['includes_tv'])
-                ? '<div style="margin-top:3px;"><span style="display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:700; background:#4f46e5; color:#ffffff; padding:2px 7px; border-radius:999px;">📺 ' . $pkg['tv_channels'] . '</span></div>'
+                ? '<div class="plan-tv-badge"><span>📺 ' . $pkg['tv_channels'] . '</span></div>'
                 : '';
+
+            $durationStr = htmlspecialchars((string)$pkg['duration'], ENT_QUOTES, 'UTF-8');
+            $speedStr = htmlspecialchars((string)$pkg['speed'], ENT_QUOTES, 'UTF-8');
+            $priceAmt = htmlspecialchars((string)$pkg['price'], ENT_QUOTES, 'UTF-8');
+            $nameStr = htmlspecialchars((string)$pkg['name'], ENT_QUOTES, 'UTF-8');
+
             $packagesHtml .= <<<CARD
-            <div class="plan-card {$selectedClass}" data-id="{$pkg['id']}" data-price="{$pkg['price']}" data-name="{$pkg['name']}" onclick="selectPlan(this, '{$pkg['id']}', '{$pkg['price']}', '{$rawJsName}')" style="cursor: pointer; -webkit-tap-highlight-color: transparent;">
-                <div class="plan-details">
-                    <div class="plan-name">{$pkg['name']}</div>
-                    <div class="plan-meta">{$pkg['duration']} &bull; {$pkg['speed']}</div>
-                    {$tvBadgeHtml}
+            <div class="plan-card {$selectedClass}" data-id="{$pkg['id']}" data-price="{$priceAmt}" data-name="{$nameStr}" onclick="selectPlan(this, '{$pkg['id']}', '{$priceAmt}', '{$rawJsName}')" style="cursor: pointer; -webkit-tap-highlight-color: transparent;">
+                <div class="plan-top-row">
+                    <span class="plan-pill-duration">{$durationStr}</span>
+                    <span class="plan-pill-speed">⚡ {$speedStr}</span>
                 </div>
-                <div class="plan-price">KES {$pkg['price']}</div>
+                <div class="plan-price-row">
+                    <span class="plan-cur">KES</span>
+                    <span class="plan-val">{$priceAmt}</span>
+                </div>
+                <div class="plan-title" title="{$nameStr}">{$nameStr}</div>
+                {$tvBadgeHtml}
+                <div class="plan-check-dot"></div>
             </div>
 CARD;
         }
@@ -194,6 +234,39 @@ CARD;
             : "<div class=\"brand-badge\"><span class=\"brand-icon\">⚡</span><span class=\"brand-title\">{$brandName}</span></div>";
 
         $whatsappLink = $supportWa ? "https://wa.me/{$supportWa}?text=Hello%20support%20I%20need%20help%20connecting" : '#';
+
+        // Template-specific decorative badges and snowfall particles
+        $snowflakesHtml = ($templateKey === 'christmas')
+            ? <<<SNOW
+<div class="snowflakes" aria-hidden="true">
+    <div class="snowflake">❅</div>
+    <div class="snowflake">❆</div>
+    <div class="snowflake">❅</div>
+    <div class="snowflake">❄</div>
+    <div class="snowflake">❅</div>
+    <div class="snowflake">❆</div>
+    <div class="snowflake">❄</div>
+    <div class="snowflake">❅</div>
+    <div class="snowflake">❆</div>
+    <div class="snowflake">❄</div>
+</div>
+SNOW
+            : '';
+
+        $headerExtraHtml = '';
+        if ($templateKey === 'christmas') {
+            $headerExtraHtml = '<div class="festive-ribbon"><span class="ribbon-icon">🎄</span><span>Holiday Special • High-Speed WiFi</span><span class="ribbon-icon">🎅</span></div>';
+        } elseif ($templateKey === 'hotel') {
+            $headerExtraHtml = '<div class="hotel-concierge-badge"><span>🏛️ Guest Concierge Access • High-Speed Pass</span></div>';
+        } elseif ($templateKey === 'corporate') {
+            $headerExtraHtml = '<div class="corp-verified-badge"><span>🛡️ Verified Enterprise Hotspot • Encrypted</span></div>';
+        } elseif ($templateKey === 'cafe') {
+            $headerExtraHtml = '<div class="cafe-stamp-badge"><span>☕ Artisan Roasters WiFi • Complimentary Guest Access</span></div>';
+        } elseif ($templateKey === 'neon') {
+            $headerExtraHtml = '<div class="neon-telemetry-badge"><span>[PORTAL: ONLINE] [STATUS: 100% OPERATIONAL]</span></div>';
+        } elseif ($templateKey === 'midnight') {
+            $headerExtraHtml = '<div class="telemetry-badge"><span class="pulse-dot"></span><span>5G Hotspot • Live &amp; Automated</span></div>';
+        }
 
         // 4. Return Full Self-Contained Document
         return <<<HTML
@@ -216,21 +289,132 @@ CARD;
 
         {$templateCss}
 
-        /* Common Functional Elements */
-        .plan-cards { display: flex; flex-direction: column; gap: 10px; margin: 18px 0; }
+        /* Common Functional Elements & Side-by-Side Responsive Grid */
+        .plan-cards {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 18px 0;
+            perspective: 800px;
+        }
+        @media (max-width: 360px) {
+            .plan-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+        /* Ambient Dimming: non-hovered & non-selected cards dim down when interacting */
+        .plan-cards:hover .plan-card:not(:hover):not(.selected) {
+            opacity: 0.52;
+            filter: grayscale(18%);
+            transform: scale(0.98);
+        }
         .plan-card {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 100px;
+            padding: 12px 11px;
+            border-radius: 14px;
+            cursor: pointer;
+            text-align: left;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+                        opacity 0.22s ease,
+                        filter 0.22s ease,
+                        box-shadow 0.22s ease,
+                        border-color 0.22s ease,
+                        background 0.22s ease;
+        }
+        .plan-card:hover {
+            transform: translateY(-2px);
+            z-index: 2;
+        }
+        .plan-card.selected {
+            transform: scale(1.02);
+            z-index: 3;
+        }
+        .plan-top-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 14px 16px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
+            gap: 4px;
+            margin-bottom: 5px;
         }
-        .plan-name { font-weight: 700; font-size: 15px; }
-        .plan-meta { font-size: 12px; margin-top: 2px; }
-        .plan-price { font-weight: 800; font-size: 16px; white-space: nowrap; }
+        .plan-pill-duration {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.16);
+            white-space: nowrap;
+        }
+        .plan-pill-speed {
+            font-size: 10px;
+            font-weight: 700;
+            opacity: 0.85;
+            white-space: nowrap;
+        }
+        .plan-price-row {
+            display: flex;
+            align-items: baseline;
+            gap: 3px;
+            margin-bottom: 2px;
+        }
+        .plan-cur {
+            font-size: 11px;
+            font-weight: 800;
+            opacity: 0.75;
+            letter-spacing: 0.5px;
+        }
+        .plan-val {
+            font-size: 21px;
+            font-weight: 900;
+            line-height: 1.1;
+            letter-spacing: -0.5px;
+        }
+        .plan-title {
+            font-size: 11.5px;
+            font-weight: 600;
+            line-height: 1.25;
+            opacity: 0.9;
+            margin-top: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .plan-tv-badge {
+            margin-top: 4px;
+        }
+        .plan-tv-badge span {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 9.5px;
+            font-weight: 700;
+            background: #6366f1;
+            color: #ffffff;
+            padding: 1px 6px;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+        .plan-check-dot {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: transparent;
+            border: 1.5px solid rgba(148, 163, 184, 0.4);
+            transition: all 0.2s ease;
+        }
+        .plan-card.selected .plan-check-dot {
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 0 8px var(--primary);
+        }
 
         /* Payment Form */
         .form-group { margin-bottom: 14px; text-align: left; }
@@ -280,11 +464,14 @@ CARD;
 </head>
 <body class="tpl-{$templateKey}">
 
+{$snowflakesHtml}
+
 <div class="portal-container">
     <div class="portal-card">
         
         <!-- Header -->
         <div class="portal-header">
+            {$headerExtraHtml}
             {$logoHtml}
             <h1 class="portal-headline">{$headline}</h1>
             <p class="portal-subheadline">{$subheadline}</p>
@@ -1093,53 +1280,321 @@ HTML;
         $bgImageRule = $bgUrl ? "background-image: url('{$bgUrl}'); background-size: cover; background-position: center;" : "";
 
         switch ($key) {
-            case 'glass':
+            case 'christmas':
                 return <<<CSS
-                body.tpl-glass {
-                    background: linear-gradient(135deg, #312e81 0%, #4c1d95 50%, #831843 100%);
+                body.tpl-christmas {
+                    background: radial-gradient(ellipse at 50% 15%, #0e3a2b 0%, #072218 55%, #03120c 100%);
                     {$bgImageRule}
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                     color: #ffffff;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    padding: 20px;
+                    padding: 24px 16px;
+                    position: relative;
+                    min-height: 100vh;
+                    overflow-x: hidden;
+                }
+                .tpl-christmas .portal-container { width: 100%; max-width: 450px; margin: 0 auto; position: relative; z-index: 10; }
+                .tpl-christmas .portal-card {
+                    background: rgba(10, 39, 29, 0.94);
+                    backdrop-filter: blur(16px);
+                    -webkit-backdrop-filter: blur(16px);
+                    border: 1.5px solid rgba(251, 191, 36, 0.35);
+                    border-radius: 24px;
+                    padding: 30px 22px;
+                    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.55), 0 0 40px rgba(13, 148, 86, 0.15);
+                    position: relative;
+                }
+                .tpl-christmas .festive-ribbon {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%);
+                    color: #fef08a;
+                    font-size: 11.5px;
+                    font-weight: 800;
+                    padding: 5px 14px;
+                    border-radius: 999px;
+                    border: 1px solid rgba(254, 240, 138, 0.4);
+                    box-shadow: 0 4px 12px rgba(185, 28, 28, 0.4);
+                    margin-bottom: 12px;
+                    letter-spacing: 0.3px;
+                    animation: ribbonPulse 2.5s infinite alternate;
+                }
+                @keyframes ribbonPulse {
+                    0% { transform: scale(1); }
+                    100% { transform: scale(1.03); }
+                }
+                .tpl-christmas .portal-header { text-align: center; margin-bottom: 18px; }
+                .tpl-christmas .brand-logo { max-height: 48px; max-width: 180px; margin-bottom: 10px; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4)); }
+                .tpl-christmas .brand-badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 20px; color: #fef08a; margin-bottom: 10px; }
+                .tpl-christmas .portal-headline { font-size: 21px; font-weight: 800; color: #ffffff; letter-spacing: -0.3px; }
+                .tpl-christmas .portal-subheadline { font-size: 13px; color: #a7f3d0; margin-top: 5px; }
+
+                .tpl-christmas .plan-card {
+                    background: rgba(6, 78, 59, 0.45);
+                    border: 1.5px solid rgba(251, 191, 36, 0.22);
+                    color: #ffffff;
+                }
+                .tpl-christmas .plan-pill-duration {
+                    background: rgba(251, 191, 36, 0.18);
+                    color: #fef08a;
+                }
+                .tpl-christmas .plan-pill-speed {
+                    color: #6ee7b7;
+                }
+                .tpl-christmas .plan-cur {
+                    color: #fef08a;
+                }
+                .tpl-christmas .plan-val {
+                    color: #ffffff;
+                }
+                .tpl-christmas .plan-card.selected {
+                    border-color: #fbbf24;
+                    background: linear-gradient(135deg, rgba(185, 28, 28, 0.4) 0%, rgba(6, 78, 59, 0.7) 100%);
+                    box-shadow: 0 0 20px rgba(251, 191, 36, 0.35);
+                }
+                .tpl-christmas .plan-card.selected .plan-check-dot {
+                    background: #fbbf24;
+                    border-color: #fbbf24;
+                    box-shadow: 0 0 10px #fbbf24;
+                }
+                .tpl-christmas .input-box {
+                    background: rgba(3, 30, 20, 0.7);
+                    border: 1.5px solid rgba(251, 191, 36, 0.3);
+                    color: #ffffff;
+                }
+                .tpl-christmas .input-box::placeholder { color: rgba(255, 255, 255, 0.5); }
+                .tpl-christmas .input-box:focus {
+                    border-color: #fbbf24;
+                    box-shadow: 0 0 12px rgba(251, 191, 36, 0.3);
+                }
+                .tpl-christmas .btn-pay {
+                    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 50%, #991b1b 100%);
+                    color: #ffffff;
+                    border: 1px solid #fca5a5;
+                    box-shadow: 0 10px 24px rgba(220, 38, 38, 0.45);
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+                }
+                .tpl-christmas .footer-links a { color: #fde047; }
+
+                /* Pure CSS Falling Snowflakes */
+                .snowflakes {
+                    position: fixed;
+                    top: -20px;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    pointer-events: none;
+                    z-index: 1;
+                    overflow: hidden;
+                }
+                .snowflake {
+                    position: fixed;
+                    top: -10%;
+                    color: rgba(255, 255, 255, 0.85);
+                    font-size: 1.2rem;
+                    user-select: none;
+                    animation: snowFall linear infinite;
+                }
+                .snowflake:nth-child(1) { left: 5%; animation-duration: 9s; animation-delay: 0s; font-size: 1.1rem; }
+                .snowflake:nth-child(2) { left: 15%; animation-duration: 12s; animation-delay: 2s; font-size: 0.8rem; opacity: 0.6; }
+                .snowflake:nth-child(3) { left: 28%; animation-duration: 8s; animation-delay: 4s; font-size: 1.4rem; }
+                .snowflake:nth-child(4) { left: 42%; animation-duration: 11s; animation-delay: 1s; font-size: 0.9rem; opacity: 0.7; }
+                .snowflake:nth-child(5) { left: 55%; animation-duration: 10s; animation-delay: 3s; font-size: 1.3rem; }
+                .snowflake:nth-child(6) { left: 68%; animation-duration: 13s; animation-delay: 0.5s; font-size: 0.8rem; opacity: 0.5; }
+                .snowflake:nth-child(7) { left: 78%; animation-duration: 9s; animation-delay: 5s; font-size: 1.2rem; }
+                .snowflake:nth-child(8) { left: 88%; animation-duration: 11s; animation-delay: 2.5s; font-size: 1.0rem; }
+                .snowflake:nth-child(9) { left: 94%; animation-duration: 7s; animation-delay: 1.5s; font-size: 1.5rem; }
+                .snowflake:nth-child(10) { left: 35%; animation-duration: 14s; animation-delay: 6s; font-size: 0.7rem; opacity: 0.6; }
+
+                @keyframes snowFall {
+                    0% { transform: translateY(0) rotate(0deg); opacity: 0.9; }
+                    100% { transform: translateY(115vh) rotate(360deg); opacity: 0.2; }
+                }
+CSS;
+
+            case 'glass':
+                return <<<CSS
+                body.tpl-glass {
+                    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 35%, #4c1d95 70%, #831843 100%);
+                    {$bgImageRule}
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    color: #ffffff;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 24px 16px;
+                    min-height: 100vh;
                 }
                 .tpl-glass .portal-container { width: 100%; max-width: 440px; margin: 0 auto; }
                 .tpl-glass .portal-card {
-                    background: rgba(255, 255, 255, 0.12);
-                    backdrop-filter: blur(18px);
-                    -webkit-backdrop-filter: blur(18px);
-                    border: 1px solid rgba(255, 255, 255, 0.25);
+                    background: rgba(255, 255, 255, 0.10);
+                    backdrop-filter: blur(24px);
+                    -webkit-backdrop-filter: blur(24px);
+                    border: 1.5px solid rgba(255, 255, 255, 0.26);
                     border-radius: 26px;
                     padding: 32px 24px;
-                    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+                    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
                 }
                 .tpl-glass .portal-header { text-align: center; margin-bottom: 20px; }
                 .tpl-glass .brand-logo { max-height: 48px; max-width: 180px; margin-bottom: 12px; }
                 .tpl-glass .brand-badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 20px; color: #fff; margin-bottom: 10px; }
-                .tpl-glass .portal-headline { font-size: 20px; font-weight: 800; color: #ffffff; }
-                .tpl-glass .portal-subheadline { font-size: 13px; color: rgba(255, 255, 255, 0.8); margin-top: 4px; }
+                .tpl-glass .portal-headline { font-size: 21px; font-weight: 800; color: #ffffff; }
+                .tpl-glass .portal-subheadline { font-size: 13px; color: rgba(255, 255, 255, 0.85); margin-top: 4px; }
                 .tpl-glass .plan-card {
-                    background: rgba(255, 255, 255, 0.1);
-                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    background: rgba(255, 255, 255, 0.08);
+                    border: 1px solid rgba(255, 255, 255, 0.18);
                     border-radius: 14px;
                     color: #fff;
                 }
-                .tpl-glass .plan-card.selected {
-                    background: rgba(255, 255, 255, 0.25);
-                    border-color: #ffffff;
-                    box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
-                }
-                .tpl-glass .plan-price { color: #fde047; }
-                .tpl-glass .input-box {
+                .tpl-glass .plan-pill-duration {
                     background: rgba(255, 255, 255, 0.15);
+                    color: #fde047;
+                }
+                .tpl-glass .plan-pill-speed { color: rgba(255, 255, 255, 0.8); }
+                .tpl-glass .plan-cur { color: #fde047; }
+                .tpl-glass .plan-val { color: #ffffff; }
+                .tpl-glass .plan-card.selected {
+                    background: rgba(255, 255, 255, 0.22);
+                    border-color: #ffffff;
+                    box-shadow: 0 0 25px rgba(255, 255, 255, 0.35);
+                }
+                .tpl-glass .input-box {
+                    background: rgba(255, 255, 255, 0.14);
                     border: 1px solid rgba(255, 255, 255, 0.3);
                     color: #ffffff;
                 }
                 .tpl-glass .input-box::placeholder { color: rgba(255, 255, 255, 0.6); }
-                .tpl-glass .btn-pay { background: {$primary}; color: {$btnText}; box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+                .tpl-glass .btn-pay { background: {$primary}; color: {$btnText}; box-shadow: 0 10px 24px rgba(0,0,0,0.25); border-radius: 12px; }
                 .tpl-glass .footer-links a { color: #fde047; }
+CSS;
+
+            case 'hotel':
+                return <<<CSS
+                body.tpl-hotel {
+                    background-color: #faf8f5;
+                    {$bgImageRule}
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    color: #292524;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 24px 16px;
+                    min-height: 100vh;
+                }
+                .tpl-hotel .portal-container { width: 100%; max-width: 450px; margin: 0 auto; }
+                .tpl-hotel .portal-card {
+                    background: #ffffff;
+                    border: 1px solid #ebd9c8;
+                    border-radius: 22px;
+                    padding: 34px 26px;
+                    box-shadow: 0 20px 45px rgba(120, 53, 15, 0.07);
+                }
+                .tpl-hotel .hotel-concierge-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    background: #fffbf0;
+                    border: 1px solid #fed7aa;
+                    color: #9a3412;
+                    font-size: 11px;
+                    font-weight: 700;
+                    padding: 4px 12px;
+                    border-radius: 999px;
+                    margin-bottom: 12px;
+                    letter-spacing: 0.3px;
+                }
+                .tpl-hotel .portal-header { text-align: center; margin-bottom: 22px; }
+                .tpl-hotel .portal-headline { font-family: Georgia, 'Times New Roman', serif; font-size: 23px; font-weight: 700; color: #1c1917; }
+                .tpl-hotel .portal-subheadline { font-size: 13px; color: #78716c; margin-top: 5px; }
+                .tpl-hotel .plan-card {
+                    background: #fffdfa;
+                    border: 1.5px solid #ebd9c8;
+                    border-radius: 14px;
+                    color: #292524;
+                }
+                .tpl-hotel .plan-pill-duration {
+                    background: #fef3c7;
+                    color: #92400e;
+                }
+                .tpl-hotel .plan-pill-speed { color: #b45309; }
+                .tpl-hotel .plan-cur { color: #b45309; }
+                .tpl-hotel .plan-val { color: #1c1917; }
+                .tpl-hotel .plan-card.selected {
+                    border: 2px solid #b45309;
+                    background: #fffbf0;
+                    box-shadow: 0 8px 24px rgba(180, 83, 9, 0.15);
+                }
+                .tpl-hotel .plan-card.selected .plan-check-dot {
+                    background: #b45309;
+                    border-color: #b45309;
+                }
+                .tpl-hotel .input-box {
+                    background: #fafaf9;
+                    border: 1.5px solid #d6d3d1;
+                    color: #1c1917;
+                    border-radius: 10px;
+                }
+                .tpl-hotel .btn-pay { background: #b45309; color: #ffffff; border-radius: 12px; font-weight: 700; box-shadow: 0 8px 20px rgba(180, 83, 9, 0.25); }
+                .tpl-hotel .footer-links a { color: #b45309; }
+CSS;
+
+            case 'voucher':
+                return <<<CSS
+                body.tpl-voucher {
+                    background-color: #0f172a;
+                    {$bgImageRule}
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    color: #f8fafc;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 24px 16px;
+                    min-height: 100vh;
+                }
+                .tpl-voucher .portal-container { width: 100%; max-width: 450px; margin: 0 auto; }
+                .tpl-voucher .portal-card {
+                    background: #1e293b;
+                    border: 1.5px solid #334155;
+                    border-radius: 20px;
+                    padding: 32px 24px;
+                    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+                }
+                .tpl-voucher .portal-header { text-align: center; margin-bottom: 20px; }
+                .tpl-voucher .portal-headline { font-size: 21px; font-weight: 800; color: #f8fafc; }
+                .tpl-voucher .portal-subheadline { font-size: 13px; color: #94a3b8; margin-top: 5px; }
+                .tpl-voucher .plan-card {
+                    background: #0f172a;
+                    border: 1.5px solid #334155;
+                    border-radius: 12px;
+                    color: #f8fafc;
+                }
+                .tpl-voucher .plan-pill-duration {
+                    background: #334155;
+                    color: #f8fafc;
+                }
+                .tpl-voucher .plan-pill-speed { color: #38bdf8; }
+                .tpl-voucher .plan-cur { color: #ea580c; }
+                .tpl-voucher .plan-val { color: #ffffff; }
+                .tpl-voucher .plan-card.selected {
+                    border-color: #ea580c;
+                    background: rgba(234, 88, 12, 0.12);
+                    box-shadow: 0 0 18px rgba(234, 88, 12, 0.25);
+                }
+                .tpl-voucher .plan-card.selected .plan-check-dot {
+                    background: #ea580c;
+                    border-color: #ea580c;
+                }
+                .tpl-voucher .input-box {
+                    background: #0f172a;
+                    border: 1.5px solid #475569;
+                    color: #ffffff;
+                    border-radius: 10px;
+                }
+                .tpl-voucher .btn-pay { background: #ea580c; color: #ffffff; border-radius: 10px; }
+                .tpl-voucher .footer-links a { color: #38bdf8; }
 CSS;
 
             case 'minimal':
@@ -1152,17 +1607,18 @@ CSS;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    padding: 24px;
+                    padding: 24px 16px;
+                    min-height: 100vh;
                 }
                 .tpl-minimal .portal-container { width: 100%; max-width: 420px; margin: 0 auto; }
                 .tpl-minimal .portal-card {
                     background: #ffffff;
                     border: 1px solid #e2e8f0;
                     border-radius: 20px;
-                    padding: 36px 28px;
-                    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+                    padding: 34px 26px;
+                    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
                 }
-                .tpl-minimal .portal-header { text-align: center; margin-bottom: 24px; }
+                .tpl-minimal .portal-header { text-align: center; margin-bottom: 22px; }
                 .tpl-minimal .brand-logo { max-height: 44px; max-width: 160px; margin-bottom: 12px; }
                 .tpl-minimal .brand-badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 20px; color: #0f172a; margin-bottom: 10px; }
                 .tpl-minimal .portal-headline { font-size: 21px; font-weight: 700; color: #0f172a; letter-spacing: -0.5px; }
@@ -1173,13 +1629,18 @@ CSS;
                     border-radius: 12px;
                     color: #0f172a;
                 }
+                .tpl-minimal .plan-pill-duration {
+                    background: #e2e8f0;
+                    color: #0f172a;
+                }
+                .tpl-minimal .plan-pill-speed { color: #64748b; }
+                .tpl-minimal .plan-cur { color: #64748b; }
+                .tpl-minimal .plan-val { color: #0f172a; }
                 .tpl-minimal .plan-card.selected {
                     background: #ffffff;
                     border-color: {$primary};
-                    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+                    box-shadow: 0 0 0 2px {$primary};
                 }
-                .tpl-minimal .plan-meta { color: #64748b; }
-                .tpl-minimal .plan-price { color: {$primary}; }
                 .tpl-minimal .input-box {
                     background: #f8fafc;
                     border: 1.5px solid #cbd5e1;
@@ -1192,75 +1653,97 @@ CSS;
             case 'neon':
                 return <<<CSS
                 body.tpl-neon {
-                    background-color: #050508;
+                    background-color: #040407;
                     {$bgImageRule}
                     font-family: ui-monospace, 'Cascadia Code', 'Courier New', monospace;
                     color: #e5e7eb;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    padding: 20px;
+                    padding: 24px 16px;
+                    min-height: 100vh;
                 }
                 .tpl-neon .portal-container { width: 100%; max-width: 440px; margin: 0 auto; }
                 .tpl-neon .portal-card {
-                    background: #0d0d14;
-                    border: 1px solid {$primary};
-                    border-radius: 12px;
+                    background: #08080f;
+                    border: 1.5px solid #00f3ff;
+                    border-radius: 14px;
                     padding: 32px 24px;
-                    box-shadow: 0 0 25px rgba(16, 185, 129, 0.25);
+                    box-shadow: 0 0 30px rgba(0, 243, 255, 0.25);
+                }
+                .tpl-neon .neon-telemetry-badge {
+                    font-size: 10.5px;
+                    letter-spacing: 1px;
+                    color: #00f3ff;
+                    text-shadow: 0 0 8px #00f3ff;
+                    margin-bottom: 12px;
+                    display: inline-block;
                 }
                 .tpl-neon .portal-header { text-align: center; margin-bottom: 20px; }
                 .tpl-neon .brand-logo { max-height: 48px; max-width: 180px; margin-bottom: 12px; }
-                .tpl-neon .brand-badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 20px; color: {$primary}; margin-bottom: 10px; text-shadow: 0 0 10px {$primary}; }
+                .tpl-neon .brand-badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 20px; color: #00f3ff; margin-bottom: 10px; text-shadow: 0 0 10px #00f3ff; }
                 .tpl-neon .portal-headline { font-size: 20px; font-weight: 800; color: #ffffff; text-transform: uppercase; letter-spacing: 1px; }
                 .tpl-neon .portal-subheadline { font-size: 12px; color: #9ca3af; margin-top: 4px; }
                 .tpl-neon .plan-card {
-                    background: #11111b;
-                    border: 1px solid #27273a;
+                    background: #0d0d18;
+                    border: 1px solid #1a1a2e;
                     border-radius: 8px;
                     color: #fff;
                 }
-                .tpl-neon .plan-card.selected {
-                    border-color: {$primary};
-                    box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
-                    background: #181828;
+                .tpl-neon .plan-pill-duration {
+                    background: rgba(0, 243, 255, 0.15);
+                    color: #00f3ff;
                 }
-                .tpl-neon .plan-price { color: {$primary}; font-family: monospace; font-size: 17px; }
+                .tpl-neon .plan-pill-speed { color: #ff007f; }
+                .tpl-neon .plan-cur { color: #00f3ff; }
+                .tpl-neon .plan-val { color: #ffffff; text-shadow: 0 0 8px rgba(0, 243, 255, 0.4); }
+                .tpl-neon .plan-card.selected {
+                    border-color: #00f3ff;
+                    box-shadow: 0 0 18px rgba(0, 243, 255, 0.45);
+                    background: #0f1728;
+                }
+                .tpl-neon .plan-card.selected .plan-check-dot {
+                    background: #00f3ff;
+                    border-color: #00f3ff;
+                    box-shadow: 0 0 10px #00f3ff;
+                }
                 .tpl-neon .input-box {
                     background: #06060c;
                     border: 1px solid #374151;
-                    color: #10b981;
+                    color: #00f3ff;
                     font-family: monospace;
                 }
                 .tpl-neon .btn-pay {
-                    background: {$primary};
-                    color: {$btnText};
+                    background: #00f3ff;
+                    color: #000000;
                     text-transform: uppercase;
                     letter-spacing: 1px;
                     font-family: monospace;
-                    box-shadow: 0 0 18px {$primary};
+                    font-weight: 900;
+                    box-shadow: 0 0 20px rgba(0, 243, 255, 0.6);
                 }
-                .tpl-neon .footer-links a { color: {$primary}; }
+                .tpl-neon .footer-links a { color: #00f3ff; }
 CSS;
 
             case 'sunset':
                 return <<<CSS
                 body.tpl-sunset {
-                    background: linear-gradient(135deg, #f97316 0%, #ec4899 50%, #8b5cf6 100%);
+                    background: linear-gradient(135deg, #f97316 0%, #ec4899 50%, #7c3aed 100%);
                     {$bgImageRule}
                     font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
                     color: #1f2937;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    padding: 24px;
+                    padding: 24px 16px;
+                    min-height: 100vh;
                 }
                 .tpl-sunset .portal-container { width: 100%; max-width: 440px; margin: 0 auto; }
                 .tpl-sunset .portal-card {
                     background: #ffffff;
-                    border-radius: 30px;
-                    padding: 36px 28px;
-                    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+                    border-radius: 28px;
+                    padding: 34px 26px;
+                    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.22);
                 }
                 .tpl-sunset .portal-header { text-align: center; margin-bottom: 22px; }
                 .tpl-sunset .brand-logo { max-height: 48px; max-width: 180px; margin-bottom: 12px; }
@@ -1270,15 +1753,21 @@ CSS;
                 .tpl-sunset .plan-card {
                     background: #fff7ed;
                     border: 2px solid #ffedd5;
-                    border-radius: 18px;
+                    border-radius: 16px;
                     color: #1f2937;
                 }
+                .tpl-sunset .plan-pill-duration {
+                    background: #fed7aa;
+                    color: #c2410c;
+                }
+                .tpl-sunset .plan-pill-speed { color: #ea580c; }
+                .tpl-sunset .plan-cur { color: #ea580c; }
+                .tpl-sunset .plan-val { color: #111827; }
                 .tpl-sunset .plan-card.selected {
                     border-color: #f97316;
                     background: #ffffff;
-                    box-shadow: 0 8px 20px rgba(249, 115, 22, 0.15);
+                    box-shadow: 0 8px 24px rgba(249, 115, 22, 0.2);
                 }
-                .tpl-sunset .plan-price { color: #ea580c; font-size: 18px; }
                 .tpl-sunset .input-box {
                     background: #fef2f2;
                     border: 1.5px solid #fecaca;
@@ -1288,7 +1777,7 @@ CSS;
                 .tpl-sunset .btn-pay {
                     background: linear-gradient(135deg, #f97316, #ec4899);
                     color: #ffffff;
-                    border-radius: 16px;
+                    border-radius: 14px;
                     box-shadow: 0 10px 25px rgba(236, 72, 153, 0.35);
                 }
                 .tpl-sunset .footer-links a { color: #f97316; }
@@ -1304,66 +1793,100 @@ CSS;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    padding: 24px;
+                    padding: 24px 16px;
+                    min-height: 100vh;
                 }
                 .tpl-corporate .portal-container { width: 100%; max-width: 440px; margin: 0 auto; }
                 .tpl-corporate .portal-card {
                     background: #ffffff;
                     border: 1px solid #cbd5e1;
-                    border-radius: 8px;
+                    border-radius: 10px;
                     overflow: hidden;
                     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+                }
+                .tpl-corporate .corp-verified-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    background: rgba(255, 255, 255, 0.18);
+                    color: #ffffff;
+                    font-size: 11px;
+                    font-weight: 700;
+                    padding: 3px 10px;
+                    border-radius: 999px;
+                    margin-bottom: 10px;
                 }
                 .tpl-corporate .portal-header {
                     background: {$primary};
                     color: {$btnText};
-                    padding: 28px 24px;
+                    padding: 26px 22px;
                     text-align: center;
                 }
                 .tpl-corporate .brand-logo { max-height: 44px; max-width: 180px; margin-bottom: 10px; }
                 .tpl-corporate .brand-badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 18px; color: {$btnText}; margin-bottom: 8px; }
                 .tpl-corporate .portal-headline { font-size: 20px; font-weight: 700; color: {$btnText}; }
                 .tpl-corporate .portal-subheadline { font-size: 13px; opacity: 0.9; margin-top: 4px; color: {$btnText}; }
-                .tpl-corporate .portal-body { padding: 28px 24px; }
+                .tpl-corporate .portal-body { padding: 24px 20px; }
                 .tpl-corporate .plan-card {
                     background: #ffffff;
-                    border: 1px solid #cbd5e1;
-                    border-radius: 6px;
+                    border: 1.5px solid #cbd5e1;
+                    border-radius: 8px;
                     color: #1e293b;
                 }
+                .tpl-corporate .plan-pill-duration {
+                    background: #e2e8f0;
+                    color: #1e293b;
+                }
+                .tpl-corporate .plan-pill-speed { color: #64748b; }
+                .tpl-corporate .plan-cur { color: #64748b; }
+                .tpl-corporate .plan-val { color: #1e293b; }
                 .tpl-corporate .plan-card.selected {
                     border-color: {$primary};
                     background: #f8fafc;
                     border-left: 5px solid {$primary};
                 }
-                .tpl-corporate .plan-price { color: {$primary}; }
                 .tpl-corporate .input-box {
                     border: 1px solid #94a3b8;
-                    border-radius: 4px;
+                    border-radius: 6px;
                 }
-                .tpl-corporate .btn-pay { background: {$primary}; color: {$btnText}; border-radius: 4px; }
+                .tpl-corporate .btn-pay { background: {$primary}; color: {$btnText}; border-radius: 6px; }
                 .tpl-corporate .footer-links a { color: {$primary}; }
 CSS;
 
             case 'cafe':
                 return <<<CSS
                 body.tpl-cafe {
-                    background-color: #fdfbf7;
+                    background-color: #fdf8ed;
                     {$bgImageRule}
                     font-family: Georgia, 'Times New Roman', serif;
                     color: #38271e;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    padding: 24px;
+                    padding: 24px 16px;
+                    min-height: 100vh;
                 }
                 .tpl-cafe .portal-container { width: 100%; max-width: 440px; margin: 0 auto; }
                 .tpl-cafe .portal-card {
                     background: #fffdf9;
                     border: 2px dashed #b45309;
-                    border-radius: 16px;
-                    padding: 34px 26px;
+                    border-radius: 18px;
+                    padding: 32px 24px;
                     box-shadow: 0 10px 30px rgba(180, 83, 9, 0.08);
+                }
+                .tpl-cafe .cafe-stamp-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    background: #fef3c7;
+                    border: 1px solid #fde68a;
+                    color: #854d0e;
+                    font-size: 11px;
+                    font-weight: 700;
+                    padding: 4px 12px;
+                    border-radius: 999px;
+                    margin-bottom: 12px;
+                    font-family: sans-serif;
                 }
                 .tpl-cafe .portal-header { text-align: center; margin-bottom: 22px; }
                 .tpl-cafe .brand-logo { max-height: 48px; max-width: 170px; margin-bottom: 12px; }
@@ -1373,14 +1896,21 @@ CSS;
                 .tpl-cafe .plan-card {
                     background: #fffbeb;
                     border: 1px solid #fde68a;
-                    border-radius: 10px;
+                    border-radius: 12px;
                     color: #451a03;
                 }
+                .tpl-cafe .plan-pill-duration {
+                    background: #fef3c7;
+                    color: #92400e;
+                    font-family: sans-serif;
+                }
+                .tpl-cafe .plan-pill-speed { color: #b45309; font-family: sans-serif; }
+                .tpl-cafe .plan-cur { color: #b45309; font-family: sans-serif; }
+                .tpl-cafe .plan-val { color: #451a03; }
                 .tpl-cafe .plan-card.selected {
                     border: 2px solid #b45309;
                     background: #ffffff;
                 }
-                .tpl-cafe .plan-price { color: #b45309; border: 1px solid #b45309; padding: 2px 8px; border-radius: 6px; font-size: 14px; }
                 .tpl-cafe .input-box {
                     background: #fffbeb;
                     border: 1px solid #fde68a;
@@ -1401,12 +1931,13 @@ CSS;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    padding: 24px;
+                    padding: 24px 16px;
+                    min-height: 100vh;
                 }
-                .tpl-split .portal-container { width: 100%; max-width: 820px; margin: 0 auto; }
+                .tpl-split .portal-container { width: 100%; max-width: 860px; margin: 0 auto; }
                 .tpl-split .portal-card {
                     background: #ffffff;
-                    border-radius: 24px;
+                    border-radius: 26px;
                     overflow: hidden;
                     display: flex;
                     box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
@@ -1414,7 +1945,7 @@ CSS;
                 .tpl-split .portal-header {
                     background: linear-gradient(135deg, {$primary} 0%, #1e1b4b 100%);
                     color: #ffffff;
-                    padding: 48px 36px;
+                    padding: 44px 34px;
                     flex: 1;
                     display: flex;
                     flex-direction: column;
@@ -1424,24 +1955,30 @@ CSS;
                 .tpl-split .brand-logo { max-height: 52px; max-width: 190px; margin-bottom: 20px; }
                 .tpl-split .brand-badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 22px; color: #ffffff; margin-bottom: 16px; }
                 .tpl-split .portal-headline { font-size: 26px; font-weight: 800; color: #ffffff; line-height: 1.25; }
-                .tpl-split .portal-subheadline { font-size: 14px; opacity: 0.85; margin-top: 12px; line-height: 1.5; }
-                .tpl-split .portal-body { flex: 1.2; padding: 40px 32px; }
+                .tpl-split .portal-subheadline { font-size: 14px; opacity: 0.85; margin-top: 12px; line-height: 1.5; color: rgba(255, 255, 255, 0.85); }
+                .tpl-split .portal-body { flex: 1.25; padding: 36px 30px; }
                 .tpl-split .plan-card {
                     background: #f8fafc;
                     border: 1.5px solid #e2e8f0;
                     border-radius: 12px;
                 }
+                .tpl-split .plan-pill-duration {
+                    background: #e2e8f0;
+                    color: #0f172a;
+                }
+                .tpl-split .plan-pill-speed { color: #64748b; }
+                .tpl-split .plan-cur { color: {$primary}; }
+                .tpl-split .plan-val { color: #0f172a; }
                 .tpl-split .plan-card.selected {
                     border-color: {$primary};
                     background: #ffffff;
                     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
                 }
-                .tpl-split .plan-price { color: {$primary}; }
                 .tpl-split .btn-pay { background: {$primary}; color: {$btnText}; border-radius: 10px; }
                 @media (max-width: 768px) {
                     .tpl-split .portal-card { flex-direction: column; }
-                    .tpl-split .portal-header { padding: 32px 24px; text-align: center; }
-                    .tpl-split .portal-body { padding: 28px 20px; }
+                    .tpl-split .portal-header { padding: 30px 22px; text-align: center; }
+                    .tpl-split .portal-body { padding: 26px 18px; }
                 }
 CSS;
 
@@ -1449,47 +1986,75 @@ CSS;
             default:
                 return <<<CSS
                 body.tpl-midnight {
-                    background-color: #0b0f19;
+                    background: radial-gradient(ellipse at 50% 10%, rgba(249, 115, 22, 0.16) 0%, transparent 60%), #06080e;
                     {$bgImageRule}
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                     color: #e5e7eb;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    padding: 24px;
+                    padding: 24px 16px;
+                    min-height: 100vh;
                 }
                 .tpl-midnight .portal-container { width: 100%; max-width: 440px; margin: 0 auto; }
                 .tpl-midnight .portal-card {
-                    background: #111827;
-                    border: 1px solid #1f2937;
-                    border-radius: 20px;
-                    padding: 36px 28px;
-                    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+                    background: #0f1523;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 22px;
+                    padding: 34px 26px;
+                    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
                 }
-                .tpl-midnight .portal-header { text-align: center; margin-bottom: 24px; }
-                .tpl-midnight .brand-logo { max-height: 48px; max-width: 180px; margin-bottom: 14px; }
+                .tpl-midnight .telemetry-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    background: rgba(255, 255, 255, 0.06);
+                    border: 1px solid rgba(255, 255, 255, 0.12);
+                    color: #38bdf8;
+                    font-size: 11px;
+                    font-weight: 700;
+                    padding: 4px 12px;
+                    border-radius: 999px;
+                    margin-bottom: 12px;
+                    letter-spacing: 0.3px;
+                }
+                .tpl-midnight .telemetry-badge .pulse-dot {
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 50%;
+                    background: #10b981;
+                    box-shadow: 0 0 8px #10b981;
+                }
+                .tpl-midnight .portal-header { text-align: center; margin-bottom: 22px; }
+                .tpl-midnight .brand-logo { max-height: 48px; max-width: 180px; margin-bottom: 12px; }
                 .tpl-midnight .brand-badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 20px; color: #ffffff; margin-bottom: 12px; }
-                .tpl-midnight .portal-headline { font-size: 21px; font-weight: 700; color: #ffffff; }
+                .tpl-midnight .portal-headline { font-size: 21px; font-weight: 800; color: #ffffff; }
                 .tpl-midnight .portal-subheadline { font-size: 13px; color: #9ca3af; margin-top: 6px; }
                 .tpl-midnight .plan-card {
-                    background: #1f2937;
-                    border: 1px solid #374151;
+                    background: #151c2e;
+                    border: 1px solid rgba(148, 163, 184, 0.14);
                     border-radius: 12px;
                     color: #ffffff;
                 }
+                .tpl-midnight .plan-pill-duration {
+                    background: rgba(255, 255, 255, 0.1);
+                    color: #38bdf8;
+                }
+                .tpl-midnight .plan-pill-speed { color: #94a3b8; }
+                .tpl-midnight .plan-cur { color: {$primary}; }
+                .tpl-midnight .plan-val { color: #ffffff; }
                 .tpl-midnight .plan-card.selected {
                     border-color: {$primary};
-                    background: #252e42;
-                    box-shadow: 0 0 0 2px {$primary};
+                    background: rgba(249, 115, 22, 0.12);
+                    box-shadow: 0 0 20px rgba(249, 115, 22, 0.28);
                 }
-                .tpl-midnight .plan-meta { color: #9ca3af; }
-                .tpl-midnight .plan-price { color: {$primary}; }
                 .tpl-midnight .input-box {
-                    background: #0b0f19;
-                    border: 1px solid #374151;
+                    background: #080c14;
+                    border: 1px solid #334155;
                     color: #ffffff;
+                    border-radius: 10px;
                 }
-                .tpl-midnight .btn-pay { background: {$primary}; color: {$btnText}; border-radius: 10px; }
+                .tpl-midnight .btn-pay { background: {$primary}; color: {$btnText}; border-radius: 10px; box-shadow: 0 10px 24px rgba(249, 115, 22, 0.3); }
                 .tpl-midnight .footer-links a { color: {$primary}; }
 CSS;
         }

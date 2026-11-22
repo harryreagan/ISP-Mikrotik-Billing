@@ -120,16 +120,16 @@
 
         /* ─── TEMPLATE 2: DARK CYBER & NIGHT LOUNGE ─── */
         html.theme-dark {
-            --page-bg: #0C101A;
-            --card-bg: #161B2E;
-            --card-border: rgba(109, 63, 224, 0.25);
+            --page-bg: radial-gradient(ellipse at 50% 10%, rgba(249, 115, 22, 0.16) 0%, transparent 60%), #06080E;
+            --card-bg: #0F1523;
+            --card-border: rgba(255, 255, 255, 0.08);
             --ink: #F8FAFC;
             --ink-secondary: #94A3B8;
             --primary-orange: #F47B06;
             --primary-orange-hover: #FF881A;
-            --accent-purple: #A78BFA;
-            --dark-navy: #090D16;
-            --shadow-card: 0 20px 45px rgba(0, 0, 0, 0.5);
+            --accent-purple: #38BDF8;
+            --dark-navy: #06080E;
+            --shadow-card: 0 25px 60px rgba(0, 0, 0, 0.7);
             --card-backdrop: none;
         }
 
@@ -166,17 +166,17 @@
 
         /* ─── TEMPLATE 5: EXPRESS SCRATCH VOUCHER & KIOSK ─── */
         html.theme-voucher {
-            --page-bg: #F0F4F8;
-            --card-bg: #FFFFFF;
-            --card-border: #CBD5E1;
-            --ink: #0F172A;
-            --ink-secondary: #475569;
+            --page-bg: #0F172A;
+            --card-bg: #1E293B;
+            --card-border: #334155;
+            --ink: #F8FAFC;
+            --ink-secondary: #94A3B8;
             --primary-orange: #EA580C;
             --primary-orange-hover: #C2410C;
-            --accent-purple: #4F46E5;
+            --accent-purple: #38BDF8;
             --dark-navy: #0F172A;
-            --radius-card: 16px;
-            --shadow-card: 0 8px 24px rgba(15, 23, 42, 0.08);
+            --radius-card: 18px;
+            --shadow-card: 0 20px 50px rgba(0, 0, 0, 0.45);
             --card-backdrop: none;
         }
 
@@ -184,16 +184,151 @@
         html.theme-corporate {
             --page-bg: #F8FAFC;
             --card-bg: #FFFFFF;
-            --card-border: #E2E8F0;
+            --card-border: #CBD5E1;
             --ink: #1E293B;
             --ink-secondary: #64748B;
             --primary-orange: #0284C7;
             --primary-orange-hover: #0369A1;
             --accent-purple: #0F172A;
             --dark-navy: #0F172A;
-            --radius-card: 18px;
+            --radius-card: 14px;
             --shadow-card: 0 10px 30px rgba(2, 132, 199, 0.08);
             --card-backdrop: none;
+        }
+
+        /* ─── TEMPLATE 7: CHRISTMAS FESTIVE ─── */
+        html.theme-christmas {
+            --page-bg: radial-gradient(ellipse at 50% 15%, #0e3a2b 0%, #072218 55%, #03120c 100%);
+            --card-bg: rgba(10, 39, 29, 0.94);
+            --card-border: rgba(251, 191, 36, 0.35);
+            --ink: #FFFFFF;
+            --ink-secondary: #A7F3D0;
+            --primary-orange: #DC2626;
+            --primary-orange-hover: #B91C1C;
+            --accent-purple: #FBBF24;
+            --dark-navy: #020F0A;
+            --shadow-card: 0 25px 60px rgba(0, 0, 0, 0.55), 0 0 40px rgba(13, 148, 86, 0.15);
+            --card-backdrop: blur(16px);
+        }
+        html.theme-christmas .card-top-bar {
+            background: linear-gradient(90deg, #DC2626, #FBBF24, #10B981, #DC2626);
+        }
+        html.theme-christmas .pkg-card {
+            background: rgba(6, 78, 59, 0.45);
+            border-color: rgba(251, 191, 36, 0.22);
+            color: #FFFFFF;
+        }
+        html.theme-christmas .pkg-duration { color: #FEF08A; }
+        html.theme-christmas .pkg-speed { color: #6EE7B7; }
+        html.theme-christmas .pkg-price { color: #FFFFFF; }
+        html.theme-christmas .pkg-price span.curr { color: #FEF08A; }
+        html.theme-christmas .pkg-card.selected {
+            border-color: #FBBF24;
+            background: linear-gradient(135deg, rgba(185, 28, 28, 0.4) 0%, rgba(6, 78, 59, 0.7) 100%);
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.35);
+        }
+        html.theme-christmas .btn-submit {
+            background: linear-gradient(135deg, #DC2626 0%, #B91C1C 50%, #991B1B 100%);
+            border: 1px solid #FCA5A5;
+            box-shadow: 0 10px 24px rgba(220, 38, 38, 0.45);
+        }
+
+        /* ─── TEMPLATE 8: NEON CYBERPUNK ─── */
+        html.theme-neon {
+            --page-bg: #040407;
+            --card-bg: #08080F;
+            --card-border: #00F3FF;
+            --ink: #FFFFFF;
+            --ink-secondary: #9CA3AF;
+            --primary-orange: #00F3FF;
+            --primary-orange-hover: #00D2DD;
+            --accent-purple: #FF007F;
+            --dark-navy: #000000;
+            --shadow-card: 0 0 35px rgba(0, 243, 255, 0.25);
+            --card-backdrop: none;
+        }
+        html.theme-neon .card-top-bar {
+            background: linear-gradient(90deg, #00F3FF, #FF007F, #00F3FF);
+        }
+        html.theme-neon .pkg-card {
+            background: #0D0D18;
+            border-color: #1A1A2E;
+        }
+        html.theme-neon .pkg-card.selected {
+            border-color: #00F3FF;
+            box-shadow: 0 0 18px rgba(0, 243, 255, 0.45);
+            background: #0F1728;
+        }
+        html.theme-neon .btn-submit {
+            background: #00F3FF;
+            color: #000000;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.6);
+        }
+
+        /* ─── TEMPLATE 9: SAVANNAH SUNSET ─── */
+        html.theme-sunset {
+            --page-bg: linear-gradient(135deg, #F97316 0%, #EC4899 50%, #7C3AED 100%);
+            --card-bg: #FFFFFF;
+            --card-border: #FFEDD5;
+            --ink: #111827;
+            --ink-secondary: #6B7280;
+            --primary-orange: #F97316;
+            --primary-orange-hover: #EA580C;
+            --accent-purple: #EC4899;
+            --dark-navy: #1F2937;
+            --shadow-card: 0 25px 60px rgba(0, 0, 0, 0.22);
+            --radius-card: 28px;
+            --card-backdrop: none;
+        }
+
+        /* ─── TEMPLATE 10: ARTISAN CAFE ─── */
+        html.theme-cafe {
+            --page-bg: #FDF8ED;
+            --card-bg: #FFFDF9;
+            --card-border: #B45309;
+            --ink: #451A03;
+            --ink-secondary: #78350F;
+            --primary-orange: #B45309;
+            --primary-orange-hover: #92400E;
+            --accent-purple: #D97706;
+            --dark-navy: #38271E;
+            --shadow-card: 0 10px 30px rgba(180, 83, 9, 0.08);
+            --card-backdrop: none;
+        }
+
+        /* Pure CSS Snowflakes */
+        .snowflakes-container {
+            position: fixed;
+            top: -20px;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            overflow: hidden;
+        }
+        .snowflakes-container .snowflake {
+            position: fixed;
+            top: -10%;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 1.2rem;
+            user-select: none;
+            animation: snowFall linear infinite;
+        }
+        .snowflakes-container .snowflake:nth-child(1) { left: 5%; animation-duration: 9s; animation-delay: 0s; font-size: 1.1rem; }
+        .snowflakes-container .snowflake:nth-child(2) { left: 15%; animation-duration: 12s; animation-delay: 2s; font-size: 0.8rem; opacity: 0.6; }
+        .snowflakes-container .snowflake:nth-child(3) { left: 28%; animation-duration: 8s; animation-delay: 4s; font-size: 1.4rem; }
+        .snowflakes-container .snowflake:nth-child(4) { left: 42%; animation-duration: 11s; animation-delay: 1s; font-size: 0.9rem; opacity: 0.7; }
+        .snowflakes-container .snowflake:nth-child(5) { left: 55%; animation-duration: 10s; animation-delay: 3s; font-size: 1.3rem; }
+        .snowflakes-container .snowflake:nth-child(6) { left: 68%; animation-duration: 13s; animation-delay: 0.5s; font-size: 0.8rem; opacity: 0.5; }
+        .snowflakes-container .snowflake:nth-child(7) { left: 78%; animation-duration: 9s; animation-delay: 5s; font-size: 1.2rem; }
+        .snowflakes-container .snowflake:nth-child(8) { left: 88%; animation-duration: 11s; animation-delay: 2.5s; font-size: 1.0rem; }
+        .snowflakes-container .snowflake:nth-child(9) { left: 94%; animation-duration: 7s; animation-delay: 1.5s; font-size: 1.5rem; }
+        .snowflakes-container .snowflake:nth-child(10) { left: 35%; animation-duration: 14s; animation-delay: 6s; font-size: 0.7rem; opacity: 0.6; }
+
+        @keyframes snowFall {
+            0% { transform: translateY(0) rotate(0deg); opacity: 0.9; }
+            100% { transform: translateY(115vh) rotate(360deg); opacity: 0.2; }
         }
 
         /* ─── RESET & BASE ─── */
@@ -442,13 +577,19 @@
             gap: 10px;
             margin-bottom: 1.25rem;
         }
+        /* Ambient Dimming on Packages Grid */
+        .packages-grid:hover .pkg-card:not(:hover):not(.selected) {
+            opacity: 0.52;
+            filter: grayscale(18%);
+            transform: scale(0.98);
+        }
         .pkg-card {
             background: var(--card-bg);
             border: 1.5px solid var(--card-border);
             border-radius: 14px;
             padding: 12px 12px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
             position: relative;
             text-align: left;
             display: flex;
@@ -764,18 +905,36 @@
 </head>
 <body>
 
+    <!-- Pure CSS Snowflakes Container (Active in Christmas Theme) -->
+    <div class="snowflakes-container" id="snowflakesBox" aria-hidden="true" style="display: none;">
+        <div class="snowflake">❅</div>
+        <div class="snowflake">❆</div>
+        <div class="snowflake">❅</div>
+        <div class="snowflake">❄</div>
+        <div class="snowflake">❅</div>
+        <div class="snowflake">❆</div>
+        <div class="snowflake">❄</div>
+        <div class="snowflake">❅</div>
+        <div class="snowflake">❆</div>
+        <div class="snowflake">❄</div>
+    </div>
+
     <!-- ─── 1. ISP OWNER TEMPLATE SWITCHER (6 Customizable Designs) ─── -->
     <aside class="template-toolbar" aria-label="Captive Portal Design Themes">
         <span class="toolbar-label">
             <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm.5 4.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm-4 7a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0zm8 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/></svg>
             Theme
         </span>
-        <button type="button" class="template-pill active" onclick="switchTheme('modern', this)" data-theme="modern">1. Modern Clean</button>
-        <button type="button" class="template-pill" onclick="switchTheme('dark', this)" data-theme="dark">2. Dark Cyber</button>
-        <button type="button" class="template-pill" onclick="switchTheme('hotel', this)" data-theme="hotel">3. Hotel &amp; Cafe</button>
-        <button type="button" class="template-pill" onclick="switchTheme('glass', this)" data-theme="glass">4. Glass Gradient</button>
-        <button type="button" class="template-pill" onclick="switchTheme('voucher', this)" data-theme="voucher">5. Express Kiosk</button>
-        <button type="button" class="template-pill" onclick="switchTheme('corporate', this)" data-theme="corporate">6. Corporate Fiber</button>
+        <button type="button" class="template-pill active" onclick="switchTheme('modern', this)" data-theme="modern">Modern Clean</button>
+        <button type="button" class="template-pill" onclick="switchTheme('christmas', this)" data-theme="christmas">🎄 Christmas Festive</button>
+        <button type="button" class="template-pill" onclick="switchTheme('dark', this)" data-theme="dark">🌌 Dark Cyber</button>
+        <button type="button" class="template-pill" onclick="switchTheme('hotel', this)" data-theme="hotel">🏛️ Resort &amp; Hotel</button>
+        <button type="button" class="template-pill" onclick="switchTheme('glass', this)" data-theme="glass">🔮 Aurora Glass</button>
+        <button type="button" class="template-pill" onclick="switchTheme('voucher', this)" data-theme="voucher">🎟️ Express Kiosk</button>
+        <button type="button" class="template-pill" onclick="switchTheme('neon', this)" data-theme="neon">⚡ Neon Cyberpunk</button>
+        <button type="button" class="template-pill" onclick="switchTheme('sunset', this)" data-theme="sunset">🌅 Savannah Sunset</button>
+        <button type="button" class="template-pill" onclick="switchTheme('corporate', this)" data-theme="corporate">🏢 Corporate Fiber</button>
+        <button type="button" class="template-pill" onclick="switchTheme('cafe', this)" data-theme="cafe">☕ Artisan Cafe</button>
     </aside>
 
     <!-- ─── 2. MAIN CAPTIVE PORTAL CARD ─── -->
@@ -1024,10 +1183,16 @@
         };
         let countdownInterval = null;
 
-        // 1. Theme Switcher (Supports 6 Designs with LocalStorage & URL Param)
+        // 1. Theme Switcher (Supports 10 Designs with LocalStorage & URL Param)
         function switchTheme(themeName, btnElement) {
             const root = document.getElementById('portal-root');
             root.className = 'theme-' + themeName;
+
+            // Toggle snowflakes for Christmas
+            const snowBox = document.getElementById('snowflakesBox');
+            if (snowBox) {
+                snowBox.style.display = (themeName === 'christmas') ? 'block' : 'none';
+            }
 
             // Highlight toolbar button
             document.querySelectorAll('.template-pill').forEach(btn => btn.classList.remove('active'));
