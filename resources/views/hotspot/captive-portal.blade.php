@@ -1,6 +1,6 @@
 @php
     $siteName = siteUrlSettings('site_name') ?? 'HSmart WiFi Billing';
-    $sitePhone = siteUrlSettings('site_phone') ?? '+254 743 606 108';
+    $sitePhone = (siteUrlSettings('site_phone') && !str_contains(siteUrlSettings('site_phone'), '743 606 108') && !str_contains(siteUrlSettings('site_phone'), '743606108')) ? siteUrlSettings('site_phone') : '';
     $siteEmail = siteUrlSettings('site_email') ?? 'support@hsmart.co.ke';
     $siteLogo = siteUrlSettings('site_logo');
 
@@ -1164,10 +1164,12 @@
         <!-- Footer -->
         <footer class="portal-footer">
             <div>Need help connecting? We're here for you 24/7.</div>
+            @if(!empty($sitePhone))
             <div class="support-pill">
                 <svg width="14" height="14" fill="#10B981" viewBox="0 0 16 16"><path d="M8 1a5 5 0 0 0-5 5v1h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a6 6 0 1 1 12 0v5a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h1V6a5 5 0 0 0-5-5z"/></svg>
                 <span>Call/WhatsApp: <strong>{{ $sitePhone }}</strong></span>
             </div>
+            @endif
         </footer>
     </main>
 

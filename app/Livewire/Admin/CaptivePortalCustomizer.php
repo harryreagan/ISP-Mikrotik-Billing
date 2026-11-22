@@ -12,20 +12,20 @@ use Livewire\Component;
 
 class CaptivePortalCustomizer extends Component
 {
-    // Design Template Choice (11 catalog choices)
-    public string $template = 'midnight';
+    // Design Template Choice (Default to clean HSmart SaaS design)
+    public string $template = 'hsmart';
 
     // Branding & Identity
     public $brand_name = 'HSmart WiFi';
-    public $brand_color = '#ff6600';
-    public $secondary_color = '#0f172a';
+    public $brand_color = '#F57C00';
+    public $secondary_color = '#0F172A';
     public $logo_url = '';
     public $background_url = '';
     public $headline = 'Welcome to High-Speed Internet';
     public $subheadline = 'Instant automated M-Pesa activation with zero buffering.';
     public $terms_text = 'By connecting, you agree to our fair use policy and terms of service.';
-    public $support_phone = '+254 743 606 108';
-    public $support_whatsapp = '254743606108';
+    public $support_phone = '';
+    public $support_whatsapp = '';
     public $theme_layout = 'cards';
     public $free_trial_enabled = false;
     public $free_trial_duration = '15m';
@@ -45,7 +45,7 @@ class CaptivePortalCustomizer extends Component
 
         $settings = DB::table('isp_portal_settings')->where('tenant_id', $tenantId)->first();
         if ($settings) {
-            $this->template             = $settings->template ?: 'midnight';
+            $this->template             = $settings->template ?: 'hsmart';
             $this->brand_name           = $settings->brand_name ?: $this->brand_name;
             $this->brand_color          = $settings->brand_color ?: $this->brand_color;
             $this->secondary_color      = $settings->secondary_color ?: $this->secondary_color;
@@ -54,8 +54,8 @@ class CaptivePortalCustomizer extends Component
             $this->headline             = $settings->headline ?: $this->headline;
             $this->subheadline          = $settings->subheadline ?: $this->subheadline;
             $this->terms_text           = $settings->terms_text ?: $this->terms_text;
-            $this->support_phone        = $settings->support_phone ?: $this->support_phone;
-            $this->support_whatsapp     = $settings->support_whatsapp ?: $this->support_whatsapp;
+            $this->support_phone        = ($settings->support_phone && !str_contains($settings->support_phone, '743 606 108') && !str_contains($settings->support_phone, '743606108')) ? $settings->support_phone : '';
+            $this->support_whatsapp     = ($settings->support_whatsapp && !str_contains($settings->support_whatsapp, '743606108')) ? $settings->support_whatsapp : '';
             $this->theme_layout         = $settings->theme_layout ?: $this->theme_layout;
             $this->free_trial_enabled   = (bool) $settings->free_trial_enabled;
             $this->free_trial_duration  = $settings->free_trial_duration ?: '15m';

@@ -71,7 +71,7 @@ class PlanSeeder extends Seeder
                 'is_popular' => false,
                 'badge' => null,
                 'button_text' => 'Talk to us',
-                'button_url' => 'https://wa.me/254743606108?text=Hello%20HSmart%20Team%2C%20I%20am%20interested%20in%20the%20Enterprise%20ISP%20Plan',
+                'button_url' => 'https://isp.hsmart.co.ke/register?plan=enterprise',
                 'is_active' => true,
                 'sort_order' => 3,
             ],

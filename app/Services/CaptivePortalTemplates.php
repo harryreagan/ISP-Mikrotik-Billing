@@ -10,82 +10,89 @@ class CaptivePortalTemplates
     public static function catalog(): array
     {
         return [
-            'christmas' => [
-                'name'      => 'Christmas Festive',
-                'vibe'      => 'Pine green & crimson backdrop, gentle CSS snowfall, festive holiday ribbon, and golden gift-tier cards.',
-                'gradient'  => 'radial-gradient(ellipse at 50% 20%, #0d3a2b 0%, #061e16 60%, #020f0a 100%)',
-                'accent'    => '#dc2626',
-                'textColor' => '#ffffff',
+            'hsmart' => [
+                'name'      => 'HSmart Official (Clean)',
+                'vibe'      => 'Official clean SaaS look of the HSmart platform: crisp white card, Jost typography, light slate backdrop, vibrant orange M-Pesa action, and elegant side-by-side cards.',
+                'gradient'  => '#F8FAFC',
+                'accent'    => '#F57C00',
+                'textColor' => '#0F172A',
             ],
             'midnight' => [
                 'name'      => 'Midnight Cyber',
-                'vibe'      => 'Obsidian black canvas with ambient radial orange/amber back-glow, glowing side-by-side cards, and telemetry.',
-                'gradient'  => 'linear-gradient(135deg, #07090e 0%, #0f172a 100%)',
-                'accent'    => '#ff6600',
-                'textColor' => '#ffffff',
+                'vibe'      => 'Deep obsidian canvas with subtle borders, glowing side-by-side cards, and telemetry status.',
+                'gradient'  => '#0B1120',
+                'accent'    => '#F57C00',
+                'textColor' => '#FFFFFF',
             ],
-            'glass' => [
-                'name'      => 'Aurora Glass',
-                'vibe'      => 'Frosted glassmorphism over vibrant purple-cyan mesh gradient, blurred refraction, and floating orbs.',
-                'gradient'  => 'linear-gradient(135deg, #312e81 0%, #4c1d95 40%, #0369a1 80%, #0f766e 100%)',
-                'accent'    => '#6366f1',
-                'textColor' => '#ffffff',
+            'minimal' => [
+                'name'      => 'Starlink Minimal',
+                'vibe'      => 'Ultra-refined Scandinavian monochrome, razor-thin borders, clean side-by-side cards, and crisp contrast.',
+                'gradient'  => '#F8FAFC',
+                'accent'    => '#0F172A',
+                'textColor' => '#0F172A',
+            ],
+            'corporate' => [
+                'name'      => 'Enterprise Campus',
+                'vibe'      => 'Corporate navy dual-tone header, verified security badge, solid tabular side-by-side cards.',
+                'gradient'  => '#1E3A8A',
+                'accent'    => '#2563EB',
+                'textColor' => '#FFFFFF',
             ],
             'hotel' => [
                 'name'      => 'Resort & Hotel',
-                'vibe'      => 'Luxury hospitality suite in warm alabaster, golden champagne accents, Playfair serif typography, and guest concierge pass.',
-                'gradient'  => 'linear-gradient(135deg, #fdfbf7 0%, #f3ede2 100%)',
-                'accent'    => '#b45309',
+                'vibe'      => 'Warm alabaster hospitality suite, golden champagne accents, serif typography, and guest concierge pass.',
+                'gradient'  => '#FDFBF7',
+                'accent'    => '#B45309',
                 'textColor' => '#292524',
+            ],
+            'christmas' => [
+                'name'      => 'Christmas Festive',
+                'vibe'      => 'Pine green backdrop, gentle snowfall, festive holiday ribbon, and golden gift-tier cards.',
+                'gradient'  => '#0D3A2B',
+                'accent'    => '#DC2626',
+                'textColor' => '#FFFFFF',
             ],
             'voucher' => [
                 'name'      => 'Voucher Express',
-                'vibe'      => 'Kiosk scratch-card first layout with prominent fast-pass ticket hero, high-contrast inputs, and side-by-side M-Pesa fallbacks.',
-                'gradient'  => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                'accent'    => '#ea580c',
-                'textColor' => '#ffffff',
+                'vibe'      => 'Kiosk scratch-card first layout with prominent fast-pass ticket hero and side-by-side M-Pesa fallbacks.',
+                'gradient'  => '#0F172A',
+                'accent'    => '#EA580C',
+                'textColor' => '#FFFFFF',
             ],
             'neon' => [
                 'name'      => 'Neon Cyberpunk',
-                'vibe'      => 'Pure OLED black, laser cyan & magenta scanlines, monospace terminal telemetry, and high-voltage glowing borders.',
-                'gradient'  => 'linear-gradient(135deg, #040406 0%, #0c0c14 100%)',
-                'accent'    => '#00f3ff',
-                'textColor' => '#00f3ff',
+                'vibe'      => 'Pure OLED dark canvas, laser cyan telemetry, and glowing borders.',
+                'gradient'  => '#06080E',
+                'accent'    => '#00F3FF',
+                'textColor' => '#00F3FF',
+            ],
+            'cafe' => [
+                'name'      => 'Artisan Cafe',
+                'vibe'      => 'Warm parchment paper, dashed stitching borders, and cozy coffeehouse warmth.',
+                'gradient'  => '#FDF8ED',
+                'accent'    => '#854D0E',
+                'textColor' => '#451A03',
+            ],
+            'sunset' => [
+                'name'      => 'Savannah Sunset',
+                'vibe'      => 'Warm African sunset tones with soft pebble cards and sunny amber tags.',
+                'gradient'  => '#EA580C',
+                'accent'    => '#EA580C',
+                'textColor' => '#FFFFFF',
+            ],
+            'glass' => [
+                'name'      => 'Aurora Glass',
+                'vibe'      => 'Refined glass card over calm deep slate with crisp border and subtle refraction.',
+                'gradient'  => '#1E293B',
+                'accent'    => '#6366F1',
+                'textColor' => '#FFFFFF',
             ],
             'split' => [
                 'name'      => 'Dual Split Hero',
                 'vibe'      => 'Asymmetric dual-column desk hero with live speed gauge and carrier perks on the left, 2-column checkout on the right.',
-                'gradient'  => 'linear-gradient(135deg, #0284c7 0%, #1d4ed8 100%)',
-                'accent'    => '#0284c7',
-                'textColor' => '#ffffff',
-            ],
-            'sunset' => [
-                'name'      => 'Savannah Sunset',
-                'vibe'      => 'Warm African sunset gradient with soft pebble cards, sunny amber tags, and friendly energetic vibe.',
-                'gradient'  => 'linear-gradient(135deg, #f97316 0%, #ec4899 50%, #7c3aed 100%)',
-                'accent'    => '#f97316',
-                'textColor' => '#ffffff',
-            ],
-            'minimal' => [
-                'name'      => 'Starlink Minimal',
-                'vibe'      => 'Ultra-refined Scandinavian monochrome, razor-thin borders, clean radio side-by-side pills, and crisp contrast.',
-                'gradient'  => 'linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%)',
-                'accent'    => '#0f172a',
-                'textColor' => '#0f172a',
-            ],
-            'corporate' => [
-                'name'      => 'Enterprise Campus',
-                'vibe'      => 'Corporate navy dual-tone header, verified security badge, solid tabular side-by-side cards for offices and co-working.',
-                'gradient'  => 'linear-gradient(135deg, #1e3a8a 0%, #172554 100%)',
-                'accent'    => '#2563eb',
-                'textColor' => '#ffffff',
-            ],
-            'cafe' => [
-                'name'      => 'Artisan Cafe',
-                'vibe'      => 'Warm parchment paper, Georgia serif headings, dashed stitching borders, and cozy coffeehouse warmth.',
-                'gradient'  => 'linear-gradient(135deg, #fdf8ed 0%, #fef3c7 100%)',
-                'accent'    => '#854d0e',
-                'textColor' => '#451a03',
+                'gradient'  => '#0284C7',
+                'accent'    => '#0284C7',
+                'textColor' => '#FFFFFF',
             ],
         ];
     }
@@ -102,7 +109,7 @@ class CaptivePortalTemplates
     {
         $catalog = self::catalog();
         if (!isset($catalog[$templateKey])) {
-            $templateKey = 'midnight';
+            $templateKey = 'hsmart';
         }
 
         // 1. Sanitize & Normalize Settings
@@ -120,12 +127,16 @@ class CaptivePortalTemplates
         $subheadline    = htmlspecialchars($s->subheadline ?? 'Choose a package and pay via M-Pesa for instant connection.', ENT_QUOTES, 'UTF-8');
         $instructions   = htmlspecialchars($s->payment_instructions ?? 'Select your plan, enter your M-Pesa number, and approve the payment on your phone.', ENT_QUOTES, 'UTF-8');
         $terms          = htmlspecialchars($s->terms_text ?? 'By connecting, you agree to fair usage and terms of service.', ENT_QUOTES, 'UTF-8');
-        $supportPhone   = htmlspecialchars($s->support_phone ?? '+254 743 606 108', ENT_QUOTES, 'UTF-8');
-        $supportWa      = preg_replace('/\D/', '', (string)($s->support_whatsapp ?? '254743606108'));
+        $supportPhone   = !empty($s->support_phone) && !str_contains((string)$s->support_phone, '743 606 108') && !str_contains((string)$s->support_phone, '743606108')
+            ? htmlspecialchars((string)$s->support_phone, ENT_QUOTES, 'UTF-8')
+            : '';
+        $supportWa      = !empty($s->support_whatsapp) && !str_contains((string)$s->support_whatsapp, '743606108')
+            ? preg_replace('/\D/', '', (string)$s->support_whatsapp)
+            : '';
 
         // Validate Colors
-        $primaryColor   = self::sanitizeHexColor($s->brand_color ?? null, '#ff6600');
-        $secondaryColor = self::sanitizeHexColor($s->secondary_color ?? null, '#0f172a');
+        $primaryColor   = self::sanitizeHexColor($s->brand_color ?? null, '#F57C00');
+        $secondaryColor = self::sanitizeHexColor($s->secondary_color ?? null, '#0F172A');
         $buttonTextCol  = self::getContrastColor($primaryColor);
 
         // Validate URLs (http / https only)
@@ -235,6 +246,15 @@ CARD;
 
         $whatsappLink = $supportWa ? "https://wa.me/{$supportWa}?text=Hello%20support%20I%20need%20help%20connecting" : '#';
 
+        $footerLinks = [];
+        if (!empty($supportPhone)) {
+            $footerLinks[] = "<a href=\"tel:{$supportPhone}\"><svg style=\"width:13px;height:13px;display:inline-block;vertical-align:middle;margin-right:4px\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z\"></path></svg>Call {$supportPhone}</a>";
+        }
+        if (!empty($supportWa)) {
+            $footerLinks[] = "<a href=\"{$whatsappLink}\" target=\"_blank\"><svg style=\"width:13px;height:13px;display:inline-block;vertical-align:middle;margin-right:4px\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z\"></path></svg>WhatsApp Support</a>";
+        }
+        $footerLinksHtml = !empty($footerLinks) ? '<div class="footer-links">' . implode('', $footerLinks) . '</div>' : '';
+
         // Template-specific decorative badges and snowfall particles
         $snowflakesHtml = ($templateKey === 'christmas')
             ? <<<SNOW
@@ -254,7 +274,9 @@ SNOW
             : '';
 
         $headerExtraHtml = '';
-        if ($templateKey === 'christmas') {
+        if ($templateKey === 'hsmart') {
+            $headerExtraHtml = '<div class="telemetry-badge"><span class="pulse-dot"></span><span>5G Hotspot • Instant Activation</span></div>';
+        } elseif ($templateKey === 'christmas') {
             $headerExtraHtml = '<div class="festive-ribbon"><span class="ribbon-icon">🎄</span><span>Holiday Special • High-Speed WiFi</span><span class="ribbon-icon">🎅</span></div>';
         } elseif ($templateKey === 'hotel') {
             $headerExtraHtml = '<div class="hotel-concierge-badge"><span>🏛️ Guest Concierge Access • High-Speed Pass</span></div>';
@@ -276,6 +298,9 @@ SNOW
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{$brandName} - High Speed WiFi</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         /* Base Reset & Variables */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -536,10 +561,7 @@ SNOW
 
             <div class="footer-note">
                 <p>{$instructions}</p>
-                <div class="footer-links">
-                    <a href="tel:{$supportPhone}">📞 Call {$supportPhone}</a>
-                    <a href="{$whatsappLink}" target="_blank">💬 WhatsApp Support</a>
-                </div>
+                {$footerLinksHtml}
                 <p style="margin-top: 10px; opacity: 0.7; font-size: 11px;">{$terms}</p>
             </div>
         </div>
@@ -1982,8 +2004,141 @@ CSS;
                 }
 CSS;
 
-            case 'midnight':
+            case 'hsmart':
             default:
+                return <<<CSS
+                body.tpl-hsmart {
+                    background: #F8FAFC;
+                    {$bgImageRule}
+                    font-family: 'Jost', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    color: #0F172A;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 24px 16px;
+                    min-height: 100vh;
+                }
+                .tpl-hsmart .portal-container { width: 100%; max-width: 440px; margin: 0 auto; }
+                .tpl-hsmart .portal-card {
+                    background: #FFFFFF;
+                    border: 1px solid #E2E8F0;
+                    border-radius: 20px;
+                    padding: 32px 24px;
+                    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+                }
+                .tpl-hsmart .telemetry-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    background: #EDE9FE;
+                    color: #6D28D9;
+                    font-size: 11px;
+                    font-weight: 800;
+                    padding: 4px 12px;
+                    border-radius: 999px;
+                    margin-bottom: 14px;
+                    letter-spacing: 0.4px;
+                    text-transform: uppercase;
+                }
+                .tpl-hsmart .telemetry-badge .pulse-dot {
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 50%;
+                    background: #10B981;
+                    box-shadow: 0 0 6px #10B981;
+                }
+                .tpl-hsmart .portal-header { text-align: center; margin-bottom: 22px; }
+                .tpl-hsmart .brand-logo { max-height: 52px; max-width: 190px; margin-bottom: 12px; }
+                .tpl-hsmart .brand-badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 22px; color: #0F172A; margin-bottom: 12px; }
+                .tpl-hsmart .portal-headline { font-size: 22px; font-weight: 800; color: #0F172A; letter-spacing: -0.3px; line-height: 1.25; }
+                .tpl-hsmart .portal-subheadline { font-size: 13.5px; color: #64748B; margin-top: 6px; line-height: 1.45; }
+                .tpl-hsmart .plan-card {
+                    background: #FFFFFF;
+                    border: 1.5px solid #E2E8F0;
+                    border-radius: 12px;
+                    color: #0F172A;
+                    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+                    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                }
+                .tpl-hsmart .plan-card:hover {
+                    border-color: #CBD5E1;
+                    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+                }
+                .tpl-hsmart .plan-pill-duration {
+                    background: #F1F5F9;
+                    color: #334155;
+                    font-weight: 700;
+                }
+                .tpl-hsmart .plan-pill-speed {
+                    color: #0284C7;
+                    font-weight: 700;
+                }
+                .tpl-hsmart .plan-cur {
+                    color: {$primary};
+                    font-weight: 800;
+                }
+                .tpl-hsmart .plan-val {
+                    color: #0F172A;
+                    font-weight: 900;
+                }
+                .tpl-hsmart .plan-title {
+                    color: #334155;
+                    font-weight: 700;
+                }
+                .tpl-hsmart .plan-card.selected {
+                    border-color: {$primary};
+                    background: #FFF7ED;
+                    box-shadow: 0 0 0 3px rgba(245, 124, 0, 0.15), 0 4px 14px rgba(245, 124, 0, 0.12);
+                }
+                .tpl-hsmart .plan-card.selected .plan-check-dot {
+                    background: {$primary};
+                    border-color: {$primary};
+                    box-shadow: 0 0 8px rgba(245, 124, 0, 0.4);
+                }
+                .tpl-hsmart .form-label {
+                    color: #334155;
+                    font-weight: 700;
+                    font-size: 12.5px;
+                }
+                .tpl-hsmart .input-box {
+                    background: #FFFFFF;
+                    border: 1.5px solid #CBD5E1;
+                    color: #0F172A;
+                    border-radius: 10px;
+                    font-size: 14.5px;
+                    font-weight: 600;
+                    transition: border-color 0.2s, box-shadow 0.2s;
+                }
+                .tpl-hsmart .input-box::placeholder {
+                    color: #94A3B8;
+                }
+                .tpl-hsmart .input-box:focus {
+                    border-color: {$primary};
+                    box-shadow: 0 0 0 3px rgba(245, 124, 0, 0.15);
+                    outline: none;
+                }
+                .tpl-hsmart .btn-pay {
+                    background: {$primary};
+                    color: {$btnText};
+                    font-weight: 800;
+                    border-radius: 10px;
+                    box-shadow: 0 4px 14px rgba(245, 124, 0, 0.35);
+                    transition: transform 0.15s, box-shadow 0.15s;
+                }
+                .tpl-hsmart .btn-pay:hover {
+                    box-shadow: 0 6px 18px rgba(245, 124, 0, 0.45);
+                    transform: translateY(-1px);
+                }
+                .tpl-hsmart .footer-note {
+                    color: #64748B;
+                }
+                .tpl-hsmart .footer-links a {
+                    color: {$primary};
+                    font-weight: 600;
+                }
+CSS;
+
+            case 'midnight':
                 return <<<CSS
                 body.tpl-midnight {
                     background: radial-gradient(ellipse at 50% 10%, rgba(249, 115, 22, 0.16) 0%, transparent 60%), #06080e;
@@ -2139,23 +2294,23 @@ CSS;
             'brand_name'           => 'HSmart WiFi',
             'headline'             => 'Welcome to High-Speed Internet',
             'subheadline'          => 'Instant automated M-Pesa activation with zero buffering.',
-            'brand_color'          => '#ff6600',
-            'secondary_color'      => '#0f172a',
-            'support_phone'        => '+254 743 606 108',
-            'support_whatsapp'     => '254743606108',
+            'brand_color'          => '#F57C00',
+            'secondary_color'      => '#0F172A',
+            'support_phone'        => '',
+            'support_whatsapp'     => '',
             'payment_instructions' => 'Select a package, enter your M-Pesa phone number, and accept the STK push on your phone.',
             'terms_text'           => 'By connecting, you agree to our fair use policy and terms of service.',
             'logo_url'             => 'https://isp.hsmart.co.ke/images/hsmart-isp-logo.svg',
             'background_url'       => '',
         ];
-        $template = 'midnight';
+        $template = 'hsmart';
 
         try {
             $tenantObj = \Illuminate\Support\Facades\DB::table('tenants')->where('id', $tenantId)->first();
             if ($tenantObj && !empty($tenantObj->name)) {
                 $settings['brand_name'] = $tenantObj->name;
             }
-            if ($tenantObj && !empty($tenantObj->phone)) {
+            if ($tenantObj && !empty($tenantObj->phone) && !str_contains($tenantObj->phone, '743 606 108') && !str_contains($tenantObj->phone, '743606108')) {
                 $settings['support_phone'] = $tenantObj->phone;
                 $settings['support_whatsapp'] = preg_replace('/\D/', '', $tenantObj->phone);
             }

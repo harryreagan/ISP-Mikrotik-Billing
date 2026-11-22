@@ -130,20 +130,22 @@
 
                         <div class="col-12">
                             <label class="form-label">Main Headline</label>
-                            <input type="text" wire:model.live.debounce.400ms="headline" class="form-control">
+                            <input type="text" wire:model.live.debounce.400ms="headline" class="form-control" placeholder="Welcome to High-Speed Internet">
                         </div>
                         <div class="col-12">
                             <label class="form-label">Subheadline / Value Proposition</label>
-                            <input type="text" wire:model.live.debounce.400ms="subheadline" class="form-control">
+                            <input type="text" wire:model.live.debounce.400ms="subheadline" class="form-control" placeholder="Instant automated M-Pesa activation with zero buffering.">
                         </div>
 
                         <div class="col-md-6">
                             <label class="form-label">Support Phone</label>
-                            <input type="text" wire:model.live.debounce.400ms="support_phone" class="form-control">
+                            <input type="text" wire:model.live.debounce.400ms="support_phone" class="form-control" placeholder="e.g. 0712 345 678 (optional)">
+                            <small class="text-muted">Customer help phone (leave empty if not applicable)</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">WhatsApp Direct Link Number</label>
-                            <input type="text" wire:model.live.debounce.400ms="support_whatsapp" class="form-control" placeholder="2547XXXXXXXX">
+                            <input type="text" wire:model.live.debounce.400ms="support_whatsapp" class="form-control" placeholder="e.g. 254712345678 (optional)">
+                            <small class="text-muted">International format without + or spaces</small>
                         </div>
 
                         <div class="col-12">

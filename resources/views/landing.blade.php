@@ -6,7 +6,7 @@
 
     $landingConfig = config('landing');
     $brandName = $landingConfig['brand_name'] ?? 'HSmart ISP';
-    $whatsappNumber = $landingConfig['whatsapp_number'] ?? '254743606108';
+    $whatsappNumber = ($landingConfig['whatsapp_number'] && !str_contains($landingConfig['whatsapp_number'], '743606108')) ? $landingConfig['whatsapp_number'] : '';
     $whatsappPlaceholder = $landingConfig['whatsapp_display_placeholder'] ?? '[YOUR NUMBER]';
     $supportEmail = $landingConfig['support_email'] ?? 'support@hsmart.co.ke';
 

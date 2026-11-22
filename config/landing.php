@@ -12,7 +12,7 @@ return [
     'brand_name' => 'HSmart ISP',
 
     // Replace [YOUR NUMBER] / placeholder digits with your live WhatsApp number (E.164 digits without +)
-    'whatsapp_number' => env('LANDING_WHATSAPP_NUMBER', '254743606108'),
+    'whatsapp_number' => env('LANDING_WHATSAPP_NUMBER', ''),
     'whatsapp_display_placeholder' => '[YOUR NUMBER]',
     'support_email' => env('LANDING_SUPPORT_EMAIL', 'support@hsmart.co.ke'),
 
