@@ -48,10 +48,13 @@
             document.querySelector('.navbar-vertical').classList.add(`navbar-${navbarStyle}`);
         }
     </script>
-    <div class="d-flex align-items-center justify-content-between px-3 border-bottom border-200" style="height: 64px; background: var(--surface);">
+    <div class="d-flex align-items-center justify-content-between px-3 border-bottom border-200 sidebar-header-bar" style="height: 64px; background: var(--surface);">
         <a class="navbar-brand m-0 p-0 text-decoration-none d-flex align-items-center" href="{{ route('dashboard') }}" style="text-decoration: none;">
             <x-hsmart-logo color="auto" height="40px" />
         </a>
+        <button type="button" class="btn btn-sm btn-link text-secondary p-1 sidebar-collapse-btn d-none d-xl-inline-flex align-items-center justify-content-center text-decoration-none" onclick="window.toggleDesktopSidebar && window.toggleDesktopSidebar()" title="{{ __('Toggle sidebar') }}" aria-label="Toggle sidebar" style="width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border-ring, rgba(226, 232, 240, 0.7)); background: var(--surface); cursor: pointer;">
+            <i class="bi bi-layout-sidebar-inset sidebar-toggle-icon" style="font-size: 15px; color: var(--text-secondary, #64748b);"></i>
+        </button>
     </div>
     <div class="collapse navbar-collapse" id="navbarVerticalCollapse">
         <div class="navbar-vertical-content scrollbar">
