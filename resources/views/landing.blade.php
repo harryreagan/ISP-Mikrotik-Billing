@@ -13,7 +13,8 @@
     // Currency Detection via Cloudflare CF-IPCountry, Accept-Language, or Cookie (Default: KES)
     $detectedCurrency = \App\Services\Currency\CurrencyDetector::detect(request());
     $currencies = \App\Services\Currency\CurrencyDetector::getRates();
-    $defaultCurrency = $detectedCurrency;
+    // Guarantee KES as default display for HSmart ISP unless explicitly overridden
+    $defaultCurrency = (request()->cookie('hsmart_currency') || request()->cookie('hsmart_landing_currency') || request()->has('currency')) ? $detectedCurrency : 'KES';
 
     $plansBaseKes = $landingConfig['plans_base_kes'] ?? ['starter' => 400, 'business' => 1000, 'enterprise' => null];
     $previewBaseKes = $landingConfig['preview_base_kes'] ?? [
@@ -224,6 +225,42 @@
         .btn-outline-light:hover {
             background: #FFFFFF;
             color: #111111;
+        }
+
+        .btn-login-portal {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            min-height: 42px;
+            padding: 8px 18px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 700;
+            color: #0F172A;
+            background: #F1F5F9;
+            border: 1.5px solid #CBD5E1;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .btn-login-portal:hover {
+            background: #0F172A;
+            color: #FFFFFF;
+            border-color: #0F172A;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.18);
+            transform: translateY(-1px);
+        }
+
+        .btn-login-portal svg {
+            stroke: currentColor;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+
+        .btn-login-portal:hover svg {
+            transform: translateX(2px);
         }
 
         /* ─── HEADER (56px mobile bar, 44x44 hamburger, horizontal desktop) ─── */
@@ -1276,7 +1313,6 @@
                 <a href="#how" data-i18n="nav.how">{{ $t['nav']['how'] }}</a>
                 <a href="#pricing" data-i18n="nav.pricing">{{ $t['nav']['pricing'] }}</a>
                 <a href="#faq" data-i18n="nav.faq">{{ $t['nav']['faq'] }}</a>
-                <a href="{{ $loginUrl }}" data-i18n="nav.login">{{ $t['nav']['login'] }}</a>
 
                 <div class="lang-switcher" role="group" aria-label="{{ $t['nav']['language'] }}">
                     <button type="button" class="lang-btn {{ $locale === 'en' ? 'active' : '' }}" data-lang-switch="en">EN</button>
@@ -1284,7 +1320,16 @@
                     <button type="button" class="lang-btn {{ $locale === 'fr' ? 'active' : '' }}" data-lang-switch="fr">FR</button>
                 </div>
 
-                <a href="{{ $registerUrl }}" class="btn btn-orange" style="min-height: 44px; padding: 10px 20px;" data-i18n="nav.trial">
+                <a href="{{ $loginUrl }}" class="btn-login-portal" data-i18n="nav.login">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                        <polyline points="10 17 15 12 10 7"/>
+                        <line x1="15" y1="12" x2="3" y2="12"/>
+                    </svg>
+                    <span>Portal Login</span>
+                </a>
+
+                <a href="{{ $registerUrl }}" class="btn btn-orange" style="min-height: 42px; padding: 10px 20px;" data-i18n="nav.trial">
                     {{ $t['nav']['trial'] }}
                 </a>
             </nav>
@@ -1311,7 +1356,6 @@
                 <a href="#how" class="mobile-nav-link" data-i18n="nav.how">{{ $t['nav']['how'] }}</a>
                 <a href="#pricing" class="mobile-nav-link" data-i18n="nav.pricing">{{ $t['nav']['pricing'] }}</a>
                 <a href="#faq" class="mobile-nav-link" data-i18n="nav.faq">{{ $t['nav']['faq'] }}</a>
-                <a href="{{ $loginUrl }}" class="mobile-nav-link" data-i18n="nav.login">{{ $t['nav']['login'] }}</a>
             </nav>
 
             <div class="mobile-menu-Controls">
@@ -1323,9 +1367,19 @@
                 </div>
             </div>
 
-            <a href="{{ $registerUrl }}" class="btn btn-orange" style="width: 100%;" data-i18n="nav.trial">
-                {{ $t['nav']['trial'] }}
-            </a>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 14px;">
+                <a href="{{ $loginUrl }}" class="btn btn-login-portal" style="width: 100%; justify-content: center;" data-i18n="nav.login">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                        <polyline points="10 17 15 12 10 7"/>
+                        <line x1="15" y1="12" x2="3" y2="12"/>
+                    </svg>
+                    <span>Portal Login</span>
+                </a>
+                <a href="{{ $registerUrl }}" class="btn btn-orange" style="width: 100%;" data-i18n="nav.trial">
+                    {{ $t['nav']['trial'] }}
+                </a>
+            </div>
         </div>
     </header>
 
@@ -1379,20 +1433,20 @@
                         </div>
                         <div class="tile g2">
                             <span class="tile-label" data-i18n="preview.today_pppoe">{{ $t['preview']['today_pppoe'] }}</span>
-                            <div class="tile-val" data-price-kes="{{ $previewBaseKes['pppoe_today'] }}">$97</div>
+                            <div class="tile-val" data-price-kes="{{ $previewBaseKes['pppoe_today'] }}">KES {{ number_format($previewBaseKes['pppoe_today']) }}</div>
                             <span class="tile-sub" data-i18n="preview.pppoe_only">{{ $t['preview']['pppoe_only'] }}</span>
                         </div>
                         <div class="tile g3">
                             <span class="tile-label" data-i18n="preview.hotspot_sales">{{ $t['preview']['hotspot_sales'] }}</span>
-                            <div class="tile-val" data-price-kes="{{ $previewBaseKes['hotspot_today'] }}">$53</div>
+                            <div class="tile-val" data-price-kes="{{ $previewBaseKes['hotspot_today'] }}">KES {{ number_format($previewBaseKes['hotspot_today']) }}</div>
                             <span class="tile-sub" data-i18n="preview.hotspot_only">{{ $t['preview']['hotspot_only'] }}</span>
                         </div>
                         <div class="tile g4">
                             <span class="tile-label" data-i18n="preview.total_revenue">{{ $t['preview']['total_revenue'] }}</span>
-                            <div class="tile-val" data-price-kes="{{ $previewBaseKes['total_revenue'] }}">$3,111</div>
+                            <div class="tile-val" data-price-kes="{{ $previewBaseKes['total_revenue'] }}">KES {{ number_format($previewBaseKes['total_revenue']) }}</div>
                             <span class="tile-sub">
                                 <span data-i18n="preview.pending_due">{{ $t['preview']['pending_due'] }}</span>
-                                <strong data-price-kes="{{ $previewBaseKes['pending_due'] }}">$270</strong>
+                                <strong data-price-kes="{{ $previewBaseKes['pending_due'] }}">KES {{ number_format($previewBaseKes['pending_due']) }}</strong>
                             </span>
                         </div>
                     </div>
@@ -1912,15 +1966,16 @@
         });
     });
 
-    // Initialize saved preferences or defaults (prioritize cookie)
-    let initialCurrency = CONFIG.DEFAULT_CURRENCY;
+    // Initialize saved preferences or defaults (prioritize explicit cookie choice)
+    let initialCurrency = 'KES';
     let initialLang = @json($locale);
     try {
         const cookieMatch = document.cookie.match(/(?:^|; )hsmart_currency=([^;]*)/);
         const cookieCurr = cookieMatch ? decodeURIComponent(cookieMatch[1]) : null;
-        const savedCurr = (cookieCurr && CONFIG.CURRENCIES[cookieCurr]) ? cookieCurr : localStorage.getItem('hsmart_landing_currency');
-        if (savedCurr && CONFIG.CURRENCIES[savedCurr]) {
-            initialCurrency = savedCurr;
+        if (cookieCurr && CONFIG.CURRENCIES[cookieCurr]) {
+            initialCurrency = cookieCurr;
+        } else if (CONFIG.DEFAULT_CURRENCY && CONFIG.CURRENCIES[CONFIG.DEFAULT_CURRENCY]) {
+            initialCurrency = CONFIG.DEFAULT_CURRENCY;
         }
         const savedLang = localStorage.getItem('hsmart_landing_lang');
         if (savedLang && CONFIG.TRANSLATIONS[savedLang]) {

@@ -27,20 +27,20 @@ class CurrencyDetector
             }
         }
 
-        // 2. Cloudflare CF-IPCountry header
+        // 2. Cloudflare CF-IPCountry header (if specifically from another country)
         $cfCountry = strtoupper(trim((string)($request->header('CF-IPCountry') ?? ($request->server('HTTP_CF_IPCOUNTRY') ?? ''))));
-        if (!empty($cfCountry) && $cfCountry !== 'XX' && $cfCountry !== 'T1') {
+        if (!empty($cfCountry) && !in_array($cfCountry, ['XX', 'T1', 'KE'])) {
             $currFromCountry = self::mapCountryToCurrency($cfCountry);
             if ($currFromCountry && self::hasRateFor($currFromCountry)) {
                 return $currFromCountry;
             }
         }
 
-        // 3. Accept-Language header (e.g. en-KE, en-UG, sw-TZ, rw-RW, en-US)
+        // 3. Explicit regional East African languages only (do not switch to USD just because of en-US browser default)
         $acceptLang = $request->header('Accept-Language', '');
         if (!empty($acceptLang)) {
             $detectedCountry = self::extractCountryFromAcceptLanguage($acceptLang);
-            if ($detectedCountry) {
+            if ($detectedCountry && in_array($detectedCountry, ['UG', 'TZ', 'RW'])) {
                 $currFromLang = self::mapCountryToCurrency($detectedCountry);
                 if ($currFromLang && self::hasRateFor($currFromLang)) {
                     return $currFromLang;
@@ -48,7 +48,7 @@ class CurrencyDetector
             }
         }
 
-        // 4. Default fallback: KES
+        // 4. Default home currency for HSmart ISP: KES
         return 'KES';
     }
 
