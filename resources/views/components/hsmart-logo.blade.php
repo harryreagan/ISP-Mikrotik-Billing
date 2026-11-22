@@ -6,6 +6,7 @@
     'showSubtitle' => null,
     'asLink' => true,
     'href' => null,
+    'showTenantBadge' => false,
 ])
 
 @php
@@ -16,8 +17,11 @@
 
     $targetUrl = $href ?: url('/');
 
-    $loggedInBusinessName = null;
-    if (auth()->check()) {
+    // White label / custom tenant: only if explicitly passed via brandName OR requested in tenant portal with showTenantBadge=true
+    $customTenant = null;
+    if ($brandName && !in_array(strtolower(trim((string)$brandName)), ['hsmart', 'hsmart platforms', 'hsmart isp', 'default'])) {
+        $customTenant = $brandName;
+    } elseif ($showTenantBadge && auth()->check() && !request()->is('terms*', 'privacy*', 'cookie*', 'landing*', 'login', 'register', 'forgot-password', 'password*')) {
         $u = auth()->user();
         $tName = $u->tenant?->name ?? null;
         $rComp = $u->reseller?->company ?? null;
@@ -41,13 +45,9 @@
         $found = reset($candidates) ?: null;
         if ($found) {
             $stripped = trim(preg_replace('/^hsmart\s+/i', '', (string) $found));
-            $loggedInBusinessName = $stripped !== '' ? $stripped : $found;
+            $customTenant = $stripped !== '' ? $stripped : $found;
         }
     }
-    
-    $customTenant = $brandName && !in_array(strtolower(trim((string)$brandName)), ['hsmart', 'hsmart platforms', 'hsmart isp', 'default']) 
-        ? $brandName 
-        : $loggedInBusinessName;
 @endphp
 
 @if($asLink)

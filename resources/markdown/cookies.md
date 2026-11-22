@@ -52,3 +52,4 @@ For questions regarding our use of cookies or privacy practices:
 - **Email**: privacy@hsmart.co.ke / support@hsmart.co.ke
 - **Phone / WhatsApp**: +254 743 606 108
 - **Address**: Harry Smart Technologies Ltd, Nairobi, Kenya
+

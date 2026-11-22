@@ -39,7 +39,10 @@ class RobustRouterosClient extends Client
 
     private function authenticate(): void
     {
-        // Step 1: Direct modern login (RouterOS v6.43+ and all RouterOS v7) with plaintext credentials
+        // Step 1: Initial /login handshake query (primes RouterOS API session)
+        $this->query('/login')->read(false);
+
+        // Step 2: Modern login (RouterOS v6.43+ and all RouterOS v7) with plaintext credentials
         $qModern = new Query('/login', [
             '=name=' . $this->cfg->get('user'),
             '=password=' . $this->cfg->get('pass'),
