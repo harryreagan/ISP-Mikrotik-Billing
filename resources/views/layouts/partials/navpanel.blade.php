@@ -145,10 +145,6 @@
                 <a wire:navigate.hover wire:current.exact="active" class="nav-link"
                     href="{{ route('customers.index') }}" role="button">{{ __('Customers') }}</a>
             </li>
-            <li class="nav-item">
-                <a wire:navigate.hover wire:current="active" class="nav-link" href="{{ route('admin-tickets') }}"
-                    role="button">{{ __('Support Tickets') }}</a>
-            </li>
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
                     aria-haspopup="true" aria-expanded="false" id="collections">{{ __('Collection') }}</a>

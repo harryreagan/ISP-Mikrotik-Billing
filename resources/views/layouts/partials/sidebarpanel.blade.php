@@ -174,7 +174,20 @@
                             ->where(fn($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
                             ->count();
                         $sbActiveCount = max($sbActiveCount, $sbHsActive);
-                        $sbOnlineCount = max($sbOnlineCount, $sbHsActive);
+                    }
+                    if (\Illuminate\Support\Facades\Schema::hasTable('routers')) {
+                        $tenantRouters = \App\Models\Router::withoutGlobalScopes()
+                            ->where('tenant_id', $sidebarTenantId)
+                            ->where('status', 'online')
+                            ->get();
+                        $rLive = 0;
+                        foreach ($tenantRouters as $tr) {
+                            $pr = is_array($tr->port_roles) ? $tr->port_roles : [];
+                            $rLive += (int) ($pr['active_total'] ?? (($pr['active_hs'] ?? 0) + ($pr['active_ppp'] ?? 0)));
+                        }
+                        if ($rLive > 0) {
+                            $sbOnlineCount = max($sbOnlineCount, $rLive);
+                        }
                     }
                 } catch (\Throwable $e) {}
                 $isCustomersOpen = request()->routeIs('admin.customers') || request()->routeIs('customers.index') || request()->routeIs('admin.activation.*') || request()->routeIs('new-customer');

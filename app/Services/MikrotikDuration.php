@@ -42,47 +42,65 @@ class MikrotikDuration
                 $seconds = (int) round($val);
             }
         } else {
-            // 1. Compound MikroTik duration parsing (e.g. "1w2d3h4m5s", "1h34m30s", "45m", "30s")
-            $compoundMatched = false;
-            $totalCompound = 0;
-            if (preg_match_all('/([0-9.]+)\s*([wdhms])/i', $str, $allParts, PREG_SET_ORDER)) {
-                foreach ($allParts as $part) {
-                    $val = (float) $part[1];
-                    $unitKey = strtolower($part[2]);
-                    $compoundMatched = true;
-                    if ($unitKey === 'w') $totalCompound += (int) round($val * 604800);
-                    elseif ($unitKey === 'd') $totalCompound += (int) round($val * 86400);
-                    elseif ($unitKey === 'h') $totalCompound += (int) round($val * 3600);
-                    elseif ($unitKey === 'm') $totalCompound += (int) round($val * 60);
-                    elseif ($unitKey === 's') $totalCompound += (int) round($val);
-                }
-            }
-
-            if ($compoundMatched && $totalCompound > 0) {
-                $seconds = $totalCompound;
-            } elseif (preg_match('/([0-9.]+)\s*(month|mon)/i', $str, $matches)) {
-                $seconds = (int) round(((float)$matches[1]) * 2592000);
-            } elseif (preg_match('/([0-9.]+)\s*(week|wk)/i', $str, $matches)) {
-                $seconds = (int) round(((float)$matches[1]) * 604800);
-            } elseif (preg_match('/([0-9.]+)\s*(day)/i', $str, $matches)) {
-                $seconds = (int) round(((float)$matches[1]) * 86400);
-            } elseif (preg_match('/([0-9.]+)\s*(hour|hr)/i', $str, $matches)) {
-                $seconds = (int) round(((float)$matches[1]) * 3600);
-            } elseif (preg_match('/([0-9.]+)\s*(min|minute)/i', $str, $matches)) {
-                $seconds = (int) round(((float)$matches[1]) * 60);
-            } elseif (preg_match('/([0-9.]+)\s*(sec|second)/i', $str, $matches)) {
-                $seconds = (int) round((float)$matches[1]);
-            } else {
-                // Fallback numeric extract
-                $num = (float) filter_var($str, FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION);
-                if ($num > 0) {
-                    if (str_contains($str, 'min')) {
-                        $seconds = (int) round($num * 60);
-                    } else {
-                        $seconds = (int) round($num * 3600);
-                    }
+            // 0. RouterOS colon-based duration/uptime parsing (e.g. "00:05:00", "01:30:15", "05:30", "1d02:15:30", "2w1d04:20:00")
+            if (preg_match('/^(([0-9]+)\s*w)?\s*(([0-9]+)\s*d)?\s*([0-9]{1,2}:[0-9]{2}(:[0-9]{2})?)$/i', $str, $cm)) {
+                $weeks = !empty($cm[2]) ? (int) $cm[2] : 0;
+                $days = !empty($cm[4]) ? (int) $cm[4] : 0;
+                $timePart = $cm[5];
+                $timeParts = explode(':', $timePart);
+                if (count($timeParts) === 3) {
+                    $h = (int) $timeParts[0];
+                    $m = (int) $timeParts[1];
+                    $s = (int) $timeParts[2];
                 } else {
-                    $seconds = 3600; // 1 hour default
+                    $h = 0;
+                    $m = (int) $timeParts[0];
+                    $s = (int) $timeParts[1];
+                }
+                $seconds = ($weeks * 604800) + ($days * 86400) + ($h * 3600) + ($m * 60) + $s;
+            } else {
+                // 1. Compound MikroTik duration parsing (e.g. "1w2d3h4m5s", "1h34m30s", "45m", "30s")
+                $compoundMatched = false;
+                $totalCompound = 0;
+                if (preg_match_all('/([0-9.]+)\s*([wdhms])/i', $str, $allParts, PREG_SET_ORDER)) {
+                    foreach ($allParts as $part) {
+                        $val = (float) $part[1];
+                        $unitKey = strtolower($part[2]);
+                        $compoundMatched = true;
+                        if ($unitKey === 'w') $totalCompound += (int) round($val * 604800);
+                        elseif ($unitKey === 'd') $totalCompound += (int) round($val * 86400);
+                        elseif ($unitKey === 'h') $totalCompound += (int) round($val * 3600);
+                        elseif ($unitKey === 'm') $totalCompound += (int) round($val * 60);
+                        elseif ($unitKey === 's') $totalCompound += (int) round($val);
+                    }
+                }
+
+                if ($compoundMatched && $totalCompound > 0) {
+                    $seconds = $totalCompound;
+                } elseif (preg_match('/([0-9.]+)\s*(month|mon)/i', $str, $matches)) {
+                    $seconds = (int) round(((float)$matches[1]) * 2592000);
+                } elseif (preg_match('/([0-9.]+)\s*(week|wk)/i', $str, $matches)) {
+                    $seconds = (int) round(((float)$matches[1]) * 604800);
+                } elseif (preg_match('/([0-9.]+)\s*(day)/i', $str, $matches)) {
+                    $seconds = (int) round(((float)$matches[1]) * 86400);
+                } elseif (preg_match('/([0-9.]+)\s*(hour|hr)/i', $str, $matches)) {
+                    $seconds = (int) round(((float)$matches[1]) * 3600);
+                } elseif (preg_match('/([0-9.]+)\s*(min|minute)/i', $str, $matches)) {
+                    $seconds = (int) round(((float)$matches[1]) * 60);
+                } elseif (preg_match('/([0-9.]+)\s*(sec|second)/i', $str, $matches)) {
+                    $seconds = (int) round((float)$matches[1]);
+                } else {
+                    // Fallback numeric extract
+                    $num = (float) filter_var($str, FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION);
+                    if ($num > 0) {
+                        if (str_contains($str, 'min')) {
+                            $seconds = (int) round($num * 60);
+                        } else {
+                            $seconds = (int) round($num * 3600);
+                        }
+                    } else {
+                        $seconds = 3600; // 1 hour default
+                    }
                 }
             }
         }
