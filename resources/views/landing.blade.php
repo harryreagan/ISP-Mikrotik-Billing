@@ -155,19 +155,24 @@
         .w {
             width: 100%;
             max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 16px;
+            margin-left: auto;
+            margin-right: auto;
+            padding-left: 20px;
+            padding-right: 20px;
+            box-sizing: border-box;
         }
 
         @media (min-width: 640px) {
             .w {
-                padding: 0 24px;
+                padding-left: 24px;
+                padding-right: 24px;
             }
         }
 
         @media (min-width: 1024px) {
             .w {
-                padding: 0 32px;
+                padding-left: 32px;
+                padding-right: 32px;
             }
         }
 
@@ -418,7 +423,8 @@
 
         /* ─── HERO SECTION ─── */
         .hero {
-            padding: 28px 0 48px;
+            padding-top: 28px;
+            padding-bottom: 48px;
             display: grid;
             grid-template-columns: 1fr;
             gap: 32px;
@@ -427,7 +433,8 @@
 
         @media (min-width: 960px) {
             .hero {
-                padding: 56px 0 76px;
+                padding-top: 56px;
+                padding-bottom: 76px;
                 grid-template-columns: 1.05fr 0.95fr;
                 gap: 48px;
             }
@@ -730,12 +737,14 @@
 
         /* ─── SECTIONS & HEADINGS ─── */
         .sec {
-            padding: 56px 0;
+            padding-top: 56px;
+            padding-bottom: 56px;
         }
 
         @media (min-width: 768px) {
             .sec {
-                padding: 84px 0;
+                padding-top: 84px;
+                padding-bottom: 84px;
             }
         }
 
