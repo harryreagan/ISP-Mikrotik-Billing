@@ -1591,6 +1591,10 @@
             <div class="pricing-grid">
                 @forelse($pricingPlans as $plan)
                     @php
+                        if (!empty($plan['is_hidden']) || !empty($plan['hidden']) || (isset($plan['is_active']) && !$plan['is_active'])) {
+                            continue;
+                        }
+
                         $pName = $plan['name'] ?? 'Plan';
                         $basePriceKes = null;
                         if (array_key_exists('base_price_kes', $plan) && $plan['base_price_kes'] !== null && $plan['base_price_kes'] !== '') {
