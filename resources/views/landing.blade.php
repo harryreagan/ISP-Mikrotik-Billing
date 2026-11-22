@@ -30,26 +30,28 @@
     $termsUrl = Route::has('terms.show') ? route('terms.show') : '#terms';
     $whatsAppUrl = 'https://wa.me/' . preg_replace('/\D/', '', $whatsappNumber) . '?text=' . urlencode("Hello {$brandName}, I would like to learn more.");
 
-    // Query platform subscription plans from database (Plan model)
+    // Query platform subscription plans from database
     $pricingPlans = [];
     $landingFaqs = null;
+
+    // 1. Check main_site_data first (where SuperAdmin live edits are stored)
     try {
-        if (\Illuminate\Support\Facades\Schema::hasTable('platform_plans')) {
-            $pricingPlans = \App\Models\Plan::active()->get()->toArray();
+        if (\Illuminate\Support\Facades\Schema::hasTable('main_site_data')) {
+            $rawPlans = \Illuminate\Support\Facades\DB::table('main_site_data')->where('type', 'pricing_plans')->value('value');
+            if ($rawPlans) {
+                $decodedPlans = json_decode($rawPlans, true);
+                if (is_array($decodedPlans) && !empty($decodedPlans)) {
+                    $pricingPlans = $decodedPlans;
+                }
+            }
         }
     } catch (\Throwable $e) {}
 
-    // Backwards-compatible fallback to main_site_data if platform_plans is empty
+    // 2. Next check platform_plans if main_site_data is empty
     if (empty($pricingPlans)) {
         try {
-            if (\Illuminate\Support\Facades\Schema::hasTable('main_site_data')) {
-                $rawPlans = \Illuminate\Support\Facades\DB::table('main_site_data')->where('type', 'pricing_plans')->value('value');
-                if ($rawPlans) {
-                    $decodedPlans = json_decode($rawPlans, true);
-                    if (is_array($decodedPlans) && !empty($decodedPlans)) {
-                        $pricingPlans = $decodedPlans;
-                    }
-                }
+            if (\Illuminate\Support\Facades\Schema::hasTable('platform_plans')) {
+                $pricingPlans = \App\Models\Plan::active()->get()->toArray();
             }
         } catch (\Throwable $e) {}
     }
@@ -65,66 +67,6 @@
             }
         }
     } catch (\Throwable $e) {}
-
-    // Sensible base fallback if database has not been seeded yet
-    if (empty($pricingPlans)) {
-        $pricingPlans = [
-            [
-                'slug' => 'starter',
-                'name' => 'Starter',
-                'base_price_kes' => 400,
-                'router_limit' => 2,
-                'customer_limit' => 150,
-                'features' => [
-                    '2 routers',
-                    '150 customers',
-                    'Mobile money, cards & bank',
-                    'SMS, WhatsApp & email alerts',
-                    'Unlimited admin users',
-                ],
-                'is_popular' => false,
-                'badge' => null,
-                'button_text' => 'Choose Starter',
-                'button_url' => $registerUrl . '?plan=starter',
-            ],
-            [
-                'slug' => 'business',
-                'name' => 'Business',
-                'base_price_kes' => 1000,
-                'router_limit' => 5,
-                'customer_limit' => 500,
-                'features' => [
-                    '5 routers',
-                    '500 customers',
-                    'Resellers and vouchers',
-                    'SMS, WhatsApp & email alerts',
-                    'Unlimited admin users',
-                ],
-                'is_popular' => true,
-                'badge' => 'POPULAR',
-                'button_text' => 'Choose Business',
-                'button_url' => $registerUrl . '?plan=business',
-            ],
-            [
-                'slug' => 'enterprise',
-                'name' => 'Enterprise',
-                'base_price_kes' => null,
-                'router_limit' => null,
-                'customer_limit' => null,
-                'features' => [
-                    'Unlimited routers',
-                    'Unlimited customers',
-                    'Dedicated server / VPS',
-                    'Custom captive portal branding',
-                    '24/7 Priority SLA support',
-                ],
-                'is_popular' => false,
-                'badge' => null,
-                'button_text' => 'Talk to us',
-                'button_url' => $whatsAppUrl,
-            ],
-        ];
-    }
 
     $allTranslations = [
         'en' => trans('landing', [], 'en'),
@@ -1602,22 +1544,71 @@
             </div>
 
             <div class="pricing-grid">
-                @foreach($pricingPlans as $plan)
+                @forelse($pricingPlans as $plan)
                     @php
                         $pName = $plan['name'] ?? 'Plan';
                         $basePriceKes = null;
                         if (array_key_exists('base_price_kes', $plan) && $plan['base_price_kes'] !== null && $plan['base_price_kes'] !== '') {
                             $basePriceKes = (int) $plan['base_price_kes'];
-                        } elseif (isset($plan['price']) && is_numeric($plan['price'])) {
-                            $basePriceKes = (int) $plan['price'];
+                        } elseif (isset($plan['price'])) {
+                            if (is_numeric($plan['price'])) {
+                                $basePriceKes = (int) $plan['price'];
+                            } elseif (is_string($plan['price']) && strtolower(trim($plan['price'])) !== 'custom') {
+                                $digits = preg_replace('/[^\d]/', '', $plan['price']);
+                                if ($digits !== '') {
+                                    $basePriceKes = (int) $digits;
+                                }
+                            }
                         }
-                        $isCustom = ($basePriceKes === null);
+                        $isCustom = ($basePriceKes === null || (isset($plan['price']) && strtolower(trim((string)$plan['price'])) === 'custom'));
+                        $period = isset($plan['period']) ? trim($plan['period']) : '/month';
+                        if ($period !== '' && !str_starts_with($period, '/') && !in_array(strtolower($period), ['one-time', 'none', 'custom'])) {
+                            $period = '/' . $period;
+                        }
+                        if (in_array(strtolower($period), ['none', 'custom', ''])) {
+                            $period = '';
+                        }
+
                         $isPopular = !empty($plan['is_popular']) || !empty($plan['highlighted']) || !empty($plan['badge']);
                         $badgeText = !empty($plan['badge']) ? $plan['badge'] : ($isPopular ? 'POPULAR' : null);
-                        $planTargetUrl = auth()->check() ? url('/subscription?plan=' . ($plan['slug'] ?? 'starter')) : ($registerUrl . '?plan=' . ($plan['slug'] ?? 'starter'));
-                        $btnUrl = $isCustom ? $whatsAppUrl : (auth()->check() ? url('/subscription?plan=' . ($plan['slug'] ?? 'starter')) : (!empty($plan['button_url']) ? $plan['button_url'] : $planTargetUrl));
+                        $planSlug = $plan['slug'] ?? \Illuminate\Support\Str::slug($pName);
+                        $planTargetUrl = auth()->check() ? url('/subscription?plan=' . $planSlug) : ($registerUrl . '?plan=' . $planSlug);
+                        $btnUrl = $isCustom ? $whatsAppUrl : (auth()->check() ? url('/subscription?plan=' . $planSlug) : (!empty($plan['button_url']) ? $plan['button_url'] : $planTargetUrl));
                         $btnText = !empty($plan['button_text']) ? $plan['button_text'] : ($isCustom ? 'Talk to us' : 'Choose Plan');
-                        $features = is_array($plan['features'] ?? null) ? $plan['features'] : [];
+                        $rawFeatures = is_array($plan['features'] ?? null) ? $plan['features'] : [];
+
+                        $builtFeatures = [];
+                        if (isset($plan['router_limit']) && $plan['router_limit'] !== '' && $plan['router_limit'] !== null) {
+                            $rLimit = (int) $plan['router_limit'];
+                            $rText = $rLimit === 0 ? 'Unlimited routers' : ($rLimit . ' ' . ($rLimit === 1 ? 'router' : 'routers'));
+                            $hasRouterBullet = false;
+                            foreach ($rawFeatures as $f) {
+                                if (preg_match('/router/i', (string)$f)) {
+                                    $hasRouterBullet = true;
+                                    break;
+                                }
+                            }
+                            if (!$hasRouterBullet) {
+                                $builtFeatures[] = $rText;
+                            }
+                        }
+
+                        if (isset($plan['customer_limit']) && $plan['customer_limit'] !== '' && $plan['customer_limit'] !== null) {
+                            $cLimit = (int) $plan['customer_limit'];
+                            $cText = $cLimit === 0 ? 'Unlimited customers' : ($cLimit . ' ' . ($cLimit === 1 ? 'customer' : 'customers'));
+                            $hasCustomerBullet = false;
+                            foreach ($rawFeatures as $f) {
+                                if (preg_match('/customer|subscriber|client/i', (string)$f)) {
+                                    $hasCustomerBullet = true;
+                                    break;
+                                }
+                            }
+                            if (!$hasCustomerBullet) {
+                                $builtFeatures[] = $cText;
+                            }
+                        }
+
+                        $features = array_merge($builtFeatures, $rawFeatures);
                     @endphp
                     <div class="p-card {{ $isPopular ? 'popular' : '' }}">
                         @if($badgeText)
@@ -1627,9 +1618,14 @@
                         <div class="p-price">
                             @if(!$isCustom)
                                 <span data-price-plan data-price-kes="{{ $basePriceKes }}">KES {{ number_format($basePriceKes) }}</span>
-                                <small>/month</small>
+                                @if(!empty($period))
+                                    <small>{{ $period }}</small>
+                                @endif
                             @else
                                 <span>Custom</span>
+                                @if(!empty($period))
+                                    <small>{{ $period }}</small>
+                                @endif
                             @endif
                         </div>
                         @if(!empty($features))
@@ -1650,7 +1646,12 @@
                             {{ $btnText }}
                         </a>
                     </div>
-                @endforeach
+                @empty
+                    <div style="text-align: center; padding: 40px; color: #64748b; font-size: 14px; grid-column: 1 / -1;">
+                        <p>No pricing plans currently published. Contact us directly for a custom quote.</p>
+                        <a href="{{ $whatsAppUrl }}" class="btn btn-orange" style="margin-top: 15px; display: inline-block;">Talk to us</a>
+                    </div>
+                @endforelse
             </div>
 
             <p id="approxBilledNote" class="text-center mt-3" style="display: {{ $defaultCurrency !== 'KES' ? 'block' : 'none' }}; font-size: 0.8125rem; color: #64748b; margin-top: 0.75rem; text-align: center;">
