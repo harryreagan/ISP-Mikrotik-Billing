@@ -1,15 +1,9 @@
-<x-guest-layout>
-    <div class="terms-policy-container">
-        <div class="box">
-            <div class="min-h-screen flex flex-col items-center pt-6 sm:pt-0">
-                <div class="h-25">
-                    <x-authentication-auth-logo />
-                </div>
+@extends('layouts.legal', [
+    'title'    => 'Terms of Service',
+    'heading'  => 'Terms of Service',
+    'subtitle' => 'Operating terms, router orchestration policies, and service level agreements on HSmart ISP.'
+])
 
-                <div class="w-full sm:max-w-2xl mt-6 p-6 bg-white dark:bg-gray-800 shadow-md overflow-hidden sm:rounded-lg prose dark:prose-invert">
-                    {!! $terms !!}
-                </div>
-            </div>
-        </div>
-    </div>
-</x-guest-layout>
+@section('content')
+    {!! $terms !!}
+@endsection

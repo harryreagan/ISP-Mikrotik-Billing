@@ -479,4 +479,16 @@ Route::post('/payment/mock/submit', [BkashPaymentController::class, 'mockSubmit'
 Route::get('/portal/recharge/voucher', [PortalVoucherController::class, 'showRechargeForm'])->name('portal.voucher.recharge');
 Route::post('/portal/recharge/voucher', [PortalVoucherController::class, 'redeem'])->name('portal.voucher.redeem');
 
+// Legal Policies (Terms of Service, Privacy Policy, Cookie Policy)
+Route::get('/cookie-policy', function () {
+    $file = resource_path('markdown/cookies.md');
+    $content = file_exists($file) ? \Illuminate\Support\Str::markdown(file_get_contents($file)) : '';
+    return view('cookies', ['cookies' => $content]);
+})->name('cookie.show');
+
+Route::get('/cookies', fn() => redirect()->route('cookie.show'));
+Route::get('/terms', fn() => redirect()->route('terms.show'));
+Route::get('/privacy', fn() => redirect()->route('policy.show'));
+
+
 
