@@ -11,8 +11,8 @@
 @php
     $isLight = ($color === 'light');
     $logoSrc = $isLight 
-        ? asset('images/hsmart-platforms-logo-white.png') 
-        : asset('images/hsmart-platforms-logo.png');
+        ? asset('images/hsmart-isp-logo-white.png') 
+        : asset('images/hsmart-isp-logo.png');
 
     $targetUrl = $href ?: url('/');
 
@@ -51,9 +51,9 @@
 @endphp
 
 @if($asLink)
-<a href="{{ $targetUrl }}" {{ $attributes->merge(['class' => 'hsmart-brand-logo']) }} style="display: inline-flex; align-items: center; gap: 10px; text-decoration: none; user-select: none; transition: opacity 0.2s ease, transform 0.2s ease; outline: none;" aria-label="HSmart Platforms">
+<a href="{{ $targetUrl }}" {{ $attributes->merge(['class' => 'hsmart-brand-logo']) }} style="display: inline-flex; align-items: center; gap: 10px; text-decoration: none; user-select: none; transition: opacity 0.2s ease, transform 0.2s ease; outline: none;" aria-label="HSmart ISP">
     <img src="{{ $logoSrc }}" 
-         alt="HSmart Platforms - Reliable Solutions. Always." 
+         alt="HSmart ISP - Smarter Internet. Always." 
          class="hsmart-logo-img" 
          style="height: {{ $height }}; width: auto; max-height: 100%; display: block; object-fit: contain; vertical-align: middle;" />
 
@@ -68,7 +68,7 @@
 @else
 <div {{ $attributes->merge(['class' => 'hsmart-brand-logo']) }} style="display: inline-flex; align-items: center; gap: 10px; text-decoration: none; user-select: none;">
     <img src="{{ $logoSrc }}" 
-         alt="HSmart Platforms - Reliable Solutions. Always." 
+         alt="HSmart ISP - Smarter Internet. Always." 
          class="hsmart-logo-img" 
          style="height: {{ $height }}; width: auto; max-height: 100%; display: block; object-fit: contain; vertical-align: middle;" />
 
