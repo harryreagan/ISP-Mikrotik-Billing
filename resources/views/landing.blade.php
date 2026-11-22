@@ -1588,15 +1588,6 @@
                 <p data-i18n="pricing.subtitle">{{ $t['pricing']['subtitle'] }}</p>
             </div>
 
-            <div class="currency-bar">
-                <label for="currencySelect" data-i18n="pricing.currency_label">{{ $t['pricing']['currency_label'] }}</label>
-                <select id="currencySelect" class="currency-select" aria-label="{{ $t['pricing']['currency_label'] }}">
-                    @foreach($currencies as $code => $cInfo)
-                        <option value="{{ $code }}" {{ $code === $defaultCurrency ? 'selected' : '' }}>{{ $code }}</option>
-                    @endforeach
-                </select>
-            </div>
-
             <div class="pricing-grid">
                 @forelse($pricingPlans as $plan)
                     @php
@@ -1707,10 +1698,6 @@
                     </div>
                 @endforelse
             </div>
-
-            <p id="approxBilledNote" class="text-center mt-3" style="display: {{ $defaultCurrency !== 'KES' ? 'block' : 'none' }}; font-size: 0.8125rem; color: #64748b; margin-top: 0.75rem; text-align: center;">
-                Approximate. You are billed in KES.
-            </p>
 
             <p class="pricing-note" data-i18n="pricing.note">{{ $t['pricing']['note'] }}</p>
         </section>
@@ -1837,65 +1824,26 @@
         TRANSLATIONS: @json($allTranslations),
     };
 
-    function formatPrice(amountInKes, currencyCode) {
-        const code = (currencyCode && CONFIG.CURRENCIES[currencyCode]) ? currencyCode : CONFIG.DEFAULT_CURRENCY;
-        const cfg = CONFIG.CURRENCIES[code] || CONFIG.CURRENCIES.KES;
-        const rate = Number(cfg.rate_from_kes || 1);
-        const converted = Math.round(Number(amountInKes) * rate);
-        try {
-            return new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: code,
-                maximumFractionDigits: 0
-            }).format(converted);
-        } catch (e) {
-            return code + ' ' + converted.toLocaleString('en-US');
-        }
+    function formatPrice(amountInKes) {
+        return 'KES ' + Math.round(Number(amountInKes || 0)).toLocaleString('en-US');
     }
 
-    function formatPlanPrice(kesAmount, currencyCode) {
+    function formatPlanPrice(kesAmount) {
         if (kesAmount === null || kesAmount === undefined || isNaN(kesAmount) || kesAmount <= 0) {
             return 'Custom';
         }
-        const code = (currencyCode && CONFIG.CURRENCIES[currencyCode]) ? currencyCode : CONFIG.DEFAULT_CURRENCY;
-        const cfg = CONFIG.CURRENCIES[code] || CONFIG.CURRENCIES.KES;
-        const rate = Number(cfg.rate_from_kes || 1);
-        const converted = Math.round(Number(kesAmount) * rate);
-        try {
-            return new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: code,
-                maximumFractionDigits: 0
-            }).format(converted);
-        } catch (e) {
-            return code + ' ' + converted.toLocaleString('en-US');
-        }
+        return 'KES ' + Math.round(Number(kesAmount)).toLocaleString('en-US');
     }
 
-    function applyCurrency(currencyCode) {
-        const code = (currencyCode && CONFIG.CURRENCIES[currencyCode]) ? currencyCode : CONFIG.DEFAULT_CURRENCY;
+    function applyCurrency() {
         document.querySelectorAll('[data-price-kes]').forEach(function (el) {
             const kes = parseFloat(el.getAttribute('data-price-kes') || '0');
-            el.textContent = formatPrice(kes, code);
+            el.textContent = formatPrice(kes);
         });
         document.querySelectorAll('[data-price-plan]').forEach(function (el) {
             const kes = parseFloat(el.getAttribute('data-price-kes') || '0');
-            el.textContent = formatPlanPrice(kes, code);
+            el.textContent = formatPlanPrice(kes);
         });
-
-        const noteEl = document.getElementById('approxBilledNote');
-        if (noteEl) {
-            noteEl.style.display = (code !== 'KES') ? 'block' : 'none';
-        }
-
-        const select = document.getElementById('currencySelect');
-        if (select && select.value !== code) {
-            select.value = code;
-        }
-        try {
-            document.cookie = "hsmart_currency=" + encodeURIComponent(code) + ";path=/;max-age=" + (30 * 86400) + ";SameSite=Lax";
-            localStorage.setItem('hsmart_landing_currency', code);
-        } catch (e) {}
     }
 
     function getNested(obj, path) {
@@ -1950,14 +1898,6 @@
         });
     }
 
-    // Currency Switcher
-    const currencySelect = document.getElementById('currencySelect');
-    if (currencySelect) {
-        currencySelect.addEventListener('change', function (e) {
-            applyCurrency(e.target.value);
-        });
-    }
-
     // Language Switcher
     document.querySelectorAll('[data-lang-switch]').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -1966,24 +1906,19 @@
         });
     });
 
-    // Initialize saved preferences or defaults (prioritize explicit cookie choice)
-    let initialCurrency = 'KES';
+    // Initialize saved preferences or defaults
     let initialLang = @json($locale);
     try {
-        const cookieMatch = document.cookie.match(/(?:^|; )hsmart_currency=([^;]*)/);
-        const cookieCurr = cookieMatch ? decodeURIComponent(cookieMatch[1]) : null;
-        if (cookieCurr && CONFIG.CURRENCIES[cookieCurr]) {
-            initialCurrency = cookieCurr;
-        } else if (CONFIG.DEFAULT_CURRENCY && CONFIG.CURRENCIES[CONFIG.DEFAULT_CURRENCY]) {
-            initialCurrency = CONFIG.DEFAULT_CURRENCY;
-        }
+        localStorage.removeItem('hsmart_landing_currency');
+        localStorage.removeItem('hsmart_currency');
+        document.cookie = "hsmart_currency=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
         const savedLang = localStorage.getItem('hsmart_landing_lang');
         if (savedLang && CONFIG.TRANSLATIONS[savedLang]) {
             initialLang = savedLang;
         }
     } catch (e) {}
 
-    applyCurrency(initialCurrency);
+    applyCurrency();
     applyLanguage(initialLang);
 })();
 </script>
