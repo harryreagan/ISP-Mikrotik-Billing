@@ -40,16 +40,15 @@ body{margin:0}a{text-decoration:none}
 .bk{font-weight:600;font-size:14px;color:#6D3FE0;align-self:flex-start}
 @keyframes up{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
 @keyframes float{50%{transform:translateY(-10px)}}
-@media (max-width:860px){.lp{display:none}.rp{padding:40px 24px}}
+@media (max-width:860px){.lp{display:none}.rp{padding:40px 24px}.mobile-brand{display:block !important; margin-bottom: 20px; text-align: center;}}
 </style>
 </head>
 <body>
 <div class="lg">
   <div class="bx">
     <div class="lp">
-      <div class="logo">
-        <span class="lm"></span>
-        {{ $siteName }}
+      <div style="margin-bottom: 20px;">
+        <x-hsmart-logo color="light" height="40px" />
       </div>
       <div>
         <h2>Security Credentials</h2>
@@ -71,6 +70,9 @@ body{margin:0}a{text-decoration:none}
     </div>
 
     <div class="rp">
+      <div class="mobile-brand" style="display: none;">
+        <x-hsmart-logo color="dark" height="38px" />
+      </div>
       <a href="{{ route('login') }}" class="bk">← Back to Sign in</a>
 
       <div>

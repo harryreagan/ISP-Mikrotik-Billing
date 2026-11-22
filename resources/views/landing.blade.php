@@ -1312,9 +1312,7 @@
     <!-- ─── HEADER ─── -->
     <header class="site-header">
         <div class="w header-bar">
-            <a href="#top" class="brand-link" aria-label="{{ $brandName }}">
-                <x-hsmart-logo brandName="HSmart" color="dark" height="34px" />
-            </a>
+            <x-hsmart-logo href="{{ url('/') }}" class="brand-link" color="dark" height="38px" />
 
             <!-- Desktop Navigation -->
             <nav class="desktop-nav" aria-label="Primary Navigation">
@@ -1764,7 +1762,7 @@
             <div class="footer-grid">
                 <div>
                     <div style="margin-bottom: 12px;">
-                        <x-hsmart-logo brandName="HSmart" color="light" height="36px" />
+                        <x-hsmart-logo href="{{ url('/') }}" color="light" height="36px" />
                     </div>
                     <p style="margin: 0; font-size: 15px; color: #CBD5E1; max-width: 320px;" data-i18n="footer.tagline">
                         {{ $t['footer']['tagline'] }}

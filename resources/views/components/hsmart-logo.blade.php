@@ -1,22 +1,20 @@
 @props([
     'color' => 'auto',
-    'height' => '40px',
+    'height' => '38px',
     'showText' => true,
     'brandName' => null,
     'showSubtitle' => null,
+    'asLink' => true,
+    'href' => null,
 ])
 
 @php
-    $textColor = match($color) {
-        'light' => '#FFFFFF',
-        'dark' => '#0F172A',
-        default => 'currentColor',
-    };
+    $isLight = ($color === 'light');
+    $logoSrc = $isLight 
+        ? asset('images/hsmart-platforms-logo-white.png') 
+        : asset('images/hsmart-platforms-logo.png');
 
-    $subtitleColor = match($color) {
-        'light' => '#CBD5E1',
-        default => '#64748B',
-    };
+    $targetUrl = $href ?: url('/');
 
     $loggedInBusinessName = null;
     if (auth()->check()) {
@@ -32,62 +30,54 @@
             }
         } catch (\Throwable $e) {}
 
-        $teamName = null;
-        try {
-            if (method_exists($u, 'currentTeam') && $u->currentTeam) {
-                $teamName = $u->currentTeam->name;
-            } elseif (method_exists($u, 'personalTeam') && $u->personalTeam()) {
-                $teamName = $u->personalTeam()->name;
-            }
-        } catch (\Throwable $e) {}
-        $cleanTeamName = $teamName ? trim(preg_replace("/'s\s+Team$/i", '', $teamName)) : null;
-
-        $genericDefaults = ['hsmart', 'hsmart isp', 'hsmart wifi', 'hsmart wifi billing', 'default isp', 'default tenant'];
+        $genericDefaults = ['hsmart', 'hsmart isp', 'hsmart wifi', 'hsmart wifi billing', 'default isp', 'default tenant', 'hsmart platforms'];
         $candidates = array_filter([
             $rComp,
             $pBrand,
             $tName,
-            $cleanTeamName,
             $u->business_name ?? ($u->company ?? null),
-            $u->name,
         ], fn($val) => !empty($val) && !in_array(strtolower(trim((string) $val)), $genericDefaults));
 
-        $found = reset($candidates) ?: ($tName ?: ($u->name ?: null));
+        $found = reset($candidates) ?: null;
         if ($found) {
             $stripped = trim(preg_replace('/^hsmart\s+/i', '', (string) $found));
             $loggedInBusinessName = $stripped !== '' ? $stripped : $found;
         }
     }
-
-    $displayName = $brandName ?: ($loggedInBusinessName ?: 'HSmart');
-    $subtitleText = ($showSubtitle ?? auth()->check()) ? (auth()->check() ? 'ISP Management' : 'WiFi Billing Platform') : null;
+    
+    $customTenant = $brandName && !in_array(strtolower(trim((string)$brandName)), ['hsmart', 'hsmart platforms', 'hsmart isp', 'default']) 
+        ? $brandName 
+        : $loggedInBusinessName;
 @endphp
 
-<div {{ $attributes->merge(['class' => 'hsmart-brand-logo']) }} style="display: inline-flex; align-items: center; gap: 12px; min-width: 0; max-width: 100%; text-decoration: none; user-select: none;">
-    <!-- 40x40 rounded-xl (#F57C00) orange tile with clean white WiFi-arcs SVG icon (3 arcs + dot, stroke 2.4, round caps) -->
-    <div class="brand-logo-tile" style="width: 40px; height: 40px; border-radius: 12px; background-color: #F57C00; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display: block;">
-            <path d="M3.5 8.8C8.2 4.5 15.8 4.5 20.5 8.8" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" />
-            <path d="M6.5 12.5C9.6 9.7 14.4 9.7 17.5 12.5" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" />
-            <path d="M9.5 16.1C11 14.8 13 14.8 14.5 16.1" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" />
-            <circle cx="12" cy="19.2" r="1.5" fill="#FFFFFF" />
-        </svg>
-    </div>
+@if($asLink)
+<a href="{{ $targetUrl }}" {{ $attributes->merge(['class' => 'hsmart-brand-logo']) }} style="display: inline-flex; align-items: center; gap: 10px; text-decoration: none; user-select: none; transition: opacity 0.2s ease, transform 0.2s ease; outline: none;" aria-label="HSmart Platforms">
+    <img src="{{ $logoSrc }}" 
+         alt="HSmart Platforms - Reliable Solutions. Always." 
+         class="hsmart-logo-img" 
+         style="height: {{ $height }}; width: auto; max-height: 100%; display: block; object-fit: contain; vertical-align: middle;" />
 
-    @if($showText)
-        <!-- Two-line text block with min-w-0 -->
-        <div class="brand-text-block" style="display: flex; flex-direction: column; justify-content: center; min-width: 0; max-width: 180px; line-height: 1.15;">
-            <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
-                <span style="font-family: 'Jost', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 16px; font-weight: 800; color: {{ $textColor }}; letter-spacing: -0.02em; white-space: nowrap;">
-                    HSmart
-                </span>
-                <span style="font-family: 'Jost', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 10px; font-weight: 700; color: #FFFFFF; background-color: #6D3FE0; padding: 2px 6px; border-radius: 6px; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.2; flex-shrink: 0;">
-                    ISP
-                </span>
-            </div>
-            <span class="brand-network-name text-truncate" title="{{ $displayName }}" style="font-family: 'Jost', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 11px; font-weight: 500; color: {{ $subtitleColor }}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
-                {{ $displayName }}
+    @if(!empty($customTenant))
+        <div style="display: inline-flex; align-items: center; gap: 6px; border-left: 1px solid {{ $isLight ? 'rgba(255,255,255,0.25)' : '#cbd5e1' }}; padding-left: 10px; margin-left: 2px;">
+            <span style="font-family: 'Jost', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 11px; font-weight: 700; color: {{ $isLight ? '#93c5fd' : '#1e40af' }}; background: {{ $isLight ? 'rgba(59,130,246,0.18)' : '#eff6ff' }}; padding: 2px 7px; border-radius: 6px; letter-spacing: 0.3px; text-transform: uppercase;">
+                {{ $customTenant }}
+            </span>
+        </div>
+    @endif
+</a>
+@else
+<div {{ $attributes->merge(['class' => 'hsmart-brand-logo']) }} style="display: inline-flex; align-items: center; gap: 10px; text-decoration: none; user-select: none;">
+    <img src="{{ $logoSrc }}" 
+         alt="HSmart Platforms - Reliable Solutions. Always." 
+         class="hsmart-logo-img" 
+         style="height: {{ $height }}; width: auto; max-height: 100%; display: block; object-fit: contain; vertical-align: middle;" />
+
+    @if(!empty($customTenant))
+        <div style="display: inline-flex; align-items: center; gap: 6px; border-left: 1px solid {{ $isLight ? 'rgba(255,255,255,0.25)' : '#cbd5e1' }}; padding-left: 10px; margin-left: 2px;">
+            <span style="font-family: 'Jost', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 11px; font-weight: 700; color: {{ $isLight ? '#93c5fd' : '#1e40af' }}; background: {{ $isLight ? 'rgba(59,130,246,0.18)' : '#eff6ff' }}; padding: 2px 7px; border-radius: 6px; letter-spacing: 0.3px; text-transform: uppercase;">
+                {{ $customTenant }}
             </span>
         </div>
     @endif
 </div>
+@endif

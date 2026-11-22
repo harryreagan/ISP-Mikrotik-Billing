@@ -87,9 +87,8 @@ body{margin:0}a{text-decoration:none}
 
     <!-- ─── LEFT PANEL ─── -->
     <div class="lp">
-      <div class="logo">
-        <span class="lm"></span>
-        {{ $siteName }}
+      <div style="margin-bottom: 24px;">
+        <x-hsmart-logo color="light" height="40px" />
       </div>
       <div>
         <h2>Run your WiFi business from one dashboard.</h2>

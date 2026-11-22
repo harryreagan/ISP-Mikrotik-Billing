@@ -8,7 +8,7 @@
             </button>
             <a class="navbar-brand me-1 me-sm-3" href="{{ route('dashboard') }}">
                 <div class="d-flex align-items-center">
-                    <x-hsmart-logo color="auto" height="34px" />
+                    <x-hsmart-logo color="auto" height="34px" :asLink="false" />
                 </div>
             </a>
             @include('layouts.partials.searchbar')
@@ -31,7 +31,7 @@
     </button>
     <a class="navbar-brand me-1 me-sm-3" href="{{ route('dashboard') }}">
         <div class="d-flex align-items-center">
-            <x-hsmart-logo color="auto" height="34px" />
+            <x-hsmart-logo color="auto" height="34px" :asLink="false" />
         </div>
     </a>
     <div class="collapse navbar-collapse scrollbar" id="navbarStandard">
@@ -50,7 +50,7 @@
     </script>
     <div class="d-flex align-items-center justify-content-between px-3 border-bottom border-200 sidebar-header-bar" style="height: 64px; background: var(--surface);">
         <a class="navbar-brand m-0 p-0 text-decoration-none d-flex align-items-center" href="{{ route('dashboard') }}" style="text-decoration: none;">
-            <x-hsmart-logo color="auto" height="40px" />
+            <x-hsmart-logo color="auto" height="40px" :asLink="false" />
         </a>
         <button type="button" class="btn btn-sm btn-link text-secondary p-1 sidebar-collapse-btn d-none d-xl-inline-flex align-items-center justify-content-center text-decoration-none" onclick="window.toggleDesktopSidebar && window.toggleDesktopSidebar()" title="{{ __('Toggle sidebar') }}" aria-label="Toggle sidebar" style="width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border-ring, rgba(226, 232, 240, 0.7)); background: var(--surface); cursor: pointer;">
             <i class="bi bi-layout-sidebar-inset sidebar-toggle-icon" style="font-size: 15px; color: var(--text-secondary, #64748b);"></i>
@@ -69,7 +69,7 @@
 <div id="mobileSidebarDrawer" class="mobile-sidebar-drawer" aria-label="Mobile Navigation" role="dialog" aria-modal="true" style="display: none;">
     <div class="mobile-drawer-header d-flex align-items-center justify-content-between px-3 border-bottom" style="height: 64px; flex-shrink: 0; background: var(--surface);">
         <a class="navbar-brand m-0 p-0 text-decoration-none d-flex align-items-center" href="{{ route('dashboard') }}">
-            <x-hsmart-logo color="auto" height="36px" />
+            <x-hsmart-logo color="auto" height="36px" :asLink="false" />
         </a>
         <button type="button" class="btn btn-sm btn-link text-secondary p-1 text-decoration-none" id="mobileDrawerCloseBtn" onclick="window.closeMobileDrawer && window.closeMobileDrawer(event)" aria-label="Close menu" style="font-size: 1.25rem; width: 36px; height: 36px; display: inline-grid; place-items: center; border-radius: 8px;">
             <i class="bi bi-x-lg"></i>

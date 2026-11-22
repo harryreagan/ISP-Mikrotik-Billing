@@ -267,8 +267,7 @@
         <div class="hero-overlay"></div>
         <div class="hero-content">
             <div style="margin-bottom: 24px;">
-                <x-hsmart-logo color="light" h
-                eight="44px" />
+                <x-hsmart-logo color="light" height="42px" />
             </div>
 
             <div class="hero-middle">

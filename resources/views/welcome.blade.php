@@ -40,7 +40,7 @@
                 @if (siteUrlSettings('site_logo'))
                     <img class="d-inline-block align-text-top" style="width: 190px; height: 53px;" src="{{ site_image(siteUrlSettings('site_logo')) }}" alt="logo"/>
                 @else
-                    <x-hsmart-logo color="dark" height="38px" />
+                    <x-hsmart-logo color="dark" height="38px" :asLink="false" />
                 @endif
 			</a>
 
