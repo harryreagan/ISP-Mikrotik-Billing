@@ -214,13 +214,36 @@ class PrepaidUsersHub extends Component
         if ($this->section === 'active') {
             $query->whereNotIn('status', ['expired', 'disabled'])
                   ->where(function ($q) {
-                      $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                      $q->where(function ($sub) {
+                          $sub->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                      })->orWhere(function ($sub) {
+                          $sub->where('type', 'hotspot')
+                              ->whereNotNull('total_duration_seconds')
+                              ->whereRaw('used_seconds < total_duration_seconds')
+                              ->where(function ($v) {
+                                  $v->whereNull('validity_expires_at')->orWhere('validity_expires_at', '>', now());
+                              });
+                      });
                   });
         } elseif ($this->section === 'expired') {
             $query->where(function ($q) {
                 $q->where('status', 'expired')
                   ->orWhere(function ($sub) {
-                      $sub->whereNotNull('expires_at')->where('expires_at', '<=', now());
+                      $sub->where('type', 'hotspot')
+                          ->where(function ($cond) {
+                              $cond->where(function ($ex) {
+                                  $ex->whereNotNull('total_duration_seconds')
+                                     ->whereRaw('used_seconds >= total_duration_seconds');
+                              })->orWhere(function ($val) {
+                                  $val->whereNotNull('validity_expires_at')
+                                      ->where('validity_expires_at', '<=', now());
+                              });
+                          });
+                  })
+                  ->orWhere(function ($sub) {
+                      $sub->where('type', '!=', 'hotspot')
+                          ->whereNotNull('expires_at')
+                          ->where('expires_at', '<=', now());
                   });
             });
         } elseif ($this->section === 'online') {
@@ -1145,8 +1168,38 @@ class PrepaidUsersHub extends Component
         $baseCount = PrepaidUser::withoutGlobalScopes()->where('tenant_id', $tenantId);
         $counts = [
             'all'     => (clone $baseCount)->count(),
-            'active'  => (clone $baseCount)->whereNotIn('status', ['expired', 'disabled'])->where(fn($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))->count(),
-            'expired' => (clone $baseCount)->where(fn($q) => $q->where('status', 'expired')->orWhere(fn($s) => $s->whereNotNull('expires_at')->where('expires_at', '<=', now())))->count(),
+            'active'  => (clone $baseCount)->whereNotIn('status', ['expired', 'disabled'])->where(function ($q) {
+                $q->where(function ($sub) {
+                    $sub->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                })->orWhere(function ($sub) {
+                    $sub->where('type', 'hotspot')
+                        ->whereNotNull('total_duration_seconds')
+                        ->whereRaw('used_seconds < total_duration_seconds')
+                        ->where(function ($v) {
+                            $v->whereNull('validity_expires_at')->orWhere('validity_expires_at', '>', now());
+                        });
+                });
+            })->count(),
+            'expired' => (clone $baseCount)->where(function ($q) {
+                $q->where('status', 'expired')
+                  ->orWhere(function ($sub) {
+                      $sub->where('type', 'hotspot')
+                          ->where(function ($cond) {
+                              $cond->where(function ($ex) {
+                                  $ex->whereNotNull('total_duration_seconds')
+                                     ->whereRaw('used_seconds >= total_duration_seconds');
+                              })->orWhere(function ($val) {
+                                  $val->whereNotNull('validity_expires_at')
+                                      ->where('validity_expires_at', '<=', now());
+                              });
+                          });
+                  })
+                  ->orWhere(function ($sub) {
+                      $sub->where('type', '!=', 'hotspot')
+                          ->whereNotNull('expires_at')
+                          ->where('expires_at', '<=', now());
+                  });
+            })->count(),
             'online'  => (clone $baseCount)->where(fn($q) => $q->where('is_online', true)->orWhere('status', 'online'))->count(),
             'offline' => (clone $baseCount)->where('is_online', false)->whereNotIn('status', ['expired', 'disabled'])->count(),
             'roaming' => (clone $baseCount)->where('is_roaming', true)->count(),

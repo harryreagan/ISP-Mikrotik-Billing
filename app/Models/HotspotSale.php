@@ -24,8 +24,11 @@ class HotspotSale extends Model
         'payment_method',
         'status',
         'duration_minutes',
+        'duration_seconds',
+        'used_seconds',
         'started_at',
         'expires_at',
+        'validity_expires_at',
         'note',
         'sync_error',
         'sale_date',
@@ -35,9 +38,12 @@ class HotspotSale extends Model
     protected $casts = [
         'amount'           => 'decimal:2',
         'sale_date'        => 'date',
-        'started_at'       => 'datetime',
-        'expires_at'       => 'datetime',
-        'duration_minutes' => 'integer',
+        'started_at'          => 'datetime',
+        'expires_at'          => 'datetime',
+        'validity_expires_at' => 'datetime',
+        'duration_minutes'    => 'integer',
+        'duration_seconds'    => 'integer',
+        'used_seconds'        => 'integer',
         'router_id'        => 'integer',
     ];
 

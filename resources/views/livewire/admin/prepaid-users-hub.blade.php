@@ -256,7 +256,21 @@
                                 <div class="text-muted" style="font-size: 11px;">{{ $cAt ? $cAt->format('H:i') : '' }}</div>
                             </td>
                             <td>
-                                @if($row->expires_at)
+                                @if($row->type === 'hotspot' && $row->total_duration_seconds > 0)
+                                    <div>
+                                        <span class="badge {{ $row->remaining_seconds > 0 ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-danger-subtle text-danger border border-danger-subtle' }}">
+                                            <i class="bi bi-clock me-1"></i>Rem: {{ $row->formatted_remaining_duration }}
+                                        </span>
+                                    </div>
+                                    <div class="text-muted mt-1" style="font-size: 11px;">
+                                        Online: {{ $row->formatted_used_duration }} / {{ round($row->total_duration_seconds / 60) }}m
+                                    </div>
+                                    @if($row->validity_expires_at)
+                                        <div class="text-secondary" style="font-size: 10px;">
+                                            Valid to: {{ $row->validity_expires_at->format('d M Y') }}
+                                        </div>
+                                    @endif
+                                @elseif($row->expires_at)
                                     <div class="{{ $row->expires_at->isPast() ? 'text-danger fw-semibold' : 'text-dark' }}">
                                         {{ $row->expires_at->format('d M Y H:i') }}
                                     </div>
@@ -285,7 +299,12 @@
                                 </span>
                             </td>
                             <td>
-                                {{ $row->last_seen_at ? $row->last_seen_at->diffForHumans() : 'Never' }}
+                                <div>{{ $row->last_seen_at ? $row->last_seen_at->diffForHumans() : 'Never' }}</div>
+                                @if($row->type === 'hotspot' && $row->total_duration_seconds > 0)
+                                    <div class="text-muted" style="font-size: 10px;">
+                                        <i class="bi bi-stopwatch me-1"></i>Uptime: {{ $row->formatted_used_duration }}
+                                    </div>
+                                @endif
                             </td>
                             <td class="font-monospace fw-medium">
                                 {{ $row->formatted_daily_data }}

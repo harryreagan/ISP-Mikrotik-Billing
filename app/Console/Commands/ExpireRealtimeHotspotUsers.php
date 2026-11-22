@@ -33,7 +33,16 @@ class ExpireRealtimeHotspotUsers extends Command
             $activeSales = HotspotSale::withoutGlobalScopes()
                 ->whereIn('status', ['completed', 'active', 'pending_router'])
                 ->where(function ($q) use ($now) {
-                    $q->whereNull('expires_at')->orWhere('expires_at', '>', $now);
+                    $q->where(function ($sub) use ($now) {
+                        $sub->whereNull('expires_at')->orWhere('expires_at', '>', $now);
+                    })->orWhere(function ($sub) use ($now) {
+                        // Protected if accounting duration is not yet exhausted and within validity window
+                        $sub->whereNotNull('duration_seconds')
+                            ->whereRaw('used_seconds < duration_seconds')
+                            ->where(function ($v) use ($now) {
+                                $v->whereNull('validity_expires_at')->orWhere('validity_expires_at', '>', $now);
+                            });
+                    });
                 })
                 ->get(['tenant_id', 'voucher_code', 'username', 'mac_address']);
             foreach ($activeSales as $as) {
@@ -47,7 +56,17 @@ class ExpireRealtimeHotspotUsers extends Command
             $activePrepaid = PrepaidUser::withoutGlobalScopes()
                 ->whereNotIn('status', ['expired', 'disabled'])
                 ->where(function ($q) use ($now) {
-                    $q->whereNull('expires_at')->orWhere('expires_at', '>', $now);
+                    $q->where(function ($sub) use ($now) {
+                        $sub->whereNull('expires_at')->orWhere('expires_at', '>', $now);
+                    })->orWhere(function ($sub) use ($now) {
+                        // Protected if accounting duration is not yet exhausted and within validity window
+                        $sub->where('type', 'hotspot')
+                            ->whereNotNull('total_duration_seconds')
+                            ->whereRaw('used_seconds < total_duration_seconds')
+                            ->where(function ($v) use ($now) {
+                                $v->whereNull('validity_expires_at')->orWhere('validity_expires_at', '>', $now);
+                            });
+                    });
                 })
                 ->get(['tenant_id', 'username', 'mac_address', 'phone']);
             foreach ($activePrepaid as $ap) {
@@ -61,9 +80,32 @@ class ExpireRealtimeHotspotUsers extends Command
         $expiredPrepaid = collect();
         if (Schema::hasTable('prepaid_users')) {
             $expiredPrepaid = PrepaidUser::withoutGlobalScopes()
-                ->whereNotNull('expires_at')
-                ->where('expires_at', '<=', now())
-                ->whereNotIn('status', ['expired'])
+                ->whereNotIn('status', ['expired', 'disabled'])
+                ->where(function ($q) use ($now) {
+                    // Hotspot users: expire if online duration is exhausted OR validity deadline is past
+                    $q->where(function ($sub) use ($now) {
+                        $sub->where('type', 'hotspot')
+                            ->where(function ($cond) use ($now) {
+                                $cond->where(function ($ex) {
+                                    $ex->whereNotNull('total_duration_seconds')
+                                       ->whereRaw('used_seconds >= total_duration_seconds');
+                                })->orWhere(function ($val) use ($now) {
+                                    $val->whereNotNull('validity_expires_at')
+                                        ->where('validity_expires_at', '<=', $now);
+                                })->orWhere(function ($plain) use ($now) {
+                                    $plain->whereNull('total_duration_seconds')
+                                          ->whereNotNull('expires_at')
+                                          ->where('expires_at', '<=', $now);
+                                });
+                            });
+                    })
+                    // PPPoE / Static / Other: expire if fixed billing cycle expires_at <= now()
+                    ->orWhere(function ($sub) use ($now) {
+                        $sub->where('type', '!=', 'hotspot')
+                            ->whereNotNull('expires_at')
+                            ->where('expires_at', '<=', $now);
+                    });
+                })
                 ->get();
         }
 
@@ -112,10 +154,21 @@ class ExpireRealtimeHotspotUsers extends Command
                 ->update(['status' => 'expired']);
         }
 
-        if (Schema::hasTable('hotspot_sales') && Schema::hasColumn('hotspot_sales', 'status') && Schema::hasColumn('hotspot_sales', 'expires_at')) {
+        if (Schema::hasTable('hotspot_sales') && Schema::hasColumn('hotspot_sales', 'status')) {
             HotspotSale::whereIn('status', ['completed', 'active', 'pending_router'])
-                ->whereNotNull('expires_at')
-                ->where('expires_at', '<=', now())
+                ->where(function ($q) use ($now) {
+                    $q->where(function ($sub) {
+                        $sub->whereNotNull('duration_seconds')
+                            ->whereRaw('used_seconds >= duration_seconds');
+                    })->orWhere(function ($sub) use ($now) {
+                        $sub->whereNotNull('validity_expires_at')
+                            ->where('validity_expires_at', '<=', $now);
+                    })->orWhere(function ($sub) use ($now) {
+                        $sub->whereNull('duration_seconds')
+                            ->whereNotNull('expires_at')
+                            ->where('expires_at', '<=', $now);
+                    });
+                })
                 ->update(['status' => 'expired']);
         }
 

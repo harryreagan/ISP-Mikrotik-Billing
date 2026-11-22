@@ -106,26 +106,65 @@ class PollPrepaidActiveSessionsCommand extends Command
                             ->whereRaw('LOWER(username) = ?', [strtolower($uName)])
                             ->first();
 
+                        $uptimeRaw = (string) ($sess['uptime'] ?? '');
+                        $activeUptimeSec = $uptimeRaw !== '' ? \App\Services\MikrotikDuration::parse($uptimeRaw)['seconds'] : 0;
+
                         if (!$prepaid) {
                             $prepaid = PrepaidUser::withoutGlobalScopes()->create([
-                                'tenant_id'     => $tenantId,
-                                'username'      => $uName,
-                                'phone'         => null,
-                                'mac_address'   => $mac,
-                                'ip_address'    => $ip,
-                                'type'          => 'hotspot',
-                                'router_id'     => $router->id,
-                                'router_name'   => $router->name,
-                                'method'        => 'Router Sync',
-                                'status'        => 'online',
-                                'is_online'     => true,
-                                'was_connected' => true,
-                                'daily_data_bytes' => $bytes,
-                                'last_seen_at'  => now(),
-                                'started_at'    => now(),
+                                'tenant_id'              => $tenantId,
+                                'username'               => $uName,
+                                'phone'                  => null,
+                                'mac_address'            => $mac,
+                                'ip_address'             => $ip,
+                                'type'                   => 'hotspot',
+                                'router_id'              => $router->id,
+                                'router_name'            => $router->name,
+                                'method'                 => 'Router Sync',
+                                'status'                 => 'online',
+                                'is_online'              => true,
+                                'was_connected'          => true,
+                                'total_duration_seconds' => max(3600, $activeUptimeSec),
+                                'used_seconds'           => $activeUptimeSec,
+                                'daily_data_bytes'       => $bytes,
+                                'last_seen_at'           => now(),
+                                'started_at'             => now(),
+                                'validity_expires_at'    => now()->addDays(30),
                             ]);
                         } else {
-                            // Check FUP enforcement
+                            $totDur = (int) ($prepaid->total_duration_seconds ?: 0);
+                            $newUsed = $totDur > 0 ? min($totDur, max((int) $prepaid->used_seconds, $activeUptimeSec)) : $activeUptimeSec;
+
+                            // 1A. Check if online time is fully exhausted
+                            if ($totDur > 0 && $newUsed >= $totDur) {
+                                if (!empty($sess['.id'])) {
+                                    $api->executeCommand('/ip/hotspot/active/remove', [], ['.id' => $sess['.id']]);
+                                }
+                                try {
+                                    $hu = $api->executeCommand('/ip/hotspot/user/print', [], ['name' => $uName]);
+                                    if (is_array($hu) && !empty($hu[0]['.id'])) {
+                                        $api->executeCommand('/ip/hotspot/user/remove', [], ['.id' => $hu[0]['.id']]);
+                                    }
+                                } catch (\Throwable $e) {}
+
+                                $prepaid->update([
+                                    'is_online'            => false,
+                                    'status'               => 'expired',
+                                    'used_seconds'         => $totDur,
+                                    'daily_data_bytes'     => $bytes,
+                                    'last_seen_at'         => now(),
+                                    'disconnection_reason' => 'time_exhausted',
+                                ]);
+
+                                if ($prepaid->hotspot_sale_id) {
+                                    \App\Models\HotspotSale::withoutGlobalScopes()->where('id', $prepaid->hotspot_sale_id)->update([
+                                        'status'       => 'expired',
+                                        'used_seconds' => $totDur,
+                                    ]);
+                                }
+                                continue;
+                            }
+
+                            // 1B. Check FUP enforcement
                             if ($prepaid->fup_enabled && $prepaid->fup_limit_mb > 0 && $bytes >= ((int) $prepaid->fup_limit_mb * 1048576)) {
                                 if (!empty($sess['.id'])) {
                                     $api->executeCommand('/ip/hotspot/active/remove', [], ['.id' => $sess['.id']]);
@@ -141,6 +180,7 @@ class PollPrepaidActiveSessionsCommand extends Command
                                     'is_online'            => false,
                                     'status'               => 'disabled',
                                     'was_connected'        => true,
+                                    'used_seconds'         => $newUsed,
                                     'daily_data_bytes'     => $bytes,
                                     'mac_address'          => $mac ?: $prepaid->mac_address,
                                     'ip_address'           => $ip ?: $prepaid->ip_address,
@@ -155,6 +195,7 @@ class PollPrepaidActiveSessionsCommand extends Command
                                 'is_online'            => true,
                                 'status'               => 'online',
                                 'was_connected'        => true,
+                                'used_seconds'         => $newUsed,
                                 'daily_data_bytes'     => $bytes,
                                 'mac_address'          => $mac ?: $prepaid->mac_address,
                                 'ip_address'           => $ip ?: $prepaid->ip_address,
@@ -164,6 +205,12 @@ class PollPrepaidActiveSessionsCommand extends Command
                                 'roaming_router_id'    => $isRoaming ? $router->id : $prepaid->roaming_router_id,
                                 'roaming_router_name'  => $isRoaming ? $router->name : $prepaid->roaming_router_name,
                             ]);
+
+                            if ($prepaid->hotspot_sale_id) {
+                                \App\Models\HotspotSale::withoutGlobalScopes()->where('id', $prepaid->hotspot_sale_id)->update([
+                                    'used_seconds' => $newUsed,
+                                ]);
+                            }
                         }
                     }
 
