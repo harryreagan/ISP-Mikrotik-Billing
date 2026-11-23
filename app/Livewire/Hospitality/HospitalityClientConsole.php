@@ -185,3 +185,4 @@ class HospitalityClientConsole extends Component
         ]);
     }
 }
+

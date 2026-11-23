@@ -19,7 +19,7 @@ class CaptivePortalCustomizer extends Component
     public string $template = 'hsmart';
 
     // Branding & Identity
-    public $brand_name = 'HSmart WiFi';
+    public $brand_name = 'My WiFi Hotspot';
     public $brand_color = '#F57C00';
     public $secondary_color = '#0F172A';
     public $logo_url = '';
@@ -54,7 +54,7 @@ class CaptivePortalCustomizer extends Component
         $settings = DB::table('isp_portal_settings')->where('tenant_id', $tenantId)->first();
         if ($settings) {
             $this->template             = $settings->template ?: 'hsmart';
-            $this->brand_name           = (!empty($settings->brand_name) && $settings->brand_name !== 'HSmart WiFi') ? $settings->brand_name : $tenantName;
+            $this->brand_name           = !empty($settings->brand_name) ? $settings->brand_name : $tenantName;
             $this->brand_color          = $settings->brand_color ?: $this->brand_color;
             $this->secondary_color      = $settings->secondary_color ?: $this->secondary_color;
             $this->logo_url             = $settings->logo_url ?: '';
@@ -64,8 +64,8 @@ class CaptivePortalCustomizer extends Component
             $this->badge_text           = $settings->badge_text ?? '';
             $this->show_badge           = isset($settings->show_badge) ? (bool) $settings->show_badge : true;
             $this->terms_text           = $settings->terms_text ?: $this->terms_text;
-            $this->support_phone        = ($settings->support_phone && !str_contains($settings->support_phone, '743 606 108') && !str_contains($settings->support_phone, '743606108')) ? $settings->support_phone : '';
-            $this->support_whatsapp     = ($settings->support_whatsapp && !str_contains($settings->support_whatsapp, '743606108')) ? $settings->support_whatsapp : '';
+            $this->support_phone        = ($settings->support_phone && !str_contains((string)$settings->support_phone, '743') && !str_contains((string)$settings->support_phone, '606108')) ? $settings->support_phone : '';
+            $this->support_whatsapp     = ($settings->support_whatsapp && !str_contains((string)$settings->support_whatsapp, '743') && !str_contains((string)$settings->support_whatsapp, '606108')) ? $settings->support_whatsapp : '';
             $this->theme_layout         = $settings->theme_layout ?: $this->theme_layout;
             $this->free_trial_enabled   = (bool) $settings->free_trial_enabled;
             $this->free_trial_duration  = $settings->free_trial_duration ?: '15m';
@@ -75,6 +75,10 @@ class CaptivePortalCustomizer extends Component
                 $domains = is_string($settings->walled_garden_domains) ? json_decode($settings->walled_garden_domains, true) : $settings->walled_garden_domains;
                 $this->walled_garden_domains = is_array($domains) ? implode(', ', $domains) : $settings->walled_garden_domains;
             }
+        } else {
+            $this->brand_name           = $tenantName ?: 'My WiFi Hotspot';
+            $this->support_phone        = '';
+            $this->support_whatsapp     = '';
         }
 
         $firstRouter = Router::forTenant($tenantId)->first();

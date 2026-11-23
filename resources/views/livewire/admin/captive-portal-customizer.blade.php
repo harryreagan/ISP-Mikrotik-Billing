@@ -99,8 +99,15 @@
                 <div class="card-body p-4">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label">Brand Name</label>
-                            <input type="text" wire:model.live.debounce.400ms="brand_name" class="form-control" placeholder="e.g. StarNet WiFi">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label mb-0 fw-bold">Brand / WiFi Name</label>
+                                <div class="d-flex gap-1">
+                                    <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2" wire:click="$set('brand_name', 'HSmart ISP')" title="Set brand name to HSmart ISP">Preset: HSmart ISP</button>
+                                    <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2" wire:click="$set('brand_name', 'Hotel Guest WiFi')" title="Set brand name to Hotel Guest WiFi">Preset: Hotel WiFi</button>
+                                </div>
+                            </div>
+                            <input type="text" wire:model.live.debounce.400ms="brand_name" class="form-control" placeholder="e.g. StarNet WiFi, Grand Hotel WiFi, Safari Lodge">
+                            <small class="text-muted">Displayed in header badge &amp; ticket receipts if no logo image is uploaded.</small>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Primary Color</label>
@@ -137,7 +144,7 @@
                         <div class="col-md-6">
                             <label class="form-label">Background Wallpaper URL</label>
                             <input type="text" wire:model.live.debounce.400ms="background_url" class="form-control" placeholder="https://yourdomain.com/bg.jpg">
-                            <small class="text-muted">Optional custom background</small>
+                            <small class="text-muted">Optional custom background (leave empty to use template's animated mesh)</small>
                         </div>
 
                         {{-- Top Announcement Ribbon / Badge --}}
@@ -186,13 +193,13 @@
 
                         <div class="col-md-6">
                             <label class="form-label">Support Phone</label>
-                            <input type="text" wire:model.live.debounce.400ms="support_phone" class="form-control" placeholder="e.g. 0712 345 678 (optional)">
+                            <input type="text" wire:model.live.debounce.400ms="support_phone" class="form-control" placeholder="Optional phone number (e.g. 0700 000 000)">
                             <small class="text-muted">Customer help phone (leave empty if not applicable)</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">WhatsApp Direct Link Number</label>
-                            <input type="text" wire:model.live.debounce.400ms="support_whatsapp" class="form-control" placeholder="e.g. 254712345678 (optional)">
-                            <small class="text-muted">International format without + or spaces</small>
+                            <input type="text" wire:model.live.debounce.400ms="support_whatsapp" class="form-control" placeholder="Optional WhatsApp number (e.g. 254700000000)">
+                            <small class="text-muted">International format without + or spaces (leave empty if not applicable)</small>
                         </div>
 
                         <div class="col-12">
@@ -204,6 +211,20 @@
                             <label class="form-label">Terms of Service Notice</label>
                             <textarea wire:model.live.debounce.400ms="terms_text" class="form-control" rows="2"></textarea>
                         </div>
+
+                        {{-- Direct Save Button --}}
+                        <div class="col-12 mt-3 pt-3 border-top d-flex justify-content-between align-items-center">
+                            <span class="text-muted small"><i class="bi bi-shield-check text-success me-1"></i>All changes update live in the preview</span>
+                            <button type="button" wire:click="saveSettings" wire:loading.attr="disabled" wire:target="saveSettings" class="btn btn-primary px-4 fw-bold shadow-sm">
+                                <span wire:loading.remove wire:target="saveSettings">
+                                    <i class="bi bi-check-lg me-1"></i>Save Branding Changes
+                                </span>
+                                <span wire:loading wire:target="saveSettings">
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>Saving...
+                                </span>
+                            </button>
+                        </div>
+                    </div>
                     </div>
                 </div>
             </div>

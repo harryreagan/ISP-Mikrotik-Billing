@@ -26,6 +26,9 @@
                     </select>
                 </div>
             @endif
+            <button type="button" class="btn btn-warning btn-sm rounded-pill px-3 shadow-sm text-dark fw-bold" data-bs-toggle="modal" data-bs-target="#superAdminManualModal">
+                <i class="bi bi-journal-bookmark-fill me-1"></i> Super Admin Manual
+            </button>
             <a href="{{ route('admin.portal-customizer') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
                 <i class="bi bi-palette me-1"></i> Captive Portal
             </a>
@@ -561,6 +564,177 @@ print(response.json())</code></pre>
             </div>
         @endif
     </div>
+
+    {{-- ── Super Admin Interactive Step-by-Step Manual Modal ── --}}
+    <div wire:ignore.self class="modal fade" id="superAdminManualModal" tabindex="-1" aria-labelledby="superAdminManualLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+                <div class="modal-header bg-dark text-white py-3 px-4">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-journal-bookmark-fill text-warning fs-5"></i>
+                        <div>
+                            <h6 class="modal-title fw-bold mb-0 text-white" id="superAdminManualLabel">Super Admin Master Procedure: Hotel & POS WiFi Onboarding</h6>
+                            <small class="text-white-50">Quick-reference playbook on how to onboard hotel clients, hand over staff portals, and connect external POS systems.</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body p-4 bg-light">
+                    {{-- Quick Workflow Steps --}}
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <div class="bg-white p-3 rounded-3 border h-100 shadow-sm text-center">
+                                <div class="badge bg-primary rounded-circle mb-2" style="width:28px; height:28px; line-height:20px;">1</div>
+                                <h6 class="fw-bold mb-1 small text-dark">Switch Hotel Account</h6>
+                                <p class="text-muted small mb-0" style="font-size: 11px;">Pick client in Super Admin switcher at top right.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="bg-white p-3 rounded-3 border h-100 shadow-sm text-center">
+                                <div class="badge bg-primary rounded-circle mb-2" style="width:28px; height:28px; line-height:20px;">2</div>
+                                <h6 class="fw-bold mb-1 small text-dark">Configure Stay Rules</h6>
+                                <p class="text-muted small mb-0" style="font-size: 11px;">Set duration (24h/night), devices, and min spend.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="bg-white p-3 rounded-3 border h-100 shadow-sm text-center">
+                                <div class="badge bg-primary rounded-circle mb-2" style="width:28px; height:28px; line-height:20px;">3</div>
+                                <h6 class="fw-bold mb-1 small text-dark">Choose Handover Mode</h6>
+                                <p class="text-muted small mb-0" style="font-size: 11px;">Staff Portal (No-Code) OR REST API for POS.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="bg-white p-3 rounded-3 border h-100 shadow-sm text-center">
+                                <div class="badge bg-success rounded-circle mb-2" style="width:28px; height:28px; line-height:20px;">4</div>
+                                <h6 class="fw-bold mb-1 small text-dark">Guests Scan & Connect</h6>
+                                <p class="text-muted small mb-0" style="font-size: 11px;">Receipt QR code logs guest in with 0 typing.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Step 1 Details --}}
+                    <div class="card border-0 shadow-sm rounded-3 mb-3">
+                        <div class="card-header bg-white py-2 px-3 fw-bold small text-dark d-flex align-items-center gap-2">
+                            <span class="badge bg-primary">STEP 1</span> Setting Up a New Hotel Client in 30 Seconds
+                        </div>
+                        <div class="card-body p-3 small text-muted">
+                            <ol class="mb-0 ps-3">
+                                <li class="mb-1">Select the hotel operator using the <strong>Super Admin Hotel Switcher</strong> dropdown at the top right of this page.</li>
+                                <li class="mb-1">Enter their <strong>Hotel / Restaurant Display Name</strong> (e.g. <em>Seaside Safari Resort & Cafe</em>).</li>
+                                <li class="mb-1">Select their <strong>Default Hotspot Speed Package</strong> (e.g. 10 Mbps) and <strong>Designated MikroTik Router</strong>.</li>
+                                <li class="mb-1">Set <strong>Default Stay Duration</strong> (e.g. 24 hours per night) and <strong>Max Devices Per Room</strong> (e.g. 3 devices).</li>
+                                <li>Click <span class="badge bg-primary">Save Changes</span>. Your setup for this client is complete!</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    {{-- Step 2 Details: Front-Desk Staff Link --}}
+                    <div class="card border-0 shadow-sm rounded-3 mb-3">
+                        <div class="card-header bg-white py-2 px-3 fw-bold small text-dark d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-success">METHOD A</span> Handover for Hotel Front-Desk Staff (Zero Code / No Login)
+                            </div>
+                            <button type="button" class="btn btn-outline-success btn-sm py-0 px-2 rounded-pill" onclick="navigator.clipboard.writeText('Hello Reception Team,\n\nHere is your private Hotel WiFi Reception Console link:\n{{ route('hospitality.client-console', ['token' => $portal_token]) }}\n\nPlease bookmark this on your reception computer or tablet. You can click + Issue WiFi Ticket to print guest vouchers or view active rooms anytime with zero login required!'); alert('WhatsApp Reception handover message copied to clipboard!');">
+                                <i class="bi bi-whatsapp"></i> Copy WhatsApp Message
+                            </button>
+                        </div>
+                        <div class="card-body p-3 small text-muted">
+                            <p class="mb-2">Send the hotel owner or receptionist their dedicated <strong>Staff Console Link</strong> (found in Section 1 above):</p>
+                            <div class="bg-light p-2 rounded border font-monospace text-dark mb-2" style="font-size: 11px;">
+                                {{ route('hospitality.client-console', ['token' => $portal_token]) }}
+                            </div>
+                            <ul class="mb-0 ps-3">
+                                <li>Receptionists can bookmark this on their front-desk PC, tablet, or phone.</li>
+                                <li><strong>Zero login credentials needed</strong>: Authenticated automatically via the secure token.</li>
+                                <li>They only see their guest WiFi controls—no access to your ISP backend, routers, or billing secrets.</li>
+                                <li>Includes live active guest counters, 1-click receipt slip reprints, and check-out revocation.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    {{-- Step 3 Details: External POS / Opera PMS Developer Handover --}}
+                    <div class="card border-0 shadow-sm rounded-3 mb-3">
+                        <div class="card-header bg-white py-2 px-3 fw-bold small text-dark d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-dark">METHOD B</span> Handover to External POS / Opera PMS Developers (REST API)
+                            </div>
+                            <button type="button" class="btn btn-outline-dark btn-sm py-0 px-2 rounded-pill" onclick="navigator.clipboard.writeText('Hello Developer,\n\nHere are your HSmart WiFi Hotspot API credentials:\nAPI Endpoint: {{ url('/api/v1/hospitality/ticket') }}\nStats Endpoint: {{ url('/api/v1/hospitality/stats') }}\nX-API-Key: {{ $api_key }}\nMethod: POST\n\nWhen a guest checks in or receipt is printed, send a POST request with guest_name, room_number/receipt_ref, and nights/bill_amount. The API returns code, qr_url, and printable_text ready for your thermal receipt printer!'); alert('Developer handover brief copied to clipboard!');">
+                                <i class="bi bi-clipboard"></i> Copy Developer Brief
+                            </button>
+                        </div>
+                        <div class="card-body p-3 small text-muted">
+                            <p class="mb-2">If the client uses <strong>Opera PMS, Cloudbeds, Loyverse, Sirvoy, or custom POS</strong>, give their developer these credentials:</p>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered bg-white mb-2" style="font-size: 11px;">
+                                    <tbody>
+                                        <tr>
+                                            <td class="fw-bold bg-light" style="width: 160px;">API Ticket Endpoint</td>
+                                            <td class="font-monospace"><code>POST {{ url('/api/v1/hospitality/ticket') }}</code></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold bg-light">Live Stats Endpoint</td>
+                                            <td class="font-monospace"><code>GET {{ url('/api/v1/hospitality/stats') }}</code></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold bg-light">Required Header</td>
+                                            <td class="font-monospace"><code>X-API-Key: {{ $api_key }}</code></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold bg-light">Sample Payload</td>
+                                            <td class="font-monospace"><code>{"ticket_type":"hotel_guest", "guest_name":"Mwangi", "room_number":"204", "nights":2, "device_limit":3}</code></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p class="mb-0 text-dark">The API returns <code>code</code>, <code>qr_url</code>, and formatted <code>printable_text</code> that prints directly on 58mm/80mm thermal receipt slips.</p>
+                        </div>
+                    </div>
+
+                    {{-- Step 4 Details: Endpoints Summary --}}
+                    <div class="card border-0 shadow-sm rounded-3">
+                        <div class="card-header bg-white py-2 px-3 fw-bold small text-dark">
+                            <i class="bi bi-plug-fill text-indigo me-1"></i> All 4 Built-in Endpoints Reference
+                        </div>
+                        <div class="card-body p-3 small">
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <div class="p-2 border rounded bg-white">
+                                        <div class="fw-bold text-dark font-monospace small"><span class="badge bg-success me-1">POST</span> /api/v1/hospitality/ticket</div>
+                                        <small class="text-muted">Generates a new WiFi ticket on bill print or room check-in.</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="p-2 border rounded bg-white">
+                                        <div class="fw-bold text-dark font-monospace small"><span class="badge bg-primary me-1">GET</span> /api/v1/hospitality/stats</div>
+                                        <small class="text-muted">Pulls live active guests, today's counts, and active rooms.</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="p-2 border rounded bg-white">
+                                        <div class="fw-bold text-dark font-monospace small"><span class="badge bg-success me-1">POST</span> /api/v1/hospitality/verify-guest</div>
+                                        <small class="text-muted">Verifies Room # + Guest Name for captive portal splash logins.</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="p-2 border rounded bg-white">
+                                        <div class="fw-bold text-dark font-monospace small"><span class="badge bg-danger me-1">POST</span> /api/v1/hospitality/ticket/{code}/revoke</div>
+                                        <small class="text-muted">Revokes ticket & force-disconnects guest upon early checkout.</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-white border-top py-3 px-4 d-flex justify-content-between">
+                    <small class="text-muted">HSmart Hospitality Architecture • All sessions synced directly with MikroTik RouterOS</small>
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Close Manual</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
 </div>
 

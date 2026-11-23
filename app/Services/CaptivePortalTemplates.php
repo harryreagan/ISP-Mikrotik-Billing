@@ -11,15 +11,15 @@ class CaptivePortalTemplates
     {
         return [
             'hsmart' => [
-                'name'      => 'HSmart Official (Clean)',
-                'vibe'      => 'Official clean SaaS look of the HSmart platform: crisp white card, Jost typography, light slate backdrop, vibrant orange M-Pesa action, and elegant side-by-side cards.',
-                'gradient'  => '#F8FAFC',
+                'name'      => 'HSmart Official (Sleek Mesh)',
+                'vibe'      => 'Modern web portal aesthetic: obsidian canvas, floating ambient animated mesh, frosted glass card, Jost typography, and vibrant M-Pesa action.',
+                'gradient'  => 'linear-gradient(135deg, #0b0f19 0%, #1e1b4b 50%, #0f172a 100%)',
                 'accent'    => '#F57C00',
-                'textColor' => '#0F172A',
+                'textColor' => '#FFFFFF',
             ],
             'midnight' => [
-                'name'      => 'Midnight Cyber',
-                'vibe'      => 'Deep obsidian canvas with subtle borders, glowing side-by-side cards, and telemetry status.',
+                'name'      => 'Midnight Cyber (Mesh Glow)',
+                'vibe'      => 'Deep obsidian canvas with subtle borders, glowing ambient mesh, and telemetry status.',
                 'gradient'  => '#0B1120',
                 'accent'    => '#F57C00',
                 'textColor' => '#FFFFFF',
@@ -263,11 +263,11 @@ CARD;
             $tvPackagesOptionsHtml .= "<option value=\"{$pkg['id']}\" data-price=\"{$pkg['price']}\" data-name=\"{$pkg['name']}\">{$pkg['name']} - KES {$pkg['price']}</option>\n";
         }
 
-        $wifiIconSvg = '<svg style="width:20px;height:20px;display:inline-block;vertical-align:middle;margin-right:6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>';
+        $wifiIconSvg = '<span class="brand-icon-box"><svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg></span>';
 
         $logoHtml = $logoUrl 
             ? "<img src=\"{$logoUrl}\" alt=\"{$brandName}\" class=\"brand-logo\">"
-            : "<div class=\"brand-badge\"><span class=\"brand-icon\">{$wifiIconSvg}</span><span class=\"brand-title\">{$brandName}</span></div>";
+            : "<div class=\"brand-badge\">{$wifiIconSvg}<span class=\"brand-title\">{$brandName}</span></div>";
 
         $whatsappLink = $supportWa ? "https://wa.me/{$supportWa}?text=Hello%20support%20I%20need%20help%20connecting" : '#';
 
@@ -279,6 +279,21 @@ CARD;
             $footerLinks[] = "<a href=\"{$whatsappLink}\" target=\"_blank\"><svg style=\"width:13px;height:13px;display:inline-block;vertical-align:middle;margin-right:4px\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z\"></path></svg>WhatsApp Support</a>";
         }
         $footerLinksHtml = !empty($footerLinks) ? '<div class="footer-links">' . implode('', $footerLinks) . '</div>' : '';
+
+        // Ambient Floating Mesh Animation Background (Matched with ISP Web Pages & Login)
+        $hasMeshBg = in_array($templateKey, ['hsmart', 'midnight', 'glass', 'neon', 'voucher', 'split']);
+        $meshBackgroundHtml = $hasMeshBg
+            ? <<<MESH
+<div class="hero-mesh-wrapper" aria-hidden="true">
+    <div class="mesh-grid-pattern"></div>
+    <div class="mesh-blob mesh-blob-1"></div>
+    <div class="mesh-blob mesh-blob-2"></div>
+    <div class="mesh-blob mesh-blob-3"></div>
+    <div class="mesh-blob mesh-blob-4"></div>
+    <div class="mesh-noise-overlay"></div>
+</div>
+MESH
+            : '';
 
         // Template-specific decorative badges and snowfall particles
         $snowflakesHtml = ($templateKey === 'christmas')
@@ -513,10 +528,116 @@ SNOW
         .footer-note { font-size: 12px; text-align: center; margin-top: 18px; line-height: 1.5; }
         .footer-links { display: flex; justify-content: center; gap: 16px; margin-top: 8px; }
         .footer-links a { text-decoration: none; font-weight: 600; font-size: 13px; }
+
+        /* ─── ANIMATED MESH BACKGROUND (Like Web Login Pages) ─── */
+        .hero-mesh-wrapper {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .mesh-grid-pattern {
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+            background-size: 28px 28px;
+            opacity: 0.45;
+            mask-image: radial-gradient(ellipse at 50% 50%, black 45%, transparent 85%);
+            -webkit-mask-image: radial-gradient(ellipse at 50% 50%, black 45%, transparent 85%);
+        }
+        .mesh-blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            -webkit-filter: blur(80px);
+            will-change: transform;
+            opacity: 0.55;
+            mix-blend-mode: screen;
+        }
+        .mesh-blob-1 {
+            width: 440px;
+            height: 440px;
+            background: radial-gradient(circle, #f97316 0%, rgba(249, 115, 22, 0.42) 55%, transparent 80%);
+            top: -10%;
+            right: -15%;
+            animation: meshFloat1 18s ease-in-out infinite alternate;
+        }
+        .mesh-blob-2 {
+            width: 480px;
+            height: 480px;
+            background: radial-gradient(circle, #6366f1 0%, rgba(99, 102, 241, 0.36) 55%, transparent 80%);
+            bottom: -15%;
+            left: -15%;
+            animation: meshFloat2 22s ease-in-out infinite alternate;
+        }
+        .mesh-blob-3 {
+            width: 360px;
+            height: 360px;
+            background: radial-gradient(circle, #0284c7 0%, rgba(2, 132, 199, 0.32) 55%, transparent 80%);
+            top: 35%;
+            left: 15%;
+            opacity: 0.45;
+            animation: meshFloat3 26s ease-in-out infinite alternate;
+        }
+        .mesh-blob-4 {
+            width: 340px;
+            height: 340px;
+            background: radial-gradient(circle, #f59e0b 0%, rgba(245, 158, 11, 0.3) 55%, transparent 80%);
+            bottom: 8%;
+            right: 4%;
+            opacity: 0.35;
+            animation: meshFloat4 20s ease-in-out infinite alternate;
+        }
+        .mesh-noise-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(11, 15, 25, 0.35) 0%, rgba(11, 15, 25, 0.12) 50%, rgba(11, 15, 25, 0.45) 100%);
+        }
+        @keyframes meshFloat1 {
+            0% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+            50% { transform: translate3d(-60px, 70px, 0) scale(1.12) rotate(15deg); }
+            100% { transform: translate3d(-120px, 40px, 0) scale(0.95) rotate(-10deg); }
+        }
+        @keyframes meshFloat2 {
+            0% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+            50% { transform: translate3d(80px, -60px, 0) scale(1.15) rotate(-20deg); }
+            100% { transform: translate3d(50px, -110px, 0) scale(0.92) rotate(15deg); }
+        }
+        @keyframes meshFloat3 {
+            0% { transform: translate3d(0, 0, 0) scale(1); }
+            50% { transform: translate3d(-50px, -50px, 0) scale(1.2) rotate(30deg); }
+            100% { transform: translate3d(70px, 40px, 0) scale(0.88) rotate(-15deg); }
+        }
+        @keyframes meshFloat4 {
+            0% { transform: translate3d(0, 0, 0) scale(0.9); }
+            50% { transform: translate3d(-70px, -40px, 0) scale(1.1) rotate(25deg); }
+            100% { transform: translate3d(-30px, 50px, 0) scale(1.05) rotate(-20deg); }
+        }
+
+        .brand-icon-box {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.35);
+            margin-right: 8px;
+            flex-shrink: 0;
+            vertical-align: middle;
+        }
+        .brand-icon-box svg {
+            width: 20px;
+            height: 20px;
+            display: block;
+        }
     </style>
 </head>
 <body class="tpl-{$templateKey}">
 
+{$meshBackgroundHtml}
 {$snowflakesHtml}
 
 <div class="portal-container">
@@ -2036,30 +2157,35 @@ CSS;
             default:
                 return <<<CSS
                 body.tpl-hsmart {
-                    background: #F8FAFC;
+                    background: #0B0F19;
                     {$bgImageRule}
                     font-family: 'Jost', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                    color: #0F172A;
+                    color: #FFFFFF;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     padding: 24px 16px;
                     min-height: 100vh;
+                    position: relative;
+                    overflow-x: hidden;
                 }
-                .tpl-hsmart .portal-container { width: 100%; max-width: 440px; margin: 0 auto; }
+                .tpl-hsmart .portal-container { width: 100%; max-width: 440px; margin: 0 auto; position: relative; z-index: 10; }
                 .tpl-hsmart .portal-card {
-                    background: #FFFFFF;
-                    border: 1px solid #E2E8F0;
-                    border-radius: 20px;
+                    background: rgba(15, 23, 42, 0.88);
+                    backdrop-filter: blur(20px);
+                    -webkit-backdrop-filter: blur(20px);
+                    border: 1px solid rgba(255, 255, 255, 0.12);
+                    border-radius: 22px;
                     padding: 32px 24px;
-                    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+                    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.65), 0 0 40px rgba(99, 102, 241, 0.1);
                 }
                 .tpl-hsmart .telemetry-badge {
                     display: inline-flex;
                     align-items: center;
                     gap: 6px;
-                    background: #EDE9FE;
-                    color: #6D28D9;
+                    background: rgba(99, 102, 241, 0.15);
+                    border: 1px solid rgba(99, 102, 241, 0.35);
+                    color: #a5b4fc;
                     font-size: 11px;
                     font-weight: 800;
                     padding: 4px 12px;
@@ -2073,32 +2199,33 @@ CSS;
                     height: 6px;
                     border-radius: 50%;
                     background: #10B981;
-                    box-shadow: 0 0 6px #10B981;
+                    box-shadow: 0 0 8px #10B981;
                 }
                 .tpl-hsmart .portal-header { text-align: center; margin-bottom: 22px; }
-                .tpl-hsmart .brand-logo { max-height: 52px; max-width: 190px; margin-bottom: 12px; }
-                .tpl-hsmart .brand-badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 22px; color: #0F172A; margin-bottom: 12px; }
-                .tpl-hsmart .portal-headline { font-size: 22px; font-weight: 800; color: #0F172A; letter-spacing: -0.3px; line-height: 1.25; }
-                .tpl-hsmart .portal-subheadline { font-size: 13.5px; color: #64748B; margin-top: 6px; line-height: 1.45; }
+                .tpl-hsmart .brand-logo { max-height: 52px; max-width: 190px; margin-bottom: 12px; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5)); }
+                .tpl-hsmart .brand-badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 20px; color: #FFFFFF; margin-bottom: 12px; }
+                .tpl-hsmart .portal-headline { font-size: 22px; font-weight: 800; color: #FFFFFF; letter-spacing: -0.3px; line-height: 1.25; }
+                .tpl-hsmart .portal-subheadline { font-size: 13.5px; color: #94A3B8; margin-top: 6px; line-height: 1.45; }
                 .tpl-hsmart .plan-card {
-                    background: #FFFFFF;
-                    border: 1.5px solid #E2E8F0;
+                    background: rgba(30, 41, 59, 0.65);
+                    border: 1.5px solid rgba(255, 255, 255, 0.08);
                     border-radius: 12px;
-                    color: #0F172A;
-                    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+                    color: #FFFFFF;
+                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
                     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                 }
                 .tpl-hsmart .plan-card:hover {
-                    border-color: #CBD5E1;
-                    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+                    border-color: rgba(249, 115, 22, 0.5);
+                    background: rgba(30, 41, 59, 0.9);
+                    transform: translateY(-1px);
                 }
                 .tpl-hsmart .plan-pill-duration {
-                    background: #F1F5F9;
-                    color: #334155;
+                    background: rgba(255, 255, 255, 0.08);
+                    color: #cbd5e1;
                     font-weight: 700;
                 }
                 .tpl-hsmart .plan-pill-speed {
-                    color: #0284C7;
+                    color: #38bdf8;
                     font-weight: 700;
                 }
                 .tpl-hsmart .plan-cur {
@@ -2106,62 +2233,62 @@ CSS;
                     font-weight: 800;
                 }
                 .tpl-hsmart .plan-val {
-                    color: #0F172A;
+                    color: #FFFFFF;
                     font-weight: 900;
                 }
                 .tpl-hsmart .plan-title {
-                    color: #334155;
+                    color: #cbd5e1;
                     font-weight: 700;
                 }
                 .tpl-hsmart .plan-card.selected {
                     border-color: {$primary};
-                    background: #FFF7ED;
-                    box-shadow: 0 0 0 3px rgba(245, 124, 0, 0.15), 0 4px 14px rgba(245, 124, 0, 0.12);
+                    background: linear-gradient(135deg, rgba(249, 115, 22, 0.18) 0%, rgba(30, 41, 59, 0.92) 100%);
+                    box-shadow: 0 0 24px rgba(249, 115, 22, 0.3);
                 }
                 .tpl-hsmart .plan-card.selected .plan-check-dot {
                     background: {$primary};
                     border-color: {$primary};
-                    box-shadow: 0 0 8px rgba(245, 124, 0, 0.4);
+                    box-shadow: 0 0 8px rgba(249, 115, 22, 0.5);
                 }
                 .tpl-hsmart .form-label {
-                    color: #334155;
+                    color: #cbd5e1;
                     font-weight: 700;
                     font-size: 12.5px;
                 }
                 .tpl-hsmart .input-box {
-                    background: #FFFFFF;
-                    border: 1.5px solid #CBD5E1;
-                    color: #0F172A;
+                    background: rgba(15, 23, 42, 0.7);
+                    border: 1.5px solid rgba(255, 255, 255, 0.14);
+                    color: #FFFFFF;
                     border-radius: 10px;
                     font-size: 14.5px;
                     font-weight: 600;
                     transition: border-color 0.2s, box-shadow 0.2s;
                 }
                 .tpl-hsmart .input-box::placeholder {
-                    color: #94A3B8;
+                    color: #64748b;
                 }
                 .tpl-hsmart .input-box:focus {
                     border-color: {$primary};
-                    box-shadow: 0 0 0 3px rgba(245, 124, 0, 0.15);
+                    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.25);
                     outline: none;
                 }
                 .tpl-hsmart .btn-pay {
-                    background: {$primary};
+                    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
                     color: {$btnText};
                     font-weight: 800;
                     border-radius: 10px;
-                    box-shadow: 0 4px 14px rgba(245, 124, 0, 0.35);
+                    box-shadow: 0 4px 18px rgba(249, 115, 22, 0.4);
                     transition: transform 0.15s, box-shadow 0.15s;
                 }
                 .tpl-hsmart .btn-pay:hover {
-                    box-shadow: 0 6px 18px rgba(245, 124, 0, 0.45);
+                    box-shadow: 0 6px 22px rgba(249, 115, 22, 0.55);
                     transform: translateY(-1px);
                 }
                 .tpl-hsmart .footer-note {
-                    color: #64748B;
+                    color: #94A3B8;
                 }
                 .tpl-hsmart .footer-links a {
-                    color: {$primary};
+                    color: #38bdf8;
                     font-weight: 600;
                 }
 CSS;
@@ -2340,9 +2467,9 @@ CSS;
             if ($tenantObj && !empty($tenantObj->name)) {
                 $settings['brand_name'] = $tenantObj->name;
             }
-            if ($tenantObj && !empty($tenantObj->phone) && !str_contains($tenantObj->phone, '743 606 108') && !str_contains($tenantObj->phone, '743606108')) {
+            if ($tenantObj && !empty($tenantObj->phone) && !str_contains((string)$tenantObj->phone, '743') && !str_contains((string)$tenantObj->phone, '606108')) {
                 $settings['support_phone'] = $tenantObj->phone;
-                $settings['support_whatsapp'] = preg_replace('/\D/', '', $tenantObj->phone);
+                $settings['support_whatsapp'] = preg_replace('/\D/', '', (string)$tenantObj->phone);
             }
 
             if (\Illuminate\Support\Facades\Schema::hasTable('isp_portal_settings')) {
