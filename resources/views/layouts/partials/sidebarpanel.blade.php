@@ -312,13 +312,7 @@
                     </div>
                 </a>
 
-                {{-- Hospitality & POS Integration --}}
-                <a wire:navigate.hover wire:current="active" class="nav-link {{ request()->routeIs('admin.hospitality-pos') ? 'active' : '' }}" href="{{ route('admin.hospitality-pos') }}" role="button">
-                    <div class="d-flex align-items-center">
-                        <span class="nav-link-icon"><i class="bi bi-building-gear text-primary"></i></span>
-                        <span class="nav-link-text ps-1">{{ __('Hotel & POS WiFi') }}</span>
-                    </div>
-                </a>
+
             </li>
 
             {{-- ══════════════════════════════════════════════════════════════ --}}
