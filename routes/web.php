@@ -348,6 +348,9 @@ Route::middleware([
         Route::get('/admin/captive-portal', fn() => redirect()->route('admin.portal-customizer'))->name('admin.captive-portal');
         Route::get('/admin/hospitality-pos', \App\Livewire\Admin\HospitalityPosManager::class)->name('admin.hospitality-pos');
 
+        // Dedicated White-Labeled Client Hospitality Reception & POS Console (Token-Authenticated)
+        Route::get('/hospitality/portal/{token}', \App\Livewire\Hospitality\HospitalityClientConsole::class)->name('hospitality.client-console');
+
         // Mikrotik Setup Routes (Redirect old wizard/setup URLs to new Add Router wizard, keep HotspotManager intact)
         Route::prefix('mikrotik-setup')->group(function () {
             Route::get('/', fn() => redirect()->route('admin.add-router'))->name('mikrotik-setup.index');

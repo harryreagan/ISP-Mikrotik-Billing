@@ -15,7 +15,17 @@
             <p class="text-muted small mb-0">Automate complimentary WiFi tickets printed on hotel check-in folios & POS thermal receipts for HSmart and 3rd-party systems.</p>
         </div>
 
-        <div class="d-flex align-items-center gap-2 mt-2 mt-md-0">
+        <div class="d-flex flex-wrap align-items-center gap-2 mt-2 mt-md-0">
+            @if($isSuperAdmin && $tenants->isNotEmpty())
+                <div class="d-flex align-items-center gap-2 me-2 bg-light p-1 px-2 rounded-pill border">
+                    <span class="small fw-bold text-muted"><i class="bi bi-shield-check text-primary"></i> Super Admin Hotel:</span>
+                    <select class="form-select form-select-sm border-0 bg-transparent fw-semibold" wire:model.live="selected_tenant_id" style="min-width: 180px;">
+                        @foreach($tenants as $ten)
+                            <option value="{{ $ten->id }}">{{ $ten->name }} (ID: {{ $ten->id }})</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
             <a href="{{ route('admin.portal-customizer') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
                 <i class="bi bi-palette me-1"></i> Captive Portal
             </a>
@@ -52,6 +62,33 @@
             </div>
         </div>
         <div class="card-body p-4 bg-light bg-opacity-50">
+            <div class="row g-3 mb-3">
+                <div class="col-lg-6">
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Hotel / Restaurant Display Name</label>
+                    <input type="text" class="form-control bg-white fw-semibold" wire:model="business_name" placeholder="e.g. Grand Safari Hotel & Cafe">
+                    <small class="text-muted mt-1 d-block">Shown on guest thermal receipt slips and staff reception console.</small>
+                </div>
+                <div class="col-lg-6">
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">
+                        <i class="bi bi-display text-primary me-1"></i> Hotel Staff Reception & POS Console (No ISP Login Required)
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0 text-success"><i class="bi bi-shield-check"></i></span>
+                        <input type="text" class="form-control bg-white font-monospace small" readonly value="{{ route('hospitality.client-console', ['token' => $portal_token]) }}" id="clientPortalUrlInput">
+                        <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('clientPortalUrlInput').value); alert('Staff Portal Link copied to clipboard!');">
+                            <i class="bi bi-clipboard"></i> Copy
+                        </button>
+                        <a href="{{ route('hospitality.client-console', ['token' => $portal_token]) }}" target="_blank" class="btn btn-primary" title="Open Staff Console">
+                            <i class="bi bi-box-arrow-up-right"></i> Open
+                        </a>
+                        <button wire:click="regeneratePortalToken" wire:confirm="Regenerate this staff portal link? Old link will stop working." class="btn btn-outline-danger" type="button" title="Regenerate Link">
+                            <i class="bi bi-arrow-repeat"></i>
+                        </button>
+                    </div>
+                    <small class="text-muted mt-1 d-block">Give this link to the hotel receptionist or cashier. They can issue tickets and view active rooms without accessing your ISP backend!</small>
+                </div>
+            </div>
+
             <div class="row g-3">
                 <div class="col-lg-6">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">API Endpoint URL</label>
@@ -526,3 +563,4 @@ print(response.json())</code></pre>
     </div>
 
 </div>
+

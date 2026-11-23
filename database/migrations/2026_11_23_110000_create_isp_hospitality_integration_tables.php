@@ -84,3 +84,4 @@ return new class extends Migration
         Schema::dropIfExists('isp_hospitality_settings');
     }
 };
+

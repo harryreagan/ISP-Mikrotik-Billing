@@ -15,7 +15,9 @@ class HospitalitySetting extends Model
 
     protected $fillable = [
         'tenant_id',
+        'business_name',
         'api_key',
+        'portal_token',
         'is_enabled',
         'default_hotel_package_id',
         'hotel_duration_hours',
@@ -48,10 +50,12 @@ class HospitalitySetting extends Model
     {
         $tenantId = $tenantId ?: (auth()->user()->tenant_id ?? 1);
 
-        return static::withoutGlobalScopes()->firstOrCreate(
+        $setting = static::withoutGlobalScopes()->firstOrCreate(
             ['tenant_id' => $tenantId],
             [
                 'api_key'                 => 'hsm_live_' . Str::random(32),
+                'portal_token'            => 'hsp_' . Str::random(32),
+                'business_name'           => 'Hotel & Cafe Partner',
                 'is_enabled'              => true,
                 'hotel_duration_hours'    => 24,
                 'hotel_device_limit'      => 3,
@@ -64,6 +68,12 @@ class HospitalitySetting extends Model
                 'webhook_secret'          => 'whsec_' . Str::random(24),
             ]
         );
+
+        if (empty($setting->portal_token)) {
+            $setting->update(['portal_token' => 'hsp_' . Str::random(32)]);
+        }
+
+        return $setting;
     }
 
     public function hotelPackage()
@@ -81,3 +91,4 @@ class HospitalitySetting extends Model
         return $this->belongsTo(Router::class, 'selected_router_id');
     }
 }
+

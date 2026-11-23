@@ -15,7 +15,12 @@ class HospitalityPosManager extends Component
 {
     use WithPagination;
 
+    // Multi-tenant & Super Admin support
+    public bool $isSuperAdmin = false;
+    public ?int $selected_tenant_id = null;
+
     // Settings fields
+    public string $business_name = 'Hotel Partner';
     public bool $is_enabled = true;
     public ?int $default_hotel_package_id = null;
     public int $hotel_duration_hours = 24;
@@ -32,6 +37,7 @@ class HospitalityPosManager extends Component
     public ?int $selected_router_id = null;
 
     public string $api_key = '';
+    public string $portal_token = '';
     public string $webhook_secret = '';
 
     // Quick Test Ticket Generator
@@ -55,9 +61,31 @@ class HospitalityPosManager extends Component
 
     public function mount()
     {
-        $tenantId = auth()->user()->tenant_id ?? 1;
+        $user = auth()->user();
+        $this->isSuperAdmin = (is_object($user) && method_exists($user, 'hasRole') && $user->hasRole('Super Admin'))
+            || in_array(strtolower($user->role ?? ''), ['admin', 'superadmin', 'super_admin'])
+            || ($user->id ?? 0) === 1;
+
+        $tenantId = $user->tenant_id ?? 1;
+        $this->selected_tenant_id = $tenantId;
+
+        $this->loadTenantSettings($tenantId);
+    }
+
+    public function updatedSelectedTenantId($newTenantId)
+    {
+        if ($this->isSuperAdmin && $newTenantId) {
+            $this->loadTenantSettings((int) $newTenantId);
+            $this->resetPage();
+        }
+    }
+
+    public function loadTenantSettings(int $tenantId)
+    {
+        $this->selected_tenant_id = $tenantId;
         $setting = HospitalitySetting::forTenant($tenantId);
 
+        $this->business_name = $setting->business_name ?: 'Hotel Partner';
         $this->is_enabled = (bool) $setting->is_enabled;
         $this->default_hotel_package_id = $setting->default_hotel_package_id;
         $this->hotel_duration_hours = (int) $setting->hotel_duration_hours;
@@ -74,15 +102,17 @@ class HospitalityPosManager extends Component
         $this->selected_router_id = $setting->selected_router_id;
 
         $this->api_key = $setting->api_key;
+        $this->portal_token = $setting->portal_token ?: 'hsp_' . Str::random(32);
         $this->webhook_secret = $setting->webhook_secret ?: 'whsec_' . Str::random(24);
     }
 
     public function saveSettings()
     {
-        $tenantId = auth()->user()->tenant_id ?? 1;
+        $tenantId = $this->selected_tenant_id ?: (auth()->user()->tenant_id ?? 1);
         $setting = HospitalitySetting::forTenant($tenantId);
 
         $setting->update([
+            'business_name'            => trim($this->business_name) ?: 'Hotel Partner',
             'is_enabled'               => $this->is_enabled,
             'default_hotel_package_id' => $this->default_hotel_package_id ?: null,
             'hotel_duration_hours'     => max(1, $this->hotel_duration_hours),
@@ -102,7 +132,7 @@ class HospitalityPosManager extends Component
 
     public function regenerateApiKey()
     {
-        $tenantId = auth()->user()->tenant_id ?? 1;
+        $tenantId = $this->selected_tenant_id ?: (auth()->user()->tenant_id ?? 1);
         $setting = HospitalitySetting::forTenant($tenantId);
 
         $newKey = 'hsm_live_' . Str::random(32);
@@ -112,9 +142,21 @@ class HospitalityPosManager extends Component
         session()->flash('success', 'API Key regenerated! Make sure to update your external POS or Hotel PMS integration.');
     }
 
+    public function regeneratePortalToken()
+    {
+        $tenantId = $this->selected_tenant_id ?: (auth()->user()->tenant_id ?? 1);
+        $setting = HospitalitySetting::forTenant($tenantId);
+
+        $newToken = 'hsp_' . Str::random(32);
+        $setting->update(['portal_token' => $newToken]);
+        $this->portal_token = $newToken;
+
+        session()->flash('success', 'Client Hospitality Portal link refreshed!');
+    }
+
     public function issueTestTicket(HospitalityTicketService $ticketService)
     {
-        $tenantId = auth()->user()->tenant_id ?? 1;
+        $tenantId = $this->selected_tenant_id ?: (auth()->user()->tenant_id ?? 1);
         $setting = HospitalitySetting::forTenant($tenantId);
 
         $payload = [
@@ -155,7 +197,11 @@ class HospitalityPosManager extends Component
 
     public function render()
     {
-        $tenantId = auth()->user()->tenant_id ?? 1;
+        $tenantId = $this->selected_tenant_id ?: (auth()->user()->tenant_id ?? 1);
+
+        $tenants = $this->isSuperAdmin
+            ? \App\Models\Tenant::orderBy('name')->get()
+            : collect([]);
 
         $packages = PackageList::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
@@ -191,9 +237,11 @@ class HospitalityPosManager extends Component
         $tickets = $query->paginate(15);
 
         return view('livewire.admin.hospitality-pos-manager', [
+            'tenants'  => $tenants,
             'packages' => $packages,
             'routers'  => $routers,
             'tickets'  => $tickets,
         ])->layout('layouts.app');
     }
 }
+

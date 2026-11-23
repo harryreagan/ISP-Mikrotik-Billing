@@ -56,3 +56,4 @@ class HospitalityTicket extends Model
         return $query->where('status', 'active');
     }
 }
+

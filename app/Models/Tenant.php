@@ -50,11 +50,6 @@ class Tenant extends Model
         return $this->hasMany(CustomersInfo::class);
     }
 
-    public function smsWallet(): HasOne
-    {
-        return $this->hasOne(SmsWallet::class, 'tenant_id');
-    }
-
     public function paymentChannels(): HasMany
     {
         return $this->hasMany(PaymentChannel::class, 'tenant_id');
