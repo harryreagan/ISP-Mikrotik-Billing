@@ -70,6 +70,142 @@
             background: radial-gradient(circle at 10% 20%, rgba(109, 63, 224, 0.12) 0%, transparent 60%),
                         radial-gradient(circle at 90% 80%, rgba(244, 123, 6, 0.08) 0%, transparent 50%);
             z-index: 1;
+            pointer-events: none;
+        }
+
+        /* ─── ANIMATED MESH BACKGROUND ─── */
+        .hero-mesh-wrapper {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Subtle cyber/infrastructure dot-grid overlay */
+        .mesh-grid-pattern {
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.14) 1px, transparent 1px);
+            background-size: 30px 30px;
+            opacity: 0.55;
+            mask-image: radial-gradient(ellipse at 50% 50%, black 45%, transparent 85%);
+            -webkit-mask-image: radial-gradient(ellipse at 50% 50%, black 45%, transparent 85%);
+        }
+
+        /* Ambient floating mesh blobs */
+        .mesh-blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(85px);
+            -webkit-filter: blur(85px);
+            will-change: transform;
+            opacity: 0.55;
+            mix-blend-mode: screen;
+        }
+
+        /* Blob 1: Vibrant Orange - top right drifting toward center */
+        .mesh-blob-1 {
+            width: 480px;
+            height: 480px;
+            background: radial-gradient(circle, #f97316 0%, rgba(249, 115, 22, 0.45) 55%, transparent 80%);
+            top: -10%;
+            right: -15%;
+            animation: meshFloat1 18s ease-in-out infinite alternate;
+        }
+
+        /* Blob 2: Deep Indigo / Violet - bottom left drifting upward */
+        .mesh-blob-2 {
+            width: 520px;
+            height: 520px;
+            background: radial-gradient(circle, #6366f1 0%, rgba(99, 102, 241, 0.38) 55%, transparent 80%);
+            bottom: -15%;
+            left: -15%;
+            animation: meshFloat2 22s ease-in-out infinite alternate;
+        }
+
+        /* Blob 3: Electric Sky / Cyan - drifting through center */
+        .mesh-blob-3 {
+            width: 380px;
+            height: 380px;
+            background: radial-gradient(circle, #0284c7 0%, rgba(2, 132, 199, 0.35) 55%, transparent 80%);
+            top: 38%;
+            left: 18%;
+            opacity: 0.45;
+            animation: meshFloat3 26s ease-in-out infinite alternate;
+        }
+
+        /* Blob 4: Warm Amber / Sunset - lower right corner pulse */
+        .mesh-blob-4 {
+            width: 360px;
+            height: 360px;
+            background: radial-gradient(circle, #f59e0b 0%, rgba(245, 158, 11, 0.32) 55%, transparent 80%);
+            bottom: 8%;
+            right: 4%;
+            opacity: 0.4;
+            animation: meshFloat4 20s ease-in-out infinite alternate;
+        }
+
+        /* Soft vignette overlay so text always stays razor-sharp & legible */
+        .mesh-noise-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(15, 20, 36, 0.3) 0%, rgba(15, 20, 36, 0.12) 50%, rgba(15, 20, 36, 0.45) 100%);
+        }
+
+        /* Smooth Fluid Floating Keyframes */
+        @keyframes meshFloat1 {
+            0% {
+                transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+            }
+            50% {
+                transform: translate3d(-60px, 70px, 0) scale(1.12) rotate(15deg);
+            }
+            100% {
+                transform: translate3d(-120px, 40px, 0) scale(0.95) rotate(-10deg);
+            }
+        }
+
+        @keyframes meshFloat2 {
+            0% {
+                transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+            }
+            50% {
+                transform: translate3d(80px, -60px, 0) scale(1.15) rotate(-20deg);
+            }
+            100% {
+                transform: translate3d(50px, -110px, 0) scale(0.92) rotate(15deg);
+            }
+        }
+
+        @keyframes meshFloat3 {
+            0% {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+            50% {
+                transform: translate3d(-50px, -50px, 0) scale(1.2) rotate(30deg);
+            }
+            100% {
+                transform: translate3d(70px, 40px, 0) scale(0.88) rotate(-15deg);
+            }
+        }
+
+        @keyframes meshFloat4 {
+            0% {
+                transform: translate3d(0, 0, 0) scale(0.9);
+            }
+            50% {
+                transform: translate3d(-70px, -40px, 0) scale(1.1) rotate(25deg);
+            }
+            100% {
+                transform: translate3d(-30px, 50px, 0) scale(1.05) rotate(-20deg);
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .mesh-blob {
+                animation: none !important;
+            }
         }
         .hero-content {
             position: relative;
@@ -499,6 +635,15 @@
 <div class="auth-container">
     <!-- ─── LEFT HERO PANEL ─── -->
     <div class="hero-panel">
+        <!-- Animated Mesh Background -->
+        <div class="hero-mesh-wrapper" aria-hidden="true">
+            <div class="mesh-grid-pattern"></div>
+            <div class="mesh-blob mesh-blob-1"></div>
+            <div class="mesh-blob mesh-blob-2"></div>
+            <div class="mesh-blob mesh-blob-3"></div>
+            <div class="mesh-blob mesh-blob-4"></div>
+            <div class="mesh-noise-overlay"></div>
+        </div>
         <div class="hero-overlay"></div>
         <div class="hero-content">
             <!-- Official HSmart ISP Logo -->
