@@ -144,7 +144,7 @@
                         <select class="form-select" wire:model="default_hotel_package_id">
                             <option value="">-- Use First Active Router Package --</option>
                             @foreach($packages as $pkg)
-                                <option value="{{ $pkg->id }}">{{ $pkg->name }} ({{ $pkg->speed_limit ?: 'Full Speed' }})</option>
+                                <option value="{{ $pkg->id }}">{{ $pkg->package }} ({{ $pkg->speed ?: 'Full Speed' }})</option>
                             @endforeach
                         </select>
                         <small class="text-muted">Bandwidth profile assigned to hotel guest accounts.</small>
@@ -196,7 +196,7 @@
                         <select class="form-select" wire:model="default_pos_package_id">
                             <option value="">-- Use First Active Router Package --</option>
                             @foreach($packages as $pkg)
-                                <option value="{{ $pkg->id }}">{{ $pkg->name }} ({{ $pkg->speed_limit ?: 'Standard' }})</option>
+                                <option value="{{ $pkg->id }}">{{ $pkg->package }} ({{ $pkg->speed ?: 'Standard' }})</option>
                             @endforeach
                         </select>
                         <small class="text-muted">Speed profile assigned to dining customers.</small>

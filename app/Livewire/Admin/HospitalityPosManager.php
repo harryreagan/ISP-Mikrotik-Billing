@@ -205,7 +205,7 @@ class HospitalityPosManager extends Component
 
         $packages = PackageList::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->orderBy('name')
+            ->orderBy('package')
             ->get();
 
         $routers = Router::withoutGlobalScopes()
