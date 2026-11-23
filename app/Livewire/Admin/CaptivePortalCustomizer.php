@@ -9,9 +9,12 @@ use App\Services\MikrotikApiService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class CaptivePortalCustomizer extends Component
 {
+    use WithFileUploads;
+
     // Design Template Choice (Default to clean HSmart SaaS design)
     public string $template = 'hsmart';
 
@@ -20,9 +23,12 @@ class CaptivePortalCustomizer extends Component
     public $brand_color = '#F57C00';
     public $secondary_color = '#0F172A';
     public $logo_url = '';
+    public $logo_upload = null;
     public $background_url = '';
     public $headline = 'Welcome to High-Speed Internet';
     public $subheadline = 'Instant automated M-Pesa activation with zero buffering.';
+    public $badge_text = '';
+    public $show_badge = true;
     public $terms_text = 'By connecting, you agree to our fair use policy and terms of service.';
     public $support_phone = '';
     public $support_whatsapp = '';
@@ -53,6 +59,8 @@ class CaptivePortalCustomizer extends Component
             $this->background_url       = $settings->background_url ?: '';
             $this->headline             = $settings->headline ?: $this->headline;
             $this->subheadline          = $settings->subheadline ?: $this->subheadline;
+            $this->badge_text           = $settings->badge_text ?? '';
+            $this->show_badge           = isset($settings->show_badge) ? (bool) $settings->show_badge : true;
             $this->terms_text           = $settings->terms_text ?: $this->terms_text;
             $this->support_phone        = ($settings->support_phone && !str_contains($settings->support_phone, '743 606 108') && !str_contains($settings->support_phone, '743606108')) ? $settings->support_phone : '';
             $this->support_whatsapp     = ($settings->support_whatsapp && !str_contains($settings->support_whatsapp, '743606108')) ? $settings->support_whatsapp : '';
@@ -81,6 +89,24 @@ class CaptivePortalCustomizer extends Component
         }
     }
 
+    public function updatedLogoUpload()
+    {
+        $this->validate([
+            'logo_upload' => 'image|max:2048', // 2MB max
+        ]);
+
+        $path = $this->logo_upload->store('portal-logos', 'public');
+        $this->logo_url = asset('storage/' . $path);
+        $this->saveSettings(false);
+    }
+
+    public function removeLogo()
+    {
+        $this->logo_url = '';
+        $this->logo_upload = null;
+        $this->saveSettings(false);
+    }
+
     public function saveSettings(bool $pushToRouters = true)
     {
         $this->save_status = null;
@@ -107,6 +133,8 @@ class CaptivePortalCustomizer extends Component
                     'background_url'        => $this->background_url,
                     'headline'              => $this->headline,
                     'subheadline'           => $this->subheadline,
+                    'badge_text'            => $this->badge_text,
+                    'show_badge'            => (bool) $this->show_badge,
                     'terms_text'            => $this->terms_text,
                     'support_phone'         => $this->support_phone,
                     'support_whatsapp'      => $this->support_whatsapp,
@@ -241,6 +269,8 @@ class CaptivePortalCustomizer extends Component
             'background_url'       => $this->background_url,
             'headline'             => $this->headline,
             'subheadline'          => $this->subheadline,
+            'badge_text'           => $this->badge_text,
+            'show_badge'           => (bool) $this->show_badge,
             'terms_text'           => $this->terms_text,
             'support_phone'        => $this->support_phone,
             'support_whatsapp'     => $this->support_whatsapp,
@@ -265,6 +295,8 @@ class CaptivePortalCustomizer extends Component
             'background_url'       => $this->background_url,
             'headline'             => $this->headline,
             'subheadline'          => $this->subheadline,
+            'badge_text'           => $this->badge_text,
+            'show_badge'           => (bool) $this->show_badge,
             'terms_text'           => $this->terms_text,
             'support_phone'        => $this->support_phone,
             'support_whatsapp'     => $this->support_whatsapp,

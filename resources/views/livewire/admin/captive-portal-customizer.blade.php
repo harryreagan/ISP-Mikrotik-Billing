@@ -118,14 +118,61 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label">Logo Image URL</label>
-                            <input type="text" wire:model.live.debounce.400ms="logo_url" class="form-control" placeholder="https://yourdomain.com/logo.png">
-                            <small class="text-muted">Direct HTTPS image link</small>
+                            <label class="form-label">Logo Image</label>
+                            @if($logo_url)
+                            <div class="d-flex align-items-center justify-content-between gap-2 p-2 border rounded bg-white mb-2">
+                                <img src="{{ $logo_url }}" alt="Logo Preview" style="max-height: 32px; max-width: 130px; object-fit: contain;">
+                                <button type="button" wire:click="removeLogo" class="btn btn-xs btn-outline-danger" title="Remove Logo and use stylized Brand Name text">
+                                    <i class="bi bi-x-circle me-1"></i>Remove Logo
+                                </button>
+                            </div>
+                            @endif
+                            <div class="d-flex gap-2 mb-1">
+                                <input type="file" wire:model="logo_upload" accept="image/*" class="form-control form-control-sm">
+                                <div wire:loading wire:target="logo_upload" class="spinner-border spinner-border-sm text-primary align-self-center"></div>
+                            </div>
+                            <input type="text" wire:model.live.debounce.400ms="logo_url" class="form-control form-control-sm font-monospace" placeholder="Or paste https://... image URL">
+                            <small class="text-muted">Upload PNG/SVG/JPG or enter image URL. If removed, your stylized <strong>Brand Name</strong> is displayed.</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Background Wallpaper URL</label>
                             <input type="text" wire:model.live.debounce.400ms="background_url" class="form-control" placeholder="https://yourdomain.com/bg.jpg">
                             <small class="text-muted">Optional custom background</small>
+                        </div>
+
+                        {{-- Top Announcement Ribbon / Badge --}}
+                        <div class="col-12">
+                            <div class="p-3 rounded-lg border border-slate-200 bg-slate-50/70">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label class="form-label fw-bold mb-0 text-slate-800">
+                                        <i class="bi bi-megaphone-fill text-orange-500 me-1"></i>Top Announcement Ribbon / Highlight Badge
+                                    </label>
+                                    <div class="form-check form-switch mb-0">
+                                        <input class="form-check-input" type="checkbox" role="switch" id="toggleShowBadge" wire:model.live="show_badge">
+                                        <label class="form-check-label text-xs fw-semibold" for="toggleShowBadge">
+                                            {{ $show_badge ? 'Visible' : 'Hidden' }}
+                                        </label>
+                                    </div>
+                                </div>
+                                @if($show_badge)
+                                <div class="input-group">
+                                    <input type="text" 
+                                           wire:model.live.debounce.400ms="badge_text" 
+                                           class="form-control" 
+                                           placeholder="{{ \App\Services\CaptivePortalTemplates::getDefaultBadgeText($template) }}">
+                                    @if($badge_text)
+                                    <button class="btn btn-outline-secondary" type="button" wire:click="$set('badge_text', '')" title="Reset to template default">
+                                        Reset Default
+                                    </button>
+                                    @endif
+                                </div>
+                                <small class="text-muted d-block mt-1">
+                                    Customize the top highlight ribbon (e.g. <em>"Holiday Special • High-Speed WiFi"</em>, <em>"5G Hotspot • Instant Activation"</em>, <em>"Weekend Flash Sale • 50% Off"</em>). Leave blank to use the template default.
+                                </small>
+                                @else
+                                <small class="text-muted fst-italic">Top highlight ribbon is currently turned off on this captive portal.</small>
+                                @endif
+                            </div>
                         </div>
 
                         <div class="col-12">

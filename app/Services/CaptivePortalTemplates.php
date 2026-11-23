@@ -98,6 +98,26 @@ class CaptivePortalTemplates
     }
 
     /**
+     * Get default contextual badge/ribbon text for a specific template.
+     */
+    public static function getDefaultBadgeText(string $templateKey): string
+    {
+        return match ($templateKey) {
+            'christmas' => 'Holiday Special • High-Speed WiFi',
+            'hotel'     => 'Guest Concierge Access • High-Speed Pass',
+            'corporate' => 'Verified Enterprise Hotspot • Encrypted',
+            'cafe'      => 'Artisan Roasters WiFi • Complimentary Guest Access',
+            'neon'      => 'PORTAL: ONLINE • 100% OPERATIONAL',
+            'minimal'   => 'High-Speed WiFi Access',
+            'voucher'   => 'Voucher Express • Instant Connect',
+            'sunset'    => 'Savannah Sunset • High-Speed WiFi',
+            'glass'     => 'Aurora Glass • High-Speed WiFi',
+            'split'     => 'Gigabit Fiber Hotspot • Instant Connect',
+            default     => '5G Hotspot • Instant Activation',
+        };
+    }
+
+    /**
      * Render complete, self-contained standalone login.html for MikroTik captive portal.
      *
      * @param string $templateKey
@@ -125,6 +145,9 @@ class CaptivePortalTemplates
         $brandName      = htmlspecialchars(!empty($s->brand_name) && strtolower($s->brand_name) !== 'high-speed wifi' ? $s->brand_name : $defaultBrand, ENT_QUOTES, 'UTF-8');
         $headline       = htmlspecialchars($s->headline ?? 'Welcome to Fast Internet', ENT_QUOTES, 'UTF-8');
         $subheadline    = htmlspecialchars($s->subheadline ?? 'Choose a package and pay via M-Pesa for instant connection.', ENT_QUOTES, 'UTF-8');
+        $badgeTextRaw   = isset($s->badge_text) && $s->badge_text !== '' ? (string)$s->badge_text : self::getDefaultBadgeText($templateKey);
+        $badgeText      = htmlspecialchars(trim($badgeTextRaw), ENT_QUOTES, 'UTF-8');
+        $showBadge      = isset($s->show_badge) ? (bool)$s->show_badge : true;
         $instructions   = htmlspecialchars($s->payment_instructions ?? 'Select your plan, enter your M-Pesa number, and approve the payment on your phone.', ENT_QUOTES, 'UTF-8');
         $terms          = htmlspecialchars($s->terms_text ?? 'By connecting, you agree to fair usage and terms of service.', ENT_QUOTES, 'UTF-8');
         $supportPhone   = !empty($s->support_phone) && !str_contains((string)$s->support_phone, '743 606 108') && !str_contains((string)$s->support_phone, '743606108')
@@ -141,9 +164,17 @@ class CaptivePortalTemplates
 
         // Validate URLs (http / https only)
         try {
-            $logoUrl    = self::sanitizeUrl($s->logo_url ?? null) ?: (function_exists('asset') ? asset('images/hsmart-isp-logo.svg') : '/images/hsmart-isp-logo.svg');
+            $logoUrl    = self::sanitizeUrl($s->logo_url ?? null);
+            if (empty($logoUrl)) {
+                // If brand name is explicitly HSmart, provide official SVG logo fallback; otherwise render custom brand-badge
+                if (stripos((string)$brandName, 'HSmart') !== false) {
+                    $logoUrl = function_exists('asset') ? asset('images/hsmart-isp-logo.svg') : '/images/hsmart-isp-logo.svg';
+                } else {
+                    $logoUrl = null;
+                }
+            }
         } catch (\Throwable $e) {
-            $logoUrl    = '/images/hsmart-isp-logo.svg';
+            $logoUrl    = null;
         }
         $backgroundUrl  = self::sanitizeUrl($s->background_url ?? null);
 
@@ -274,20 +305,23 @@ SNOW
             : '';
 
         $headerExtraHtml = '';
-        if ($templateKey === 'hsmart') {
-            $headerExtraHtml = '<div class="telemetry-badge"><span class="pulse-dot"></span><span>5G Hotspot • Instant Activation</span></div>';
-        } elseif ($templateKey === 'christmas') {
-            $headerExtraHtml = '<div class="festive-ribbon"><span class="ribbon-icon">🎄</span><span>Holiday Special • High-Speed WiFi</span><span class="ribbon-icon">🎅</span></div>';
-        } elseif ($templateKey === 'hotel') {
-            $headerExtraHtml = '<div class="hotel-concierge-badge"><span>🏛️ Guest Concierge Access • High-Speed Pass</span></div>';
-        } elseif ($templateKey === 'corporate') {
-            $headerExtraHtml = '<div class="corp-verified-badge"><span>🛡️ Verified Enterprise Hotspot • Encrypted</span></div>';
-        } elseif ($templateKey === 'cafe') {
-            $headerExtraHtml = '<div class="cafe-stamp-badge"><span>☕ Artisan Roasters WiFi • Complimentary Guest Access</span></div>';
-        } elseif ($templateKey === 'neon') {
-            $headerExtraHtml = '<div class="neon-telemetry-badge"><span>[PORTAL: ONLINE] [STATUS: 100% OPERATIONAL]</span></div>';
-        } elseif ($templateKey === 'midnight') {
-            $headerExtraHtml = '<div class="telemetry-badge"><span class="pulse-dot"></span><span>5G Hotspot • Live &amp; Automated</span></div>';
+        if ($showBadge && !empty($badgeText)) {
+            if ($templateKey === 'christmas') {
+                $headerExtraHtml = '<div class="festive-ribbon"><span class="ribbon-icon">🎄</span><span>' . $badgeText . '</span><span class="ribbon-icon">🎅</span></div>';
+            } elseif ($templateKey === 'hotel') {
+                $headerExtraHtml = '<div class="hotel-concierge-badge"><span>🏛️ ' . $badgeText . '</span></div>';
+            } elseif ($templateKey === 'corporate') {
+                $headerExtraHtml = '<div class="corp-verified-badge"><span>🛡️ ' . $badgeText . '</span></div>';
+            } elseif ($templateKey === 'cafe') {
+                $headerExtraHtml = '<div class="cafe-stamp-badge"><span>☕ ' . $badgeText . '</span></div>';
+            } elseif ($templateKey === 'neon') {
+                $headerExtraHtml = '<div class="neon-telemetry-badge"><span>[' . $badgeText . ']</span></div>';
+            } elseif ($templateKey === 'minimal') {
+                $headerExtraHtml = '<div class="minimal-badge" style="display:inline-flex;align-items:center;padding:4px 12px;background:#e2e8f0;color:#0f172a;border-radius:999px;font-size:11px;font-weight:700;margin-bottom:12px;letter-spacing:0.3px;"><span>' . $badgeText . '</span></div>';
+            } else {
+                // hsmart, midnight, sunset, glass, split, voucher
+                $headerExtraHtml = '<div class="telemetry-badge"><span class="pulse-dot"></span><span>' . $badgeText . '</span></div>';
+            }
         }
 
         // 4. Return Full Self-Contained Document
@@ -2298,9 +2332,11 @@ CSS;
             'secondary_color'      => '#0F172A',
             'support_phone'        => '',
             'support_whatsapp'     => '',
+            'badge_text'           => '',
+            'show_badge'           => true,
             'payment_instructions' => 'Select a package, enter your M-Pesa phone number, and accept the STK push on your phone.',
             'terms_text'           => 'By connecting, you agree to our fair use policy and terms of service.',
-            'logo_url'             => 'https://isp.hsmart.co.ke/images/hsmart-isp-logo.svg',
+            'logo_url'             => '',
             'background_url'       => '',
         ];
         $template = 'hsmart';
@@ -2318,10 +2354,12 @@ CSS;
             if (\Illuminate\Support\Facades\Schema::hasTable('isp_portal_settings')) {
                 $saved = \Illuminate\Support\Facades\DB::table('isp_portal_settings')->where('tenant_id', $tenantId)->first();
                 if ($saved) {
-                    $template = $saved->template ?? ($saved->selected_template ?? 'midnight');
+                    $template = $saved->template ?? ($saved->selected_template ?? 'hsmart');
                     if (!empty($saved->brand_name)) $settings['brand_name'] = $saved->brand_name;
                     if (!empty($saved->headline)) $settings['headline'] = $saved->headline;
                     if (!empty($saved->subheadline)) $settings['subheadline'] = $saved->subheadline;
+                    if (isset($saved->badge_text)) $settings['badge_text'] = $saved->badge_text;
+                    if (isset($saved->show_badge)) $settings['show_badge'] = (bool)$saved->show_badge;
                     if (!empty($saved->brand_color)) $settings['brand_color'] = $saved->brand_color;
                     if (!empty($saved->secondary_color)) $settings['secondary_color'] = $saved->secondary_color;
                     if (!empty($saved->support_phone)) $settings['support_phone'] = $saved->support_phone;
