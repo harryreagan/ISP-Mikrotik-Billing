@@ -194,10 +194,10 @@ Route::match(['get', 'post'], '/captive-portal/preview', function(\Illuminate\Ht
     $settings['router_id'] = $routerId;
 
     if (empty($settings['brand_name']) || strtolower($settings['brand_name']) === 'high-speed wifi') {
-        $settings['brand_name'] = $tenantName ?: 'HSmart WiFi';
+        $settings['brand_name'] = $tenantName ?: 'High-Speed WiFi';
     }
-    if (empty($settings['logo_url'])) {
-        $settings['logo_url'] = asset('images/hsmart-isp-logo.svg');
+    if (!isset($settings['logo_url'])) {
+        $settings['logo_url'] = '';
     }
 
     // ── Strictly Isolated Hotspot Packages for THIS Tenant & Router ──

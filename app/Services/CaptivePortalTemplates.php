@@ -164,17 +164,9 @@ class CaptivePortalTemplates
 
         // Validate URLs (http / https only)
         try {
-            $logoUrl    = self::sanitizeUrl($s->logo_url ?? null);
-            if (empty($logoUrl)) {
-                // If brand name is explicitly HSmart, provide official SVG logo fallback; otherwise render custom brand-badge
-                if (stripos((string)$brandName, 'HSmart') !== false) {
-                    $logoUrl = function_exists('asset') ? asset('images/hsmart-isp-logo.svg') : '/images/hsmart-isp-logo.svg';
-                } else {
-                    $logoUrl = null;
-                }
-            }
+            $logoUrl = self::sanitizeUrl($s->logo_url ?? null);
         } catch (\Throwable $e) {
-            $logoUrl    = null;
+            $logoUrl = null;
         }
         $backgroundUrl  = self::sanitizeUrl($s->background_url ?? null);
 
@@ -271,9 +263,11 @@ CARD;
             $tvPackagesOptionsHtml .= "<option value=\"{$pkg['id']}\" data-price=\"{$pkg['price']}\" data-name=\"{$pkg['name']}\">{$pkg['name']} - KES {$pkg['price']}</option>\n";
         }
 
+        $wifiIconSvg = '<svg style="width:20px;height:20px;display:inline-block;vertical-align:middle;margin-right:6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>';
+
         $logoHtml = $logoUrl 
             ? "<img src=\"{$logoUrl}\" alt=\"{$brandName}\" class=\"brand-logo\">"
-            : "<div class=\"brand-badge\"><span class=\"brand-icon\">⚡</span><span class=\"brand-title\">{$brandName}</span></div>";
+            : "<div class=\"brand-badge\"><span class=\"brand-icon\">{$wifiIconSvg}</span><span class=\"brand-title\">{$brandName}</span></div>";
 
         $whatsappLink = $supportWa ? "https://wa.me/{$supportWa}?text=Hello%20support%20I%20need%20help%20connecting" : '#';
 

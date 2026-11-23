@@ -48,11 +48,13 @@ class CaptivePortalCustomizer extends Component
     {
         $user = auth()->user();
         $tenantId = $user ? ($user->tenant_id ?: 1) : 1;
+        $tenantObj = \App\Models\Tenant::find($tenantId);
+        $tenantName = $tenantObj?->name ?: 'My WiFi';
 
         $settings = DB::table('isp_portal_settings')->where('tenant_id', $tenantId)->first();
         if ($settings) {
             $this->template             = $settings->template ?: 'hsmart';
-            $this->brand_name           = $settings->brand_name ?: $this->brand_name;
+            $this->brand_name           = (!empty($settings->brand_name) && $settings->brand_name !== 'HSmart WiFi') ? $settings->brand_name : $tenantName;
             $this->brand_color          = $settings->brand_color ?: $this->brand_color;
             $this->secondary_color      = $settings->secondary_color ?: $this->secondary_color;
             $this->logo_url             = $settings->logo_url ?: '';
