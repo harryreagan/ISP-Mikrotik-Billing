@@ -444,28 +444,45 @@ class DarajaPaymentController extends Controller
             }
         }
 
-        // 3. Stacking calculation
-        $existingActive = HotspotSale::withoutGlobalScopes()
+        // 3. Stacking calculation (if user has active session, add duration to current expires_at)
+        // Check if THIS specific transaction already has a recorded sale (idempotency guard)
+        $existingThisSale = HotspotSale::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->where(function ($q) use ($phone, $clientMac) {
-                if ($phone) $q->where('phone', $phone);
-                if ($clientMac) $q->orWhere('mac_address', strtoupper($clientMac));
-            })
-            ->where('expires_at', '>', now())
-            ->whereIn('status', ['completed', 'active', 'pending_router'])
-            ->latest('expires_at')
+            ->where('voucher_code', $receipt)
             ->first();
 
-        if ($existingActive && $existingActive->expires_at) {
-            $startedAt = $existingActive->started_at ?: now();
-            $expiresAt = Carbon::parse($existingActive->expires_at)->addSeconds($durationSeconds);
-            $totalMinutes = (int) $existingActive->duration_minutes + $durationMinutes;
+        if ($existingThisSale) {
+            // Already fulfilled! Use recorded duration and expiration. Do NOT re-stack onto itself!
+            $startedAt = $existingThisSale->started_at ?: now();
+            $expiresAt = $existingThisSale->expires_at ? Carbon::parse($existingThisSale->expires_at) : now()->addSeconds($durationSeconds);
+            $totalMinutes = (int) ($existingThisSale->duration_minutes ?: $durationMinutes);
             $remSeconds = max(60, now()->diffInSeconds($expiresAt, false));
             $limitUptime = \App\Services\MikrotikDuration::secondsToMikrotik($remSeconds);
         } else {
-            $startedAt = now();
-            $expiresAt = now()->addSeconds($durationSeconds);
-            $totalMinutes = $durationMinutes;
+            // Look for existing ACTIVE session to stack onto, BUT EXCLUDE THIS RECEIPT!
+            $existingActive = HotspotSale::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('voucher_code', '!=', $receipt)
+                ->where(function ($q) use ($phone, $clientMac) {
+                    if ($phone) $q->where('phone', $phone);
+                    if ($clientMac) $q->orWhere('mac_address', strtoupper($clientMac));
+                })
+                ->where('expires_at', '>', now())
+                ->whereIn('status', ['completed', 'active', 'pending_router'])
+                ->latest('expires_at')
+                ->first();
+
+            if ($existingActive && $existingActive->expires_at) {
+                $startedAt = $existingActive->started_at ?: now();
+                $expiresAt = Carbon::parse($existingActive->expires_at)->addSeconds($durationSeconds);
+                $totalMinutes = (int) $existingActive->duration_minutes + $durationMinutes;
+                $remSeconds = max(60, now()->diffInSeconds($expiresAt, false));
+                $limitUptime = \App\Services\MikrotikDuration::secondsToMikrotik($remSeconds);
+            } else {
+                $startedAt = now();
+                $expiresAt = now()->addSeconds($durationSeconds);
+                $totalMinutes = $durationMinutes;
+            }
         }
 
         // 4. Record HotspotSale FIRST
@@ -625,16 +642,26 @@ class DarajaPaymentController extends Controller
                 $api = new MikrotikApiService($host, $port, $user, $pass, 15);
                 $code = strtoupper(trim($receipt));
 
+                // 0. Ensure package profile exists on router if package was resolved
                 $resolvedProfile = 'default';
                 if ($pkg && !empty($profileName) && $profileName !== 'default') {
                     try {
+                        $rateLimitStr = $pkg->getRateLimitString();
                         $existingProf = $api->executeCommand('/ip/hotspot/user/profile/print', [], ['name' => $profileName]);
                         if (is_array($existingProf) && !empty($existingProf[0]['.id'])) {
                             $resolvedProfile = $profileName;
+                            if ($rateLimitStr) {
+                                $api->executeCommand('/ip/hotspot/user/profile/set', [
+                                    '.id'                => $existingProf[0]['.id'],
+                                    'rate-limit'         => $rateLimitStr,
+                                    'shared-users'       => (string) max(1, (int) ($pkg->shared_users ?: 1)),
+                                    'status-autorefresh' => '1m',
+                                ]);
+                            }
                         } else {
                             $addProfRes = $api->executeCommand('/ip/hotspot/user/profile/add', [
                                 'name'               => $profileName,
-                                'rate-limit'         => $pkg->getRateLimitString(),
+                                'rate-limit'         => $rateLimitStr,
                                 'session-timeout'    => $pkg->getSessionTimeoutString(),
                                 'idle-timeout'       => '5m',
                                 'shared-users'       => (string) max(1, (int) ($pkg->shared_users ?: 1)),

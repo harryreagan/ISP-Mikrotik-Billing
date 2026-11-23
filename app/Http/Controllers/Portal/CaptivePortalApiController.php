@@ -336,13 +336,23 @@ class CaptivePortalApiController extends Controller
         if ($packageId) {
             $plan = PackageList::withoutGlobalScopes()->find((int) $packageId);
             if ($plan) {
+                $val = (int) ($plan->validity_value ?: ($plan->duration_value ?: 0));
+                $unit = strtolower((string) ($plan->validity_unit ?: ($plan->duration_unit ?: 'hours')));
+                if ($val > 0) {
+                    if (str_starts_with($unit, 'min')) return max(1, (int) ceil($val / 60));
+                    if (str_starts_with($unit, 'hour')) return $val;
+                    if (str_starts_with($unit, 'day')) return $val * 24;
+                    if (str_starts_with($unit, 'week')) return $val * 168;
+                    if (str_starts_with($unit, 'month')) return $val * 720;
+                }
+
                 $hours = (int) ($plan->duration_hours ?? 0);
                 if ($hours > 0) return $hours;
 
                 $days = (int) ($plan->duration_days ?? $plan->validity ?? 0);
                 if ($days > 0) return $days * 24;
 
-                $name = strtolower($plan->package_name ?: ($plan->name ?: ''));
+                $name = strtolower($plan->package ?: ($plan->package_name ?: ($plan->name ?: '')));
                 if (str_contains($name, 'hour') || str_contains($name, '1h') || str_contains($name, '2h') || str_contains($name, '3h')) {
                     preg_match('/(\d+)\s*(?:hour|hr|h)/i', $name, $m);
                     if (!empty($m[1])) return (int) $m[1];

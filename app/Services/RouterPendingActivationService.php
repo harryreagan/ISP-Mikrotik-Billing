@@ -121,6 +121,38 @@ class RouterPendingActivationService
                     }
                 }
 
+                // Ensure profile with rate-limit exists on router
+                if (!empty($activation->profile) && $activation->profile !== 'default') {
+                    try {
+                        $profName = $activation->profile;
+                        $pkg = \App\Models\PackageList::withoutGlobalScopes()
+                            ->where('tenant_id', $router->tenant_id)
+                            ->where('package', $profName)
+                            ->first();
+                        $rateLimitStr = $pkg ? $pkg->getRateLimitString() : null;
+                        $existingProf = $api->executeCommand('/ip/hotspot/user/profile/print', [], ['name' => $profName]);
+                        if (is_array($existingProf) && !empty($existingProf[0]['.id'])) {
+                            if ($rateLimitStr) {
+                                $api->executeCommand('/ip/hotspot/user/profile/set', [
+                                    '.id'                => $existingProf[0]['.id'],
+                                    'rate-limit'         => $rateLimitStr,
+                                    'shared-users'       => (string) max(1, (int) ($pkg?->shared_users ?: 1)),
+                                    'status-autorefresh' => '1m',
+                                ]);
+                            }
+                        } elseif ($pkg) {
+                            $api->executeCommand('/ip/hotspot/user/profile/add', [
+                                'name'               => $profName,
+                                'rate-limit'         => $rateLimitStr,
+                                'session-timeout'    => $pkg->getSessionTimeoutString(),
+                                'idle-timeout'       => '5m',
+                                'shared-users'       => (string) max(1, (int) ($pkg->shared_users ?: 1)),
+                                'status-autorefresh' => '1m',
+                            ]);
+                        }
+                    } catch (\Throwable $pe) {}
+                }
+
                 $comment = 'HSmart ' . ($activation->username !== $code ? $activation->username : '') .
                            ($activation->expires_at ? ' exp:' . $activation->expires_at->toDateTimeString() : '');
 
