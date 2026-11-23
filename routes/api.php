@@ -102,6 +102,15 @@ Route::get('/router-hello/{token}', function (\Illuminate\Http\Request $request,
     return response()->json(['status' => 'ok', 'timestamp' => now()->timestamp], 200);
 })->middleware('throttle:60,1');
 
+// ── Hospitality & External POS WiFi Ticket API ──
+Route::prefix('v1/hospitality')->middleware(['throttle:120,1'])->group(function () {
+    Route::post('/ticket', [\App\Http\Controllers\Api\HospitalityApiController::class, 'generateTicket']);
+    Route::post('/verify-guest', [\App\Http\Controllers\Api\HospitalityApiController::class, 'verifyGuest']);
+    Route::get('/tickets', [\App\Http\Controllers\Api\HospitalityApiController::class, 'listTickets']);
+    Route::post('/ticket/{code}/revoke', [\App\Http\Controllers\Api\HospitalityApiController::class, 'revokeTicket']);
+});
+
+
 
 
 

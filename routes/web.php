@@ -346,6 +346,7 @@ Route::middleware([
         Route::get('/payment-gateways', fn() => redirect()->route('admin.payment-gateways'));
         Route::get('/admin/portal-customizer', \App\Livewire\Admin\CaptivePortalCustomizer::class)->name('admin.portal-customizer');
         Route::get('/admin/captive-portal', fn() => redirect()->route('admin.portal-customizer'))->name('admin.captive-portal');
+        Route::get('/admin/hospitality-pos', \App\Livewire\Admin\HospitalityPosManager::class)->name('admin.hospitality-pos');
 
         // Mikrotik Setup Routes (Redirect old wizard/setup URLs to new Add Router wizard, keep HotspotManager intact)
         Route::prefix('mikrotik-setup')->group(function () {
