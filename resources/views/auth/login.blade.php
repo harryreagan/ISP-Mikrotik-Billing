@@ -706,6 +706,50 @@
     </div>
 </div>
 
+@if(session('google_not_found_email') || ($errors->has('email') && str_contains($errors->first('email'), 'ISP Billing account')))
+    @php
+        $failedEmail = session('google_not_found_email') ?? old('email');
+    @endphp
+    <!-- Account Not Found Modal -->
+    <div id="googleNotFoundModal" style="position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(8px); padding: 20px;">
+        <div style="background: #ffffff; border-radius: 20px; max-width: 440px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); border: 1px solid #e2e8f0; overflow: hidden; animation: popIn 0.25s ease-out;">
+            <div style="padding: 28px 24px 20px; text-align: center;">
+                <div style="width: 64px; height: 64px; border-radius: 18px; background: #fff1f2; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px; border: 1px solid #ffe4e6;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e11d48" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                </div>
+                <h3 style="font-size: 19px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">No ISP Account Found</h3>
+                <p style="font-size: 13.5px; color: #64748b; line-height: 1.5; margin: 0 0 16px;">
+                    We couldn't find an active ISP billing workspace registered with:
+                </p>
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; font-size: 13.5px; font-weight: 700; color: #0f172a; word-break: break-all; margin-bottom: 18px;">
+                    {{ $failedEmail ?: 'your Google email' }}
+                </div>
+                <p style="font-size: 12.5px; color: #94a3b8; line-height: 1.5; margin: 0 0 22px;">
+                    Google sign-in is strictly for verified existing accounts. If you are new to HSmart ISP Billing, please register below or ask your ISP administrator to invite you.
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <a href="{{ route('register') }}" style="display: block; width: 100%; padding: 12px; border-radius: 10px; background: #e11d48; color: #ffffff; font-size: 14px; font-weight: 700; text-decoration: none; text-align: center; box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25);">
+                        Create New ISP Account
+                    </a>
+                    <a href="{{ route('auth.google') }}" style="display: block; width: 100%; padding: 11px; border-radius: 10px; background: #f1f5f9; color: #334155; font-size: 13.5px; font-weight: 600; text-decoration: none; text-align: center; border: 1px solid #cbd5e1;">
+                        Try Another Google Account
+                    </a>
+                    <button type="button" onclick="document.getElementById('googleNotFoundModal').style.display='none'" style="border: none; background: transparent; color: #64748b; font-size: 13px; font-weight: 600; cursor: pointer; padding: 6px;">
+                        Sign In with Password
+                    </button>
+                </div>
+            </div>
+            <div style="background: #f8fafc; padding: 12px; text-align: center; border-top: 1px solid #f1f5f9; font-size: 12px; color: #64748b;">
+                Need help? <a href="tel:+254743606108" style="color: #e11d48; font-weight: 700; text-decoration: none;">Support: +254 743 606 108</a>
+            </div>
+        </div>
+    </div>
+@endif
+
 <script>
     function togglePw() {
         var input = document.getElementById('password');

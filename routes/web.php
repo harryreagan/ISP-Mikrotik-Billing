@@ -286,8 +286,10 @@ Route::post('/auth/request-otp', [\App\Http\Controllers\Auth\CustomAuthControlle
 Route::post('/auth/login-otp', [\App\Http\Controllers\Auth\CustomAuthController::class, 'loginWithOtp'])->name('auth.login-otp');
 Route::post('/auth/forgot-password-otp', [\App\Http\Controllers\Auth\CustomAuthController::class, 'requestForgotPasswordOtp'])->name('auth.forgot-password-otp');
 Route::post('/auth/reset-password-otp', [\App\Http\Controllers\Auth\CustomAuthController::class, 'resetPasswordWithOtp'])->name('auth.reset-password-otp');
+Route::get('/auth/google', [\App\Http\Controllers\Auth\CustomAuthController::class, 'redirectToGoogle']);
 Route::get('/auth/google/redirect', [\App\Http\Controllers\Auth\CustomAuthController::class, 'redirectToGoogle'])->name('auth.google');
 Route::get('/auth/google/callback', [\App\Http\Controllers\Auth\CustomAuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
+Route::get('/auth/google/relay', [\App\Http\Controllers\Auth\CustomAuthController::class, 'handleGoogleRelay'])->name('auth.google.relay');
 
 // HSmart Live Chat Direct Desk Endpoints (Accessible for both authenticated merchants & visitors)
 Route::get('/api/live-chat/messages', [\App\Http\Controllers\IspLiveChatController::class, 'messages'])->name('live-chat.messages');

@@ -334,14 +334,71 @@ class CustomAuthController extends Controller
     /**
      * Redirect to Google OAuth provider.
      */
-    public function redirectToGoogle()
+    public function redirectToGoogle(Request $request)
     {
-        if (empty(config('services.google.client_id')) || empty(config('services.google.client_secret'))) {
+        $origin = $request->getHost();
+        $returnTo = $request->query('return_to', '/dashboard');
+
+        // Centralized Google OAuth via pos.hsmart.co.ke using the single verified API
+        $posAuthUrl = 'https://pos.hsmart.co.ke/auth/google';
+        return redirect("{$posAuthUrl}?origin=" . urlencode($origin) . '&return_to=' . urlencode($returnTo));
+    }
+
+    /**
+     * Handle signed SSO relay from central pos.hsmart.co.ke Google OAuth endpoint.
+     */
+    public function handleGoogleRelay(Request $request)
+    {
+        $email = strtolower(trim((string) $request->query('email')));
+        $googleId = (string) $request->query('google_id');
+        $name = (string) $request->query('name');
+        $timestamp = (int) $request->query('timestamp');
+        $nonce = (string) $request->query('nonce');
+        $sig = (string) $request->query('sig');
+        $returnTo = (string) $request->query('return_to', '/dashboard');
+
+        if (empty($email) || empty($sig) || empty($timestamp) || empty($nonce)) {
             return redirect()->route('login')
-                ->withErrors(['email' => 'Google Sign-In is not yet configured. Please sign in with your email and password.']);
+                ->withErrors(['email' => 'Invalid Google authentication parameters. Please try again.']);
         }
 
-        return Socialite::driver('google')->redirect();
+        // Validate expiration (5 minutes window)
+        if (abs(time() - $timestamp) > 300) {
+            return redirect()->route('login')
+                ->withErrors(['email' => 'Google authentication session expired. Please try again.']);
+        }
+
+        // Validate HMAC signature
+        $secret = config('app.sso_secret') ?: env('ISP_HUB_SECRET', 'HSmart_ISP_SSO_Master_2026!');
+        $expectedSig = hash_hmac('sha256', "{$email}|{$googleId}|{$timestamp}|{$nonce}", $secret);
+
+        if (!hash_equals($expectedSig, $sig)) {
+            return redirect()->route('login')
+                ->withErrors(['email' => 'Google authentication signature verification failed.']);
+        }
+
+        // STRICT CHECK: User must already exist in ISP Billing system!
+        $user = User::where('email', $email)->first();
+
+        if (!$user) {
+            return redirect()->route('login')
+                ->withErrors(['email' => "No ISP Billing account was found for {$email}. Please contact your administrator or create an account."])
+                ->with('google_not_found_email', $email);
+        }
+
+        // Existing user: Link google_id if missing and ensure email marked verified
+        if (empty($user->google_id)) {
+            $user->google_id = $googleId;
+        }
+        if (is_null($user->email_verified_at)) {
+            $user->email_verified_at = now();
+        }
+        $user->save();
+
+        Auth::login($user, true);
+
+        $target = ($returnTo && str_starts_with($returnTo, '/')) ? url($returnTo) : route('dashboard');
+        return redirect()->intended($target);
     }
 
     /**
